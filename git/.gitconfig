@@ -1,0 +1,13 @@
+[user]
+	email = petter_friberg@hotmail.com
+	name = Petter Friberg
+	signingkey = E7A0B74C589E73CF
+
+[alias]
+	up = pull --rebase --autostash
+
+[core]
+	pager = diff-so-fancy | less --tabs=4 -RFX
+
+[push]
+	default = simple
