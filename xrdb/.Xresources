@@ -1,0 +1,18 @@
+!
+! URXVT Terminal config
+!
+URxvt.depth: 32
+URxvt.utf8: true
+URxvt.locale: true
+
+URxvt.urlLauncher: chromium
+
+URxvt*background: black
+URxvt*foreground: #B2B2B2
+URxvt*font: xft:Hack-Regular:style=Regular:size=10:antialias=true
+URxvt*boldfont: xft:Hack-Bold:style=Bold:size=9:antialias=true
+
+! Colors
+! blue
+URxvt*color4: #1818B2
+URxvt*color12: #5454FF
