@@ -5,8 +5,10 @@
 
 [alias]
 	up = pull --rebase --autostash
+	lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
 
 [core]
+	excludesfile = $HOME/.gitignore_global
 	pager = diff-so-fancy | less --tabs=4 -RFX
 
 [push]
