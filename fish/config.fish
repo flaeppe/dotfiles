@@ -47,3 +47,6 @@ end
 
 # Start 'virtualfish'
 eval (python -m virtualfish compat_aliases)
+
+# GPG key
+set -x GPG_TTY (tty)
