@@ -9,8 +9,8 @@ URxvt.urlLauncher: chromium
 
 URxvt*background: black
 URxvt*foreground: #B2B2B2
-URxvt*font: xft:Hack-Regular:style=Regular:size=10:antialias=true
-URxvt*boldfont: xft:Hack-Bold:style=Bold:size=9:antialias=true
+URxvt*font: xft:Hack\ Nerd\ Font\ Mono:style=Regular:size=10:antialias=true
+URxvt*boldfont: xft:Hack\ Nerd\ Font\ Mono:style=Bold:size=9:antialias=true
 
 ! Colors
 ! blue
