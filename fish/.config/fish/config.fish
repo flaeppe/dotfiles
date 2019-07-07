@@ -12,7 +12,7 @@ alias ls='ls -h --color=auto'
 # Starting TMUX on startup, if tmux exists
 # If existing session exists -> attach. Otherwise new tmux session
 # --------------------------------------------------------
-if begin; status --is-interactive; and test -z (echo $TMUX); end
+if begin; test (type -q tmux); and status --is-interactive; and test -z (echo $TMUX); end
     if not test (tmux attach)
         tmux new-session
     end
@@ -41,12 +41,14 @@ set PATH /usr/local/bin/ $PATH
 set -x CHANGELOG_GITHUB_TOKEN ""
 
 # Init pyenv
-if begin; status --is-interactive; and type -f pyenv > /dev/null; end
+if begin; test (type -q pyenv); and status --is-interactive; end
     source (pyenv init -|psub)
 end
 
 # Start 'virtualfish'
-eval (python -m virtualfish compat_aliases)
+if type -q python
+  eval (python -m virtualfish compat_aliases)
+end
 
 # GPG key
 set -x GPG_TTY (tty)
