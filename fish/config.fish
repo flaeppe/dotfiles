@@ -9,6 +9,16 @@ set fish_greeting
 set -gx LSCOLORS gxfxcxdxbxegedabagacad
 alias ls='ls -h --color=auto'
 
+# Starting TMUX on startup, if tmux exists
+# If existing session exists -> attach. Otherwise new tmux session
+# --------------------------------------------------------
+if begin; status --is-interactive; and test -z (echo $TMUX); end
+    if not test (tmux attach)
+        tmux new-session
+    end
+end
+# -------------------------------------------------------
+
 # Enable ssh-agent env variable at startup
 set -x SSH_AUTH_SOCK "$XDG_RUNTIME_DIR/ssh-agent.socket"
 
