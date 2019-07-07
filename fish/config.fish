@@ -1,3 +1,6 @@
+# Disable fish greeting
+set fish_greeting
+
 # -x is --export
 # -U is --universal
 # -g is --global
@@ -9,17 +12,28 @@ alias ls='ls -h --color=auto'
 # Enable ssh-agent env variable at startup
 set -x SSH_AUTH_SOCK "$XDG_RUNTIME_DIR/ssh-agent.socket"
 
-# Configure alias for dotfiles repository
-alias dotfiles='/usr/bin/git --git-dir=$HOME/.cfg/ --work-tree=$HOME'
-
-# Hardware video acceleration
+# Hardware video acceleration (arch only)
 set -x LIBVA_DRIVER_NAME vdpau 
 
-# Fish color
-set fish_color_normal white
-set fish_color_error red
-set fish_color_user brgreen
-set fish_color_host normal
-set fish_color_cwd green
-set fish_color_cwd_root red
-set fish_color_command --bold
+# Variables for 'virtualfish' (virtualenvwrapper for fish)
+set -x WORKON_HOME $HOME/.virtualenvs
+set -x PROJECT_HOME $HOME/repos
+
+set -x PIP_VIRTUALENV_BASE $HOME/.virtualenvs
+
+set -x LC_ALL en_US.UTF-8
+set -x LANG en_US.UTF-8
+set -x LANGUAGE en_US.UTF-8
+
+set PATH /usr/local/bin/ $PATH
+
+# For convenience updating changelogs in repos
+set -x CHANGELOG_GITHUB_TOKEN ""
+
+# Init pyenv
+if begin; status --is-interactive; and type -f pyenv > /dev/null; end
+    source (pyenv init -|psub)
+end
+
+# Start 'virtualfish'
+eval (python -m virtualfish compat_aliases)
