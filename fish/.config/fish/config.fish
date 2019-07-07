@@ -46,7 +46,7 @@ if begin; test (type -q pyenv); and status --is-interactive; end
 end
 
 # Start 'virtualfish'
-if type -q python
+if test (type -q python)
   eval (python -m virtualfish compat_aliases)
 end
 
