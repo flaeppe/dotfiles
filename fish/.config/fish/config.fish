@@ -25,11 +25,8 @@ set -x SSH_AUTH_SOCK "$XDG_RUNTIME_DIR/ssh-agent.socket"
 # Hardware video acceleration (arch only)
 set -x LIBVA_DRIVER_NAME vdpau 
 
-# Variables for 'virtualfish' (virtualenvwrapper for fish)
-set -x WORKON_HOME $HOME/.virtualenvs
-set -x PROJECT_HOME $HOME/repos
-
-set -x PIP_VIRTUALENV_BASE $HOME/.virtualenvs
+# Disable 'activate.fish' auto setting and displaying fish status
+set -x VIRTUAL_ENV_DISABLE_PROMPT 1
 
 set -x LC_ALL en_US.UTF-8
 set -x LANG en_US.UTF-8
@@ -37,17 +34,9 @@ set -x LANGUAGE en_US.UTF-8
 
 set PATH /usr/local/bin/ $PATH
 
-# For convenience updating changelogs in repos
-set -x CHANGELOG_GITHUB_TOKEN ""
-
 # Init pyenv
 if begin; test (type -q pyenv); and status --is-interactive; end
     source (pyenv init -|psub)
-end
-
-# Start 'virtualfish'
-if test (type -q python)
-  eval (python -m virtualfish compat_aliases)
 end
 
 # GPG key
