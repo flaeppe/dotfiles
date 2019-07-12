@@ -34,7 +34,7 @@ function fish_prompt --description 'Write out the prompt'
     # VIRTUALENV
     if set -q VIRTUAL_ENV
         set_color yellow
-        printf '(%s) ' (basename $VIRTUAL_ENV)
+        printf '(%s) ' (basename (dirname $VIRTUAL_ENV))
         set_color normal
     end
     # DOCKER HOST
