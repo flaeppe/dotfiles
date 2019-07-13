@@ -1,4 +1,4 @@
-function man --description "colorise man pages with a wrapper"
+function man --description "Colorise man pages with a wrapper"
     set -x LESS_TERMCAP_mb (set_color green)  # Begin blinking 
     set -x LESS_TERMCAP_md (set_color --bold green)  # Start of bold
     set -x LESS_TERMCAP_me (set_color normal)  # End of all formatting
