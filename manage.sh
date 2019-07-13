@@ -16,9 +16,14 @@ usage() {
 dot__install() {
   [ -z $1 ] && echo "Usage: install [module]" && exit
   [ ! -d "./${1}" ] && echo "ERROR: Module \"${1}\" not found" && exit
-  [ -f "./${1}/.init.sh" ] && "./${1}/.init.sh" || echo "Executing init file failed" && exit 1 
-  stow --ignore '\.init\.sh' $1
+  if [ -f "./${1}/.init.sh" ]; then
+    "./${1}/.init.sh" || echo "ERROR: Executing init file failed" && exit
+  fi
+  stow --ignore '\.init\.sh' --ignore '\.post_install\.sh' $1
   echo "Module \"${1}\" has been successfully installed."
+  if [ -f "./${1}/.post_install.sh" ]; then
+    "./${1}/.post_install.sh" || echo "ERROR: Executing post install file failed" && exit
+  fi
 }
 
 dot() {
