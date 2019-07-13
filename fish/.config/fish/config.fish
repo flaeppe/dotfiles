@@ -7,7 +7,11 @@ set fish_greeting
 
 # Set better color when printing folders
 set -gx LSCOLORS gxfxcxdxbxegedabagacad
-alias ls='ls -h --color=auto'
+set -gx CLICOLOR 1
+
+# Set date format language for ls
+set -x LANG en_US.UTF-8
+alias ls='ls -h'
 
 # Starting TMUX on startup, if tmux exists
 # If existing session exists -> attach. Otherwise new tmux session
@@ -29,7 +33,6 @@ set -x LIBVA_DRIVER_NAME vdpau
 set -x VIRTUAL_ENV_DISABLE_PROMPT 1
 
 set -x LC_ALL en_US.UTF-8
-set -x LANG en_US.UTF-8
 set -x LANGUAGE en_US.UTF-8
 
 set PATH /usr/local/bin/ $PATH
