@@ -1,4 +1,4 @@
-function man --description "Colorise man pages with a wrapper"
+function man --description "Colorised man pages with a wrapper"
     set -x LESS_TERMCAP_mb (set_color green)  # Begin blinking 
     set -x LESS_TERMCAP_md (set_color --bold green)  # Start of bold
     set -x LESS_TERMCAP_me (set_color normal)  # End of all formatting
@@ -7,7 +7,7 @@ function man --description "Colorise man pages with a wrapper"
     set -x LESS_TERMCAP_ue (set_color normal)  # End underline 
     set -x LESS_TERMCAP_us (set_color --underline red)  # Begin underline
 
-    # ANSI "color" excape sequences are output in "raw" form
+    # ANSI "color" escape sequences are output in "raw" form
     set -x LESS "-R"
 
     command man $argv
