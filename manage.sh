@@ -16,7 +16,7 @@ usage() {
 dot__install() {
   [ -z $1 ] && echo "Usage: install [module]" && exit
   [ ! -d "./${1}" ] && echo "ERROR: Module \"${1}\" not found" && exit
-  [ -f "./${1}/.init.sh" ] && "./${1}/.init.sh"
+  [ -f "./${1}/.init.sh" ] && "./${1}/.init.sh" || echo "Executing init file failed" && exit 1 
   stow --ignore '\.init\.sh' $1
   echo "Module \"${1}\" has been successfully installed."
 }
