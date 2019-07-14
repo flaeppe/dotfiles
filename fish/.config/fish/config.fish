@@ -6,12 +6,20 @@ set fish_greeting
 # -g is --global
 
 # Set better color when printing folders
+# BSD
 set -gx LSCOLORS gxfxcxdxbxegedabagacad
+# Linux
+set -gx LS_COLORS 'di=36:ln=35:so=32:pi=33:ex=31:bd=34;46:cd=34;43:su=30;41:sg=30;46:tw=30;42:ow=30;43'
 set -gx CLICOLOR 1
 
 # Set date format language for ls
 set -x LANG en_US.UTF-8
-alias ls='ls -h'
+# TODO: Figure out how this coloring is better controlled by /usr/share/fish/functions/ls.fish
+if [ (uname) = "Darwin" ]
+    alias ls='ls -h'
+else
+    alias ls='ls -h --color=auto'
+end
 
 # Starting TMUX on startup, if tmux exists
 # If existing session exists -> attach. Otherwise new tmux session
