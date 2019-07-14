@@ -13,16 +13,21 @@ usage() {
   exit
 }
 
+fail() {
+  echo "ERROR: $1"
+  exit 1
+}
+
 dot__install() {
   [ -z $1 ] && echo "Usage: install [module]" && exit
-  [ ! -d "./${1}" ] && echo "ERROR: Module \"${1}\" not found" && exit
+  [ ! -d "./${1}" ] && fail "Module \"${1}\" not found"
   if [ -f "./${1}/.init.sh" ]; then
-    "./${1}/.init.sh" || echo "ERROR: Executing init file failed" && exit
+    "./${1}/.init.sh" || fail "Executing init file failed"
   fi
   stow --ignore '\.init\.sh' --ignore '\.post_install\.sh' $1
   echo "Module \"${1}\" has been successfully installed."
   if [ -f "./${1}/.post_install.sh" ]; then
-    "./${1}/.post_install.sh" || echo "ERROR: Executing post install file failed" && exit
+    "./${1}/.post_install.sh" || fail "Executing post install file failed"
   fi
 }
 
