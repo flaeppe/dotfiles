@@ -13,3 +13,5 @@
 
 [push]
 	default = simple
+[pager]
+	show = bat
