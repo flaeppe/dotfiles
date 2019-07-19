@@ -32,7 +32,9 @@ end
 # -------------------------------------------------------
 
 # Enable ssh-agent env variable at startup
-set -x SSH_AUTH_SOCK "$XDG_RUNTIME_DIR/ssh-agent.socket"
+if [ (uname) = "Linux" ]
+    set -x SSH_AUTH_SOCK "$XDG_RUNTIME_DIR/ssh-agent.socket"
+end
 
 # Hardware video acceleration (arch only)
 set -x LIBVA_DRIVER_NAME vdpau 
