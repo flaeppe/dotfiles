@@ -29,6 +29,10 @@ set number
 set noerrorbells
 colorscheme gruvbox
 
+" Use the system clipboard
+let g:clipboard = {'copy': {'+': 'pbcopy', '*': 'pbcopy'}, 'paste': {'+': 'pbpaste', '*': 'pbpaste'}, 'name': 'pbcopy', 'cache_enabled': 0}
+set clipboard+=unnamedplus
+
 " Tab config for different syntaxes
 set tabstop=2 softtabstop=2 expandtab shiftwidth=2 smarttab
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
