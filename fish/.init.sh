@@ -2,7 +2,7 @@
 
 switch (uname)
     case Darwin
-            brew install fish fzf
+            brew install fish fzf ripgrep
     case Linux
             sudo pacman -S --noconfirm --needed fish fzf
     case '*'
