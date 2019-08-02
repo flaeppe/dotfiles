@@ -56,3 +56,6 @@ end
 
 # GPG key
 set -x GPG_TTY (tty)
+
+# FZF stuff
+set -x FZF_DEFAULT_COMMAND "rg --files --hidden --glob '!.git/*'"
