@@ -26,8 +26,9 @@ end
 # Starting TMUX on startup, if tmux exists
 # If existing session exists -> attach. Otherwise new tmux session
 # --------------------------------------------------------
-if begin; test (type -q tmux); and status --is-interactive; and test -z (echo $TMUX); end
-    if not test (tmux attach)
+if begin; type -q tmux; and status --is-interactive; and test -z (echo $TMUX); end
+    tmux attach
+    if test $status -gt 0
         tmux new-session
     end
 end
