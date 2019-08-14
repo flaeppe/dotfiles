@@ -53,11 +53,28 @@ colorscheme gruvbox
 let g:clipboard = {'copy': {'+': 'pbcopy', '*': 'pbcopy'}, 'paste': {'+': 'pbpaste', '*': 'pbpaste'}, 'name': 'pbcopy', 'cache_enabled': 0}
 set clipboard+=unnamedplus
 
+" Whitespace
+fun! TrimWhitespace()
+    let l:save_cursor = getpos('.')
+    %s/\s\+$//e
+    call setpos('.', l:save_cursor)
+endfun
+
 " Tab config for different syntaxes
 set tabstop=2 softtabstop=2 expandtab shiftwidth=2 smarttab
 autocmd FileType yaml setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType vim setlocal ts=8 sts=0 sw=4 expandtab smarttab
 autocmd FileType html setlocal ts=2 sts=2 sw=2 expandtab
 autocmd FileType make setlocal noexpandtab
+
 " Relative line number on by default
 set relativenumber
+
+augroup vimrc
+    " Clean the autogroup
+    autocmd!
+
+    " Trim whitespace
+    autocmd BufWritePost * :call TrimWhitespace()
+
+augroup END
