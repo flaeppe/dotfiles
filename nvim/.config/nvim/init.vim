@@ -56,9 +56,11 @@ set number
 set noerrorbells
 colorscheme gruvbox
 
-" Use the system clipboard
-let g:clipboard = {'copy': {'+': 'pbcopy', '*': 'pbcopy'}, 'paste': {'+': 'pbpaste', '*': 'pbpaste'}, 'name': 'pbcopy', 'cache_enabled': 0}
-set clipboard+=unnamedplus
+if g:os == "Darwin"
+    " Use the system clipboard
+    let g:clipboard = {'copy': {'+': 'pbcopy', '*': 'pbcopy'}, 'paste': {'+': 'pbpaste', '*': 'pbpaste'}, 'name': 'pbcopy', 'cache_enabled': 0}
+    set clipboard+=unnamedplus
+endif
 
 " Whitespace
 fun! TrimWhitespace()
