@@ -6,7 +6,7 @@ switch (uname)
             brew tap universal-ctags/universal-ctags
             brew install --HEAD universal-ctags
     case Linux
-            sudo pacman -S neovim
+            sudo pacman -S neovim ctags
     case '*'
             printf 'ERROR: No installation matching on %s\n' (uname)
             exit 1
