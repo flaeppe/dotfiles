@@ -1,5 +1,12 @@
-" Enable true colors support
-set termguicolors
+" Detect what OS we're running on
+if !exists("g:os")
+    let g:os = substitute(system('uname'), '\n', '', '')
+endif
+
+if g:os == "Darwin"
+    " Enable true colors support
+    set termguicolors
+endif
 
 " Map the leader key to SPACE
 let mapleader="\<SPACE>"
@@ -25,7 +32,7 @@ let g:python_highlight_all = 1
 " Mark which lines have changed
 Plug 'airblade/vim-gitgutter'
 
-" Quick and easy file searching 
+" Quick and easy file searching
 Plug '/usr/local/opt/fzf'
 Plug 'junegunn/fzf.vim'
 
