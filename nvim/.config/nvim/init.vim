@@ -33,7 +33,11 @@ let g:python_highlight_all = 1
 Plug 'airblade/vim-gitgutter'
 
 " Quick and easy file searching
-Plug '/usr/local/opt/fzf'
+if g:os == "Darwin"
+    Plug '/usr/local/opt/fzf'
+else
+    Plug 'junegunn/fzf', { 'dir': '~/.fzf',  'do': './install --all' }
+endif
 Plug 'junegunn/fzf.vim'
 
 " <C-p> to search files
