@@ -48,3 +48,11 @@ URxvt.color245: #928374
 URxvt.color246: #a89984
 URxvt.color248: #bdae93
 URxvt.color250: #d5c4a1
+
+! Copypasta stuff (on CTRL+META+[c|v])
+!
+URxvt.perl-ext-common: clipboard,selection-to-clipboard
+URxvt.*clipboard.copycmd: xclip -i -selection clipboard
+URxvt.*clipboard.pastecmd: xclip -o -selection clipboard
+URxvt.keysym.M-c: perl:clipboard:copy
+URxvt.keysym.M-v: perl:clipboard:paste
