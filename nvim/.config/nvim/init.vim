@@ -11,7 +11,10 @@ endif
 " Map the leader key to SPACE
 let mapleader="\<SPACE>"
 
+
+"""""""""
 " Plugins
+"""""""""
 call plug#begin('~/.vim/plugged')
 
 " Make file browsing easier
@@ -21,13 +24,14 @@ let NERDTreeIgnore = ['\.pyc$', '__pycache__', '\.js.map$',
 
 " Leader + nn for toggling the file browser
 nnoremap <Leader>nn :NERDTreeToggle<CR>
-
 " Show hidden files and folders per default in file browser
 let NERDTreeShowHidden=1
 
 " Extended syntax support
 Plug 'sheerun/vim-polyglot'
 let g:python_highlight_all = 1
+" Dockerfile syntax support
+Plug 'ekalinin/Dockerfile.vim'
 
 " Mark which lines have changed
 Plug 'airblade/vim-gitgutter'
@@ -39,10 +43,8 @@ else
     Plug 'junegunn/fzf', { 'dir': '~/.fzf',  'do': './install --all' }
 endif
 Plug 'junegunn/fzf.vim'
-
 " <C-p> to search files
 nnoremap <silent> <C-p> :Files<CR>
-
 " Buffer and ctag search
 nmap <C-e> :Tags<CR>
 nmap <Leader>f :Rg<Space>
@@ -53,7 +55,10 @@ let g:gutentags_ctags_tagfile = '.tags'
 
 call plug#end()
 
+
+""""""""""
 " Settings
+""""""""""
 set tabstop=4  " Render TABs using this many spaces
 set shiftwidth=4 " Indentation amount for < and > commands
 set number
