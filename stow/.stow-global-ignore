@@ -26,5 +26,5 @@ _darcs
 # ^ See: https://www.gnu.org/software/stow/manual/html_node/Types-And-Syntax-Of-Ignore-Lists.html
 
 # Ignore any of the setup scripts
-\.init*\.sh
-\.post_install*\.sh
+\.init.*\.sh
+\.post_install.*\.sh
