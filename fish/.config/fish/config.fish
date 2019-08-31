@@ -62,3 +62,7 @@ set -x GPG_TTY (tty)
 
 # FZF stuff
 set -x FZF_DEFAULT_COMMAND "rg --files --hidden --glob '!.git/*'"
+
+# Set pyenv root path to default value to avoid anything
+# unexpected if that default would change
+set -x PYENV_ROOT "$HOME/.pyenv"
