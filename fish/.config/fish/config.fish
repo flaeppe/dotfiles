@@ -53,7 +53,7 @@ set -x LANGUAGE en_US.UTF-8
 set PATH /usr/local/bin/ $PATH
 
 # Init pyenv
-if begin; test (type -q pyenv); and status --is-interactive; end
+if begin; type -q pyenv; and status --is-interactive; end
     source (pyenv init -|psub)
 end
 
