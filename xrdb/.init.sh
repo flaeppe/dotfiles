@@ -1,3 +1,3 @@
 #!/usr/bin/env fish
 
-yay -S rxvt-unicode-256xresources
+yay -S --noconfirm --needed rxvt-unicode-256xresources

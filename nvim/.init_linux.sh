@@ -1,3 +1,3 @@
 #!/usr/bin/env fish
 
-sudo pacman -S neovim ctags
+sudo pacman -S --noconfirm --needed neovim ctags
