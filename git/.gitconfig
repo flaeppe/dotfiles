@@ -1,18 +1,18 @@
 [user]
-	email = petter_friberg@hotmail.com
-	name = Petter Friberg
-	signingkey = E7A0B74C589E73CF
+  email = petter_friberg@hotmail.com
+  name = Petter Friberg
+  signingkey = E7A0B74C589E73CF
 
 [alias]
-	up = pull --rebase --autostash
-	lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+  up = pull --rebase --autostash
+  lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
   slog = log --pretty=oneline
 
 [core]
-	excludesfile = ~/.gitignore_global
-	pager = diff-so-fancy | less --tabs=4 -RFX
+  excludesfile = ~/.gitignore_global
+  pager = diff-so-fancy | less --tabs=4 -RFX
 
 [push]
-	default = simple
+  default = simple
 [pager]
-	show = bat
+  show = bat
