@@ -39,8 +39,10 @@ if [ (uname) = "Linux" ]
     set -x SSH_AUTH_SOCK "$XDG_RUNTIME_DIR/ssh-agent.socket"
 end
 
-# Hardware video acceleration (arch only)
-set -x LIBVA_DRIVER_NAME vdpau 
+# Hardware video acceleration
+if [ (uname) = "Linux" ]
+    set -x LIBVA_DRIVER_NAME vdpau
+end
 
 # Disable 'activate.fish' auto setting and displaying fish status
 set -x VIRTUAL_ENV_DISABLE_PROMPT 1
