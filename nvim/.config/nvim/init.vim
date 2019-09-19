@@ -96,3 +96,28 @@ augroup vimrc
     autocmd BufWritePost * :call TrimWhitespace()
 
 augroup END
+
+" FZF floating window support
+let g:fzf_layout = { 'window': 'call FloatingFZF()' }
+function! FloatingFZF()
+  let buf = nvim_create_buf(v:false, v:true)
+  call setbufvar(buf, '&signcolumn', 'no')
+
+  let width = float2nr(&columns - (&columns * 2 / 10))
+  let height = &lines - 3
+  let y = &lines - 3
+  let x = float2nr((&columns - width) / 2)
+
+  let opts = {
+        \ 'relative': 'editor',
+        \ 'row': y,
+        \ 'col': x,
+        \ 'width': width,
+        \ 'height': height
+        \ }
+
+  call nvim_open_win(buf, v:true, opts)
+endfunction
+au FileType fzf set nonu nornu
+" Text and background color of floating window
+highlight NormalFloat cterm=NONE ctermfg=14 ctermbg=0 gui=NONE guifg=#bfbfbf guibg=#1a1a1a
