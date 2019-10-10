@@ -7,6 +7,7 @@
   up = pull --rebase --autostash
   lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
   slog = log --pretty=oneline
+  local = log origin..HEAD --pretty=oneline
 
 [core]
   excludesfile = ~/.gitignore_global
