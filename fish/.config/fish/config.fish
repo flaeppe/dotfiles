@@ -66,3 +66,10 @@ set -x FZF_DEFAULT_COMMAND "rg --files --hidden --glob '!.git/*'"
 # Set pyenv root path to default value to avoid anything
 # unexpected if that default would change
 set -x PYENV_ROOT "$HOME/.pyenv"
+
+# Set SSL backend for curl and compile flags for when compiling it
+if [ (uname) = "Darwin" ]
+    set -x PYCURL_SSL_LIBRARY openssl
+    set -x LDFLAGS -L/usr/local/opt/openssl/lib
+    set -x CPPFLAGS -I/usr/local/opt/openssl/include
+end
