@@ -1,7 +1,7 @@
 [user]
   email = petter_friberg@hotmail.com
   name = Petter Friberg
-	signingkey = F188F74B056474E8
+  signingkey = F188F74B056474E8
 
 [alias]
   up = pull --rebase --autostash
@@ -18,4 +18,4 @@
 [pager]
   show = bat
 [commit]
-	gpgsign = true
+  gpgsign = true
