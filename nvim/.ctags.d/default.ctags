@@ -14,3 +14,7 @@
 --exclude=package.json
 --exclude=tags
 --exclude=vendor
+--exclude=.nox
+--exclude=.tox
+--exclude=\*.egg-info
+--exclude=.pytest_cache
