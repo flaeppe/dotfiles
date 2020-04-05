@@ -122,3 +122,9 @@ endfunction
 au FileType fzf set nonu nornu
 " Text and background color of floating window
 highlight NormalFloat cterm=NONE ctermfg=14 ctermbg=0 gui=NONE guifg=#bfbfbf guibg=#1a1a1a
+
+" Formatters
+" Via: pip install sqlparse
+:command! -range FormatSQL <line1>,<line2>!sqlformat --reindent_aligned --keywords upper --identifiers lower -
+:command! -range FormatJSON <line1>,<line2>!jq .
+source ~/.config/nvim/formatters/xml.vim
