@@ -29,8 +29,13 @@ nnoremap <Leader>nn :NERDTreeToggle<CR>
 let NERDTreeShowHidden=1
 
 " Extended syntax support
-Plug 'sheerun/vim-polyglot'
-let g:python_highlight_all = 1
+" Updating parsers on update is recommended by maintainers
+Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+" A couple of color schemes
+Plug 'christianchiarulli/nvcode-color-schemes.vim'
+" Not sure if we should enable or not..
+" let g:python_highlight_all = 1
+"
 " Dockerfile syntax support
 Plug 'ekalinin/Dockerfile.vim'
 
@@ -53,6 +58,7 @@ nmap <Leader>f :Rg<Space>
 " Incremental tag generation
 Plug 'ludovicchabant/vim-gutentags'
 let g:gutentags_ctags_tagfile = '.tags'
+nnoremap <Leader>gr :GutentagsUpdate!<CR>
 
 call plug#end()
 
@@ -64,10 +70,32 @@ set tabstop=4  " Render TABs using this many spaces
 set shiftwidth=4 " Indentation amount for < and > commands
 set number
 set noerrorbells
+
+" Syntax Highlighting via nvim-treesitter. See:
+" https://github.com/nvim-treesitter/nvim-treesitter
+lua <<EOF
+require'nvim-treesitter.configs'.setup {
+  ensure_installed = "maintained",
+  highlight = {
+    enable = true,
+  },
+}
+EOF
+
+" configure nvcode-color-schemes
+let g:nvcode_termcolors=256
+
+syntax on
 colorscheme gruvbox
 
+" checks if terminal has 24-bit color support
+if (has("termguicolors"))
+    set termguicolors
+    hi LineNr ctermbg=NONE guibg=NONE
+endif
+
+" Use the system clipboard
 if g:os == "Darwin"
-    " Use the system clipboard
     let g:clipboard = {'copy': {'+': 'pbcopy', '*': 'pbcopy'}, 'paste': {'+': 'pbpaste', '*': 'pbpaste'}, 'name': 'pbcopy', 'cache_enabled': 0}
 endif
 set clipboard+=unnamedplus
