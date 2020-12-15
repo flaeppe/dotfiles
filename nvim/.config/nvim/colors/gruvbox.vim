@@ -1021,6 +1021,8 @@ hi! link pythonDot GruvboxFg3
 hi! link pythonConditional GruvboxRed
 hi! link pythonRepeat GruvboxRed
 hi! link pythonDottedName GruvboxGreenBold
+hi! link pythonFunctionKeyword GruvboxYellow
+hi! link pythonClassVar GruvboxOrange
 
 " }}}
 " CSS: {{{
