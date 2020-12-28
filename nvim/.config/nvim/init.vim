@@ -156,3 +156,11 @@ highlight NormalFloat cterm=NONE ctermfg=14 ctermbg=0 gui=NONE guifg=#bfbfbf gui
 :command! -range FormatSQL <line1>,<line2>!sqlformat --reindent_aligned --keywords upper --identifiers lower -
 :command! -range FormatJSON <line1>,<line2>!jq .
 source ~/.config/nvim/formatters/xml.vim
+
+" Disable unused providers
+let g:loaded_python_provider = 0
+let g:loaded_perl_provider = 0
+let g:loaded_ruby_provider = 0
+let g:loaded_node_provider = 0
+" Setup Python 3 interpreter
+let g:python3_host_prog = $HOME.'/.vim/.venv/bin/python3'
