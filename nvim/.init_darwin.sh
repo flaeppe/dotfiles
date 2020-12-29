@@ -4,3 +4,4 @@ brew install --HEAD luajit
 brew install --HEAD neovim
 brew tap universal-ctags/universal-ctags
 brew install universal-ctags
+brew install tree-sitter
