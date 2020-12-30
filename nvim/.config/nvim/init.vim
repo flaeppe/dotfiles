@@ -35,6 +35,13 @@ Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 " (Extended from: Plug 'christianchiarulli/nvcode-color-schemes.vim')
 Plug '~/repos/nvcode-color-schemes.vim'
 
+" Keep using Polyglot, mainly for indentation, until
+" https://github.com/nvim-treesitter/nvim-treesitter/pull/638
+" is merged/fixed
+Plug 'sheerun/vim-polyglot'
+" See: https://github.com/sheerun/vim-polyglot#default-settings
+let g:polyglot_disabled = ['sensible']
+
 " Dockerfile syntax support
 Plug 'ekalinin/Dockerfile.vim'
 
