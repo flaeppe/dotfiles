@@ -34,9 +34,7 @@ Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 " A couple of color schemes
 " (Extended from: Plug 'christianchiarulli/nvcode-color-schemes.vim')
 Plug '~/repos/nvcode-color-schemes.vim'
-" Not sure if we should enable or not..
-" let g:python_highlight_all = 1
-"
+
 " Dockerfile syntax support
 Plug 'ekalinin/Dockerfile.vim'
 
