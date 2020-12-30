@@ -32,7 +32,8 @@ let NERDTreeShowHidden=1
 " Updating parsers on update is recommended by maintainers
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 " A couple of color schemes
-Plug 'christianchiarulli/nvcode-color-schemes.vim'
+" (Extended from: Plug 'christianchiarulli/nvcode-color-schemes.vim')
+Plug '~/repos/nvcode-color-schemes.vim'
 " Not sure if we should enable or not..
 " let g:python_highlight_all = 1
 "
@@ -86,7 +87,7 @@ EOF
 let g:nvcode_termcolors=256
 
 syntax on
-colorscheme gruvbox
+colorscheme gruvbox2
 
 " checks if terminal has 24-bit color support
 if (has("termguicolors"))
