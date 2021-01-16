@@ -59,14 +59,15 @@ endif
 Plug 'junegunn/fzf.vim'
 " <C-p> to search files
 nnoremap <silent> <C-p> :Files<CR>
-" Buffer and ctag search
-nmap <C-e> :Tags<CR>
-nmap <Leader>f :Rg<Space>
 
 " Incremental tag generation
 Plug 'ludovicchabant/vim-gutentags'
 let g:gutentags_ctags_tagfile = '.tags'
 nnoremap <Leader>gr :GutentagsUpdate!<CR>
+
+" Buffer and ctag search
+nmap <C-e> :Tags<CR>
+nmap <Leader>f :Rg<Space>
 
 call plug#end()
 
