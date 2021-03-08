@@ -31,6 +31,7 @@ let NERDTreeShowHidden=1
 " Extended syntax support
 " Updating parsers on update is recommended by maintainers
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
+Plug 'nvim-treesitter/playground'
 " A couple of color schemes
 " (Extended from: Plug 'christianchiarulli/nvcode-color-schemes.vim')
 Plug '~/repos/nvcode-color-schemes.vim'
@@ -87,6 +88,12 @@ require'nvim-treesitter.configs'.setup {
   ensure_installed = "maintained",
   highlight = {
     enable = true,
+  },
+  playground = {
+    enable = true,
+    disable = {},
+    updatetime = 25, -- Debounced time for highlighting nodes in the playground from source code
+    persist_queries = false -- Whether the query persists across vim sessions
   },
 }
 EOF
