@@ -70,6 +70,9 @@ nnoremap <Leader>gr :GutentagsUpdate!<CR>
 nmap <C-e> :Tags<CR>
 nmap <Leader>f :Rg<Space>
 
+" Syntax highlightning for just
+Plug 'NoahTheDuke/vim-just'
+
 call plug#end()
 
 

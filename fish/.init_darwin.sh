@@ -1,3 +1,3 @@
 #!/usr/bin/env fish
 
-brew install fish fzf ripgrep
+brew install fish fzf ripgrep just
