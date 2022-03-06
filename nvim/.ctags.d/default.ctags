@@ -13,6 +13,7 @@
 --exclude=package-lock.json
 --exclude=package.json
 --exclude=tags
+--exclude=.tags
 --exclude=vendor
 --exclude=.nox
 --exclude=.tox

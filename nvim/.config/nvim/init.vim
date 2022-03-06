@@ -21,7 +21,8 @@ call plug#begin('~/.vim/plugged')
 Plug 'scrooloose/nerdtree', { 'on': 'NERDTreeToggle' }
 let NERDTreeIgnore = ['\.pyc$', '__pycache__', '\.js.map$',
                     \ '\.DS_STORE', 'venv', '\.mypy_cache',
-                    \ '\.pytest_cache', '\.nox', '\.egg-info$']
+                    \ '\.pytest_cache', '\.nox', '\.egg-info$',
+                    \ '\.tags']
 
 " Leader + nn for toggling the file browser
 nnoremap <Leader>nn :NERDTreeToggle<CR>
