@@ -73,3 +73,6 @@ if [ (uname) = "Darwin" ]
     set -x LDFLAGS -L/usr/local/opt/openssl/lib
     set -x CPPFLAGS -I/usr/local/opt/openssl/include
 end
+
+# Enable fzf integration for enhanced autocompletion of cheat
+set -x CHEAT_USE_FZF true
