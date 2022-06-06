@@ -21,3 +21,5 @@
   show = bat
 [commit]
   gpgsign = true
+[init]
+	defaultBranch = main
