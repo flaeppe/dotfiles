@@ -1,25 +1,61 @@
+;; User
 [user]
   email = petter_friberg@hotmail.com
   name = Petter Friberg
   signingkey = F188F74B056474E8
 
+;; Core
+[core]
+  excludesfile = ~/.gitignore_global
+  pager = diff-so-fancy | less --tabs=4 -RFX
+[init]
+	defaultBranch = main
+[pager]
+  show = bat
+
+;; Core -- UI
+[color]
+	ui = auto
+
+;; Core commands -- status
+[status]
+  showStash = true
+
+;; Core commands -- network
+[push]
+  default = simple
+[pull]
+  ff = only
+
+;; Core commands -- diff
+[diff]
+  colorMoved = true
+  colorMovedWS = allow-indentation-change
+
+;; Core commands -- rebase
+[rebase]
+  ;; Show stat output on rebase to show what changed
+  stat = true
+
+  ;; Be more verbose than the default "ignore" about potentially
+  ;; dropping data.
+  missingCommitsCheck = warn
+
+  ;; When using 'git rebase -i --exec "make test"' I want the
+  ;; "make test" to run again on "git rebase --continue", the
+  ;; default behaviour is to omit it.
+  rescheduleFailedExec = true
+
+;; Core commands -- [creating] objects
+[commit]
+  verbose = true
+  gpgsign = true
+[tag]
+  sort = version:refname
+
+;; Aliases
 [alias]
   up = pull --rebase --autostash
   lg = log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
   slog = log --pretty=oneline
   local = log origin..HEAD --pretty=oneline
-
-[core]
-  excludesfile = ~/.gitignore_global
-  pager = diff-so-fancy | less --tabs=4 -RFX
-
-[push]
-  default = simple
-[pull]
-  ff = only
-[pager]
-  show = bat
-[commit]
-  gpgsign = true
-[init]
-	defaultBranch = main
