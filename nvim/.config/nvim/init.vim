@@ -51,6 +51,9 @@ Plug 'ekalinin/Dockerfile.vim'
 
 " Mark which lines have changed
 Plug 'airblade/vim-gitgutter'
+" difftool for git (https://github.com/sindrets/diffview.nvim)
+Plug 'nvim-lua/plenary.nvim'
+Plug 'sindrets/diffview.nvim'
 
 " Quick and easy file searching
 if g:os == "Darwin"
@@ -196,3 +199,12 @@ set statusline+=%=  " right align remainder
 set statusline+=0x%-8B  " character value
 set statusline+=%-14(%l,%c%V%)  " line, character
 set statusline+=%<%P  " file position
+
+" config for 'sindrets/diffview.nvim'
+lua <<EOF
+local actions = require("diffview.actions")
+
+require("diffview").setup({
+  use_icons = false,  -- Requires nvim-wev-devicons
+})
+EOF
