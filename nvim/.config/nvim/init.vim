@@ -76,6 +76,16 @@ nmap <Leader>f :Rg<Space>
 " Syntax highlightning for just
 Plug 'NoahTheDuke/vim-just'
 
+" Custom Timelog plugin
+Plug '~/repos/timelog-vim'
+nnoremap <Leader>tn :TimelogNewTask<CR>
+nnoremap <Leader>te :TimelogEndTask<CR>
+nnoremap <Leader>td :TimelogCalculateSessionDuration<CR>
+nnoremap <Leader>ts :TimelogSummarise<CR>
+nnoremap <Leader>tjp :TimelogJumpToProject<CR>
+nnoremap <Leader>tjt :TimelogJumpToTask<CR>
+nnoremap <Leader>tje :TimelogJumpToEndTime<CR>
+
 call plug#end()
 
 
