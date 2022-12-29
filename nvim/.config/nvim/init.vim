@@ -200,6 +200,9 @@ set statusline+=0x%-8B  " character value
 set statusline+=%-14(%l,%c%V%)  " line, character
 set statusline+=%<%P  " file position
 
+" Disable mouse (:help default-mouse)
+set mouse=
+
 " config for 'sindrets/diffview.nvim'
 lua <<EOF
 local actions = require("diffview.actions")
