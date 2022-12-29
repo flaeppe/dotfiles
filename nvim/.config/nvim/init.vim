@@ -108,6 +108,9 @@ EOF
 " configure nvcode-color-schemes
 let g:nvcode_termcolors=256
 
+" /vim-python/python-syntax (treesitter) -- enable all syntax highlightning
+let g:python_highlight_all = 1
+
 syntax on
 colorscheme gruvbox2
 
