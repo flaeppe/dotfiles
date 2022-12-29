@@ -33,9 +33,8 @@ let NERDTreeShowHidden=1
 " Updating parsers on update is recommended by maintainers
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 Plug 'nvim-treesitter/playground'
-" A couple of color schemes
-" (Extended from: Plug 'christianchiarulli/nvcode-color-schemes.vim')
-Plug '~/repos/nvcode-color-schemes.vim'
+" Gruvbox color scheme
+Plug 'luisiacc/gruvbox-baby', {'branch': 'main'}
 
 " Keep using Polyglot, mainly for indentation, until
 " https://github.com/nvim-treesitter/nvim-treesitter/pull/638
@@ -112,7 +111,26 @@ let g:nvcode_termcolors=256
 let g:python_highlight_all = 1
 
 syntax on
-colorscheme gruvbox2
+
+" Set colorscheme
+" See: https://github.com/luisiacc/gruvbox-baby
+lua <<EOF
+local colors = require("gruvbox-baby.colors").config()
+vim.g.gruvbox_baby_function_style = "NONE"
+vim.g.gruvbox_baby_highlights = {
+    Todo = {fg = colors.gray, bg = colors.medium_gray, style = "bold"},
+    TSOperator = {fg = colors.red},
+    TSConstant = {fg = colors.pink},
+    TSConstBuiltin = {fg = colors.magenta},
+    TSFuncBuiltin = {fg = colors.magenta},
+    -- Color when decorating (Python) --
+    -- See: https://github.com/luisiacc/gruvbox-baby/issues/51 --
+    PreProc = {fg = colors.orange, style = "NONE"},
+    pythonDecorator = {fg = colors.orange},
+}
+vim.cmd[[colorscheme gruvbox-baby]]
+EOF
+
 
 " checks if terminal has 24-bit color support
 if (has("termguicolors"))
