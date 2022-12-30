@@ -121,6 +121,8 @@ vim.g.gruvbox_baby_highlights = {
     -- PreProc = {fg = colors.orange, style = "NONE"},
     -- pythonDecorator = {fg = colors.orange},
     TSAttribute = {fg = colors.orange},
+    -- Color for 'gitgutter'
+    GitGutterAdd = {fg = colors.soft_green},
 }
 
 -- 'gitcommit' language highlights
@@ -135,7 +137,7 @@ vim.api.nvim_set_hl(0, "@constant.diff", { fg = colors.pink })  -- commit
 vim.api.nvim_set_hl(0, "@attribute.diff", { fg = colors.forest_green })  -- location
 vim.api.nvim_set_hl(0, "@function.diff", { fg = colors.foreground, bold = true })  -- command
 vim.api.nvim_set_hl(0, "@text.diff.add", { fg = colors.soft_green })  -- addition, new_file
-vim.api.nvim_set_hl(0, "@text.diff.delete", { fg = colors.red })  -- deletion, old_file
+vim.api.nvim_set_hl(0, "@text.diff.delete", { fg = colors.error_red })  -- deletion, old_file
 
 vim.cmd[[colorscheme gruvbox-baby]]
 EOF
