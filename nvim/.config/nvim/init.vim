@@ -33,7 +33,7 @@ let NERDTreeShowHidden=1
 " Updating parsers on update is recommended by maintainers
 Plug 'nvim-treesitter/nvim-treesitter', {'do': ':TSUpdate'}
 Plug 'nvim-treesitter/playground'
-" Gruvbox color scheme
+" Gruvbox color scheme, for tree-sitter
 Plug 'luisiacc/gruvbox-baby', {'branch': 'main'}
 
 " Mark which lines have changed
@@ -105,6 +105,7 @@ EOF
 " configure nvcode-color-schemes
 let g:nvcode_termcolors=256
 
+" Force no nvim syntax, in favor of tree-sitter
 syntax off
 
 " Set colorscheme
