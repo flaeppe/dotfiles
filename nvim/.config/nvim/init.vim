@@ -36,9 +36,6 @@ Plug 'nvim-treesitter/playground'
 " Gruvbox color scheme
 Plug 'luisiacc/gruvbox-baby', {'branch': 'main'}
 
-" Dockerfile syntax support
-Plug 'ekalinin/Dockerfile.vim'
-
 " Mark which lines have changed
 Plug 'airblade/vim-gitgutter'
 " difftool for git (https://github.com/sindrets/diffview.nvim)
