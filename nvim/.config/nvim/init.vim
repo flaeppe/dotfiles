@@ -36,15 +36,6 @@ Plug 'nvim-treesitter/playground'
 " Gruvbox color scheme
 Plug 'luisiacc/gruvbox-baby', {'branch': 'main'}
 
-" Keep using Polyglot, mainly for indentation, until
-" https://github.com/nvim-treesitter/nvim-treesitter/pull/638
-" is merged/fixed
-" UPDATE: Seems there's more to it. Some "open" function calls misplaces
-" closing parenthesis (Python)
-Plug 'sheerun/vim-polyglot'
-" See: https://github.com/sheerun/vim-polyglot#default-settings
-let g:polyglot_disabled = ['sensible']
-
 " Dockerfile syntax support
 Plug 'ekalinin/Dockerfile.vim'
 
