@@ -102,8 +102,8 @@ EOF
 " configure nvcode-color-schemes
 let g:nvcode_termcolors=256
 
-" Force no nvim syntax, in favor of tree-sitter
-syntax off
+" Enable syntax highlightning
+syntax on
 
 " Set colorscheme
 " See: https://github.com/luisiacc/gruvbox-baby
