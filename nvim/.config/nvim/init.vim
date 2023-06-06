@@ -41,8 +41,6 @@ Plug 'airblade/vim-gitgutter'
 " difftool for git (https://github.com/sindrets/diffview.nvim)
 Plug 'nvim-lua/plenary.nvim'
 Plug 'sindrets/diffview.nvim'
-" icons for diffview
-Plug 'nvim-tree/nvim-web-devicons'
 
 " Quick and easy file searching
 if g:os == "Darwin"
