@@ -7,6 +7,9 @@
     packages = with pkgs; [
       jq
     ];
+    sessionVariables = {
+      EDITOR = "nvim";
+    };
     stateVersion = "23.11";
   };
 
