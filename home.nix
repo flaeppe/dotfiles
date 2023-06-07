@@ -30,6 +30,12 @@
       };
     };
 
+    fzf = {
+      enable = true;
+      enableFishIntegration = false;
+      defaultCommand = "rg --files --hidden --glob '!.git/*'";
+    };
+
     gh = {
       enable = true;
       settings = {

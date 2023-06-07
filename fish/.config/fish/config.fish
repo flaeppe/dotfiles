@@ -62,6 +62,7 @@ end
 set -x GPG_TTY (tty)
 
 # FZF stuff
+# TODO: Remove once fish is maintained by Home Manager(?)
 set -x FZF_DEFAULT_COMMAND "rg --files --hidden --glob '!.git/*'"
 
 # Set pyenv root path to default value to avoid anything
