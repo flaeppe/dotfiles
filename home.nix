@@ -27,6 +27,33 @@
       };
     };
 
+    tmux = {
+      enable = true;
+      # Set default shell for tmux
+      # TODO: shell = "{pkgs.fish}/bin/fish"; or something..
+      shell = "/usr/local/bin/fish";
+      # Make tmux able to show coloring (i.e. for fish)
+      # MUST map with $TERM variable
+      terminal = "screen-256color";
+      # Set window indexing, starting from 1 instead of 0.
+      # Helps with keybindings for quickswitch between windows.
+      baseIndex = 1;
+      # Set vim bindings
+      keyMode = "vi";
+      # Set escape time. (Taken from healthcheck advice)
+      # See: https://github.com/neovim/neovim/wiki/FAQ#esc-in-tmux-or-gnu-screen-is-delayed
+      escapeTime = 10;
+
+      extraConfig = (
+        # Order sessions by name
+        "bind s choose-tree -sZ -O name\n" +
+        # Turn on focus events to support (vim) autoread
+        "set-option -g focus-events on\n" +
+        # Set RGB capability (taken from healthcheck advice)
+        "set-option -sa terminal-overrides ',xterm-256color:RGB'\n"
+      );
+    };
+
     home-manager.enable = true;
   };
 }
