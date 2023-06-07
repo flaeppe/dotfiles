@@ -112,15 +112,13 @@ local colors = require("gruvbox-baby.colors").config()
 vim.g.gruvbox_baby_function_style = "NONE"
 vim.g.gruvbox_baby_highlights = {
     Todo = {fg = colors.gray, bg = colors.medium_gray, style = "bold"},
-    TSOperator = {fg = colors.red},
-    TSConstant = {fg = colors.pink},
-    TSConstBuiltin = {fg = colors.magenta},
-    TSFuncBuiltin = {fg = colors.magenta},
-    -- Color when decorating (Python)
-    -- See: https://github.com/luisiacc/gruvbox-baby/issues/51
-    -- PreProc = {fg = colors.orange, style = "NONE"},
-    -- pythonDecorator = {fg = colors.orange},
-    TSAttribute = {fg = colors.orange},
+    ["@operator"] = {fg = colors.red},
+    ["@constant"] = {fg = colors.pink},
+    ["@definition.constant"] = {fg = colors.pink},
+    ["@constant.builtin"] = {fg = colors.magenta},
+    ["@func.builtin"] = {fg = colors.magenta},
+    ["@function.builtin"] = {fg = colors.magenta},
+    ["@type.builtin"] = {fg = colors.magenta},
     -- Color for 'gitgutter'
     GitGutterAdd = {fg = colors.soft_green},
 }
