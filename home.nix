@@ -27,6 +27,16 @@
       };
     };
 
+    gh = {
+      enable = true;
+      settings = {
+        aliases = {
+          co = "pr checkout";
+        };
+        git_protocol = "ssh";
+      };
+    };
+
     tmux = {
       enable = true;
       # Set default shell for tmux
