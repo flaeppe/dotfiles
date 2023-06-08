@@ -51,8 +51,6 @@ set -x VIRTUAL_ENV_DISABLE_PROMPT 1
 set -x LC_ALL en_US.UTF-8
 set -x LANGUAGE en_US.UTF-8
 
-set PATH /usr/local/bin/ $PATH
-
 # Init pyenv
 if begin; type -q pyenv; and status --is-interactive; end
     source (pyenv init -|psub)
