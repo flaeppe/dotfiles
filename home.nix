@@ -5,7 +5,12 @@
     username = "ludo";
     homeDirectory = "/Users/ludo";
     packages = with pkgs; [
+      fd
+      htop
       jq
+      less
+      ripgrep
+      tree-sitter
     ];
     sessionVariables = {
       EDITOR = "nvim";
