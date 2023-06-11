@@ -1,5 +1,14 @@
 { config, pkgs, ... }:
 
+let
+  gruvboxBaby = pkgs.fetchFromGitHub {
+    owner = "luisiacc";
+    repo = "gruvbox-baby";
+    rev = "71cbfd16f721a0119425786085e418eb7c7d6dac";
+    sha256 = "vNscOzDglpI2RGK+fci/rsn4wWh9SCxRZv8g9TJyPvc=";
+  };
+in
+
 {
   programs = {
     neovim = {
@@ -104,7 +113,42 @@
         # Nvim tree-sitter playground
         playground
         # Gruvbox color scheme, for tree-sitter
-        # gruvbox-baby
+        {
+          plugin = gruvboxBaby;
+          type = "lua";
+          config = ''
+            local colors = require("gruvbox-baby.colors").config()
+            vim.g.gruvbox_baby_function_style = "NONE"
+            vim.g.gruvbox_baby_highlights = {
+                Todo = {fg = colors.gray, bg = colors.medium_gray, style = "bold"},
+                ["@operator"] = {fg = colors.red},
+                ["@constant"] = {fg = colors.pink},
+                ["@definition.constant"] = {fg = colors.pink},
+                ["@constant.builtin"] = {fg = colors.magenta},
+                ["@func.builtin"] = {fg = colors.magenta},
+                ["@function.builtin"] = {fg = colors.magenta},
+                ["@type.builtin"] = {fg = colors.magenta},
+                -- Color for 'gitgutter'
+                GitGutterAdd = {fg = colors.soft_green},
+            }
+
+            -- 'gitcommit' language highlights
+            vim.api.nvim_set_hl(0, "@text.gitcommit", { fg = colors.comment })  -- text
+            vim.api.nvim_set_hl(0, "@text.title.gitcommit", { fg = colors.foreground })  -- title
+            vim.api.nvim_set_hl(0, "@spell.gitcommit", { fg = colors.soft_yellow })  -- message,
+            vim.api.nvim_set_hl(0, "@text.reference.gitcommit", { fg = colors.pink, bold = true })  -- branch
+            vim.api.nvim_set_hl(0, "@text.uri.gitcommit", { fg = colors.light_blue })  -- filepath
+            vim.api.nvim_set_hl(0, "@keyword.gitcommit", { fg = colors.orange })  -- change
+            -- 'diff' language highlights (injected by 'gitcommit')
+            vim.api.nvim_set_hl(0, "@constant.diff", { fg = colors.pink })  -- commit
+            vim.api.nvim_set_hl(0, "@attribute.diff", { fg = colors.forest_green })  -- location
+            vim.api.nvim_set_hl(0, "@function.diff", { fg = colors.foreground, bold = true })  -- command
+            vim.api.nvim_set_hl(0, "@text.diff.add", { fg = colors.soft_green })  -- addition, new_file
+            vim.api.nvim_set_hl(0, "@text.diff.delete", { fg = colors.error_red })  -- deletion, old_file
+
+            vim.cmd[[colorscheme gruvbox-baby]]
+          '';
+        }
         # Mark which lines have changed
         vim-gitgutter
         # Quick and easy file searching
