@@ -22,6 +22,8 @@
       LANGUAGE = "en_US.UTF-8";
     };
     stateVersion = "23.11";
+    # Setup default tags for universal-ctags
+    file.".ctags.d/.default.ctags".source = ./nvim/.ctags.d/default.ctags;
   };
 
   imports = [
