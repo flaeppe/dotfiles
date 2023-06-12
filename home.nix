@@ -11,6 +11,7 @@
       less
       ripgrep
       tree-sitter
+      universal-ctags
     ];
     sessionVariables = {
       EDITOR = "nvim";
@@ -24,7 +25,7 @@
     };
     stateVersion = "23.11";
     # Setup default tags for universal-ctags
-    file.".ctags.d/.default.ctags".source = ./nvim/.ctags.d/default.ctags;
+    file.".ctags.d/default.ctags".source = ./nvim/.ctags.d/default.ctags;
   };
 
   imports = [
