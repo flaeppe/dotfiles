@@ -14,9 +14,6 @@
       system = "x86_64-darwin";
       pkgs = nixpkgs.legacyPackages.${system};
     in {
-      packages = {
-        ctags = pkgs.universal-ctags;
-      };
       homeConfigurations.ludo = home-manager.lib.homeManagerConfiguration {
         inherit pkgs;
 
