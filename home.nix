@@ -16,6 +16,7 @@
       EDITOR = "nvim";
       # Set better color when printing folders
       LSCOLORS = "gxfxcxdxbxegedabagacad";
+      CLICOLOR = 1;
       # Set date format language for ls
       LANG = "en_US.UTF-8";
       LC_ALL = "en_US.UTF-8";
