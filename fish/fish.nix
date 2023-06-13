@@ -1,6 +1,6 @@
 {
   # Fish completions, as there's no available config we do this manually
-  xdg.configFile."fish/completions/workon.fish".source = ./fish/.config/fish/completions/workon.fish;
+  xdg.configFile."fish/completions/workon.fish".source = ./completions/workon.fish;
 
   programs = {
     fish = {
@@ -45,7 +45,7 @@
         fish_prompt = {
           description = "Write out the prompt";
           body = ''
-            ${builtins.readFile ./fish_prompt.fish}
+            ${builtins.readFile ./functions/fish_prompt.fish}
           '';
         };
         fish_user_key_bindings = {
@@ -80,7 +80,7 @@
         workon = {
           description = "Moves you to the project directory and activates the associated virtualenv, if any found";
           body = ''
-            ${builtins.readFile ./workon.fish}
+            ${builtins.readFile ./functions/workon.fish}
           '';
         };
       };
