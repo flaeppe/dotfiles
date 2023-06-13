@@ -26,6 +26,8 @@
     stateVersion = "23.11";
     # Setup default tags for universal-ctags
     file.".ctags.d/default.ctags".source = ./nvim/.ctags.d/default.ctags;
+    # Add configuration for gpg-agent
+    file.".gnupg/gpg-agent.conf".source = ./gnupg/gpg-agent.conf;
   };
 
   imports = [
@@ -67,6 +69,10 @@
         };
         git_protocol = "ssh";
       };
+    };
+
+    gpg = {
+      enable = true;
     };
 
     tmux = {
