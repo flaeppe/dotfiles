@@ -30,8 +30,8 @@
 
   imports = [
     ./git.nix
-    ./fish.nix
-    ./nvim.nix
+    ./fish/fish.nix
+    ./nvim/nvim.nix
   ];
 
   programs = {
