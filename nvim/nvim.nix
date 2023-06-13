@@ -10,6 +10,9 @@ let
 in
 
 {
+  # XML formatter for vim
+  xdg.configFile."nvim/formatters/xml.vim".source = ./formatters/xml.vim;
+
   programs = {
     neovim = {
       enable = true;
@@ -50,6 +53,7 @@ in
         " Formatters
         :command! -range FormatJSON <line1>,<line2>!jq .
         :command! -range FormatSQL <line1>,<line2>!sqlformat --reindent_aligned --keywords upper --identifiers lower -
+        source ~/.config/nvim/formatters/xml.vim
         " Disable unused providers
         let g:loaded_perl_provider = 0
         " Status line
