@@ -69,6 +69,9 @@
         ".tags"
         ".nvimlog"
         "_private/"
+        # direnv, where local project configuration resides
+        ".envrc"
+        ".direnv/"
       ];
 
       aliases = {
