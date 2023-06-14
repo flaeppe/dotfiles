@@ -29,7 +29,7 @@ __fish_hg_prompt
 echo
 # NIX
 if test -n "$IN_NIX_SHELL"
-  set_color green
+  set_color cyan
   printf '<nix-shell> '
   set_color normal
 end
