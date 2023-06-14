@@ -6,7 +6,7 @@
     fish = {
       enable = true;
       shellAliases = {
-        ls = "ls -h";
+        ls = "ls -h --color=auto";
       };
       # TODO: Move stuff to sessionVariables?
       # TODO: Get rid of pyenv
