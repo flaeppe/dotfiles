@@ -19,7 +19,7 @@ function! DoFormatXML() range
 	endif
 
 	" Remove XML header
-	exe ':' . a:firstline . ',' . a:lastline . 's/<\?xml\\_.*\?>\\_s*//e'
+	exe ':' . a:firstline . ',' . a:lastline . "s/<\?xml\\_.*\?>\\_s*//e"
 
 	" Recalculate last line of the edited code
 	let l:newLastLine=search('</PrettyXML>')
