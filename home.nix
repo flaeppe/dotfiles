@@ -30,11 +30,7 @@
     file.".gnupg/gpg-agent.conf".source = ./gnupg/gpg-agent.conf;
   };
 
-  imports = [
-    ./git.nix
-    ./fish/fish.nix
-    ./nvim/nvim.nix
-  ];
+  imports = [ ./git.nix ./fish/fish.nix ./nvim/nvim.nix ];
 
   programs = {
     home-manager.enable = true;
@@ -46,12 +42,13 @@
         map-syntax = [ ".ignore:.gitignore" ];
       };
       themes = {
-        OneHalfDark = builtins.readFile (pkgs.fetchFromGitHub {
-          owner = "sonph";
-          repo = "onehalf";
-          rev = "75eb2e97acd74660779fed8380989ee7891eec56";
-          sha256 = "F5gbDtGD2QBDGZOjr/OCJJlyQgxvQTsy8IoNNAjnDzQ=";
-        } + "/sublimetext/OneHalfDark.tmTheme");
+        OneHalfDark = builtins.readFile (pkgs.fetchFromGitHub
+          {
+            owner = "sonph";
+            repo = "onehalf";
+            rev = "75eb2e97acd74660779fed8380989ee7891eec56";
+            sha256 = "F5gbDtGD2QBDGZOjr/OCJJlyQgxvQTsy8IoNNAjnDzQ=";
+          } + "/sublimetext/OneHalfDark.tmTheme");
       };
     };
 
@@ -69,16 +66,12 @@
     gh = {
       enable = true;
       settings = {
-        aliases = {
-          co = "pr checkout";
-        };
+        aliases = { co = "pr checkout"; };
         git_protocol = "ssh";
       };
     };
 
-    gpg = {
-      enable = true;
-    };
+    gpg = { enable = true; };
 
     tmux = {
       enable = true;
@@ -98,11 +91,17 @@
 
       extraConfig = (
         # Order sessions by name
-        "bind s choose-tree -sZ -O name\n" +
+        ''
+          bind s choose-tree -sZ -O name
+        '' +
         # Turn on focus events to support (vim) autoread
-        "set-option -g focus-events on\n" +
+        ''
+          set-option -g focus-events on
+        '' +
         # Set RGB capability (taken from healthcheck advice)
-        "set-option -sa terminal-overrides ',xterm-256color:RGB'\n"
+        ''
+          set-option -sa terminal-overrides ',xterm-256color:RGB'
+        ''
       );
     };
   };

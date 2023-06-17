@@ -29,9 +29,9 @@ __fish_hg_prompt
 echo
 # NIX
 if test -n "$IN_NIX_SHELL"
-  set_color cyan
-  printf '<nix-shell> '
-  set_color normal
+    set_color cyan
+    printf '<nix-shell> '
+    set_color normal
 end
 # VIRTUALENV
 if set -q VIRTUAL_ENV

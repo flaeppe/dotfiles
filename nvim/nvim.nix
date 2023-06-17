@@ -76,19 +76,19 @@ in
           plugin = nerdtree;
           type = "viml";
           config = ''
-           " Enable true colors support
-            set termguicolors
-            hi LineNr ctermbg=NONE guibg=NONE
-            " Map the leader key to SPACE
-            let mapleader="\<SPACE>"
-            let NERDTreeIgnore = ['\.pyc$', '__pycache__', '\.js.map$',
-                                \ '\.DS_STORE', 'venv', '\.mypy_cache',
-                                \ '\.pytest_cache', '\.nox', '\.egg-info$',
-                                \ '\.tags']
-            " Leader + nn for toggling the file browser
-            nnoremap <Leader>nn :NERDTreeToggle<CR>
-            " Show hidden files and folders per default in file browser
-            let NERDTreeShowHidden=1
+            " Enable true colors support
+             set termguicolors
+             hi LineNr ctermbg=NONE guibg=NONE
+             " Map the leader key to SPACE
+             let mapleader="\<SPACE>"
+             let NERDTreeIgnore = ['\.pyc$', '__pycache__', '\.js.map$',
+                                 \ '\.DS_STORE', 'venv', '\.mypy_cache',
+                                 \ '\.pytest_cache', '\.nox', '\.egg-info$',
+                                 \ '\.tags']
+             " Leader + nn for toggling the file browser
+             nnoremap <Leader>nn :NERDTreeToggle<CR>
+             " Show hidden files and folders per default in file browser
+             let NERDTreeShowHidden=1
           '';
         }
         {
