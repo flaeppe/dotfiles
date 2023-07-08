@@ -4,6 +4,14 @@
   home = {
     username = "ludo";
     homeDirectory = "/Users/ludo";
+    language = {
+      base = "en_US.UTF-8";
+      collate = "C";
+      ctype = "en_US.UTF-8";
+      messages = "en_US.UTF-8";
+      monetary = "sv_SE.UTF-8";
+      time = "en_US.UTF-8";
+    };
     packages = with pkgs; [
       curl
       fd
@@ -22,8 +30,6 @@
       CLICOLOR = 1;
       # Set date format language for ls
       LANG = "en_US.UTF-8";
-      LC_ALL = "en_US.UTF-8";
-      LANGUAGE = "en_US.UTF-8";
     };
     stateVersion = "23.11";
     # Setup default tags for universal-ctags
