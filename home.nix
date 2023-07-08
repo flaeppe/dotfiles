@@ -13,6 +13,7 @@
       time = "en_US.UTF-8";
     };
     packages = with pkgs; [
+      coreutils
       curl
       fd
       htop
