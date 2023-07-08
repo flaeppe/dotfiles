@@ -5,8 +5,10 @@
     username = "ludo";
     homeDirectory = "/Users/ludo";
     packages = with pkgs; [
+      curl
       fd
       htop
+      git-crypt
       jq
       less
       ripgrep
