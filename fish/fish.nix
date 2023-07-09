@@ -1,3 +1,4 @@
+{ config, pkgs, ... }:
 {
   # Fish completions, as there's no available config we do this manually
   xdg.configFile."fish/completions/workon.fish".source = ./completions/workon.fish;
@@ -5,6 +6,19 @@
   programs = {
     fish = {
       enable = true;
+      plugins = [
+        # Needed when having fish as default macOS shell, so that `~/.nix-profile/bin`
+        # is picked up properly
+        {
+          name = "nix-env";
+          src = pkgs.fetchFromGitHub {
+            owner = "lilyball";
+            repo = "nix-env.fish";
+            rev = "7b65bd228429e852c8fdfa07601159130a818cfa";
+            sha256 = "RG/0rfhgq6aEKNZ0XwIqOaZ6K5S4+/Y5EEMnIdtfPhk=";
+          };
+        }
+      ];
       shellAliases = {
         ls = "ls -h --color=auto";
       };
