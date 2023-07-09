@@ -20,3 +20,8 @@ Configure dotfiles by running
 ```console
 $ nix run home-manager/master -- switch --flake ~/.dotfiles#ludo
 ```
+
+Setting `fish` as default shell on macOS
+
+1. Append entry for home-manager managed `fish` binary to `/etc/shells`
+2. Set default shell with `chsh -s ~/.nix-profile/bin/fish`
