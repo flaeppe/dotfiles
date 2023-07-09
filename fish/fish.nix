@@ -22,20 +22,11 @@
       shellAliases = {
         ls = "ls -h --color=auto";
       };
-      # TODO: Move stuff to sessionVariables?
-      # TODO: Get rid of pyenv
       shellInit = ''
         # Disable fish greeting
         set fish_greeting
         # Disable 'activate.fish' auto setting and displaying fish status
         set -x VIRTUAL_ENV_DISABLE_PROMPT 1
-        # Set pyenv root path to default value to avoid anything
-        # unexpected if that default would change
-        set -x PYENV_ROOT "$HOME/.pyenv"
-        # Set SSL backend for curl
-        set -x PYCURL_SSL_LIBRARY openssl
-        # Enable fzf integration for enhanced autocompletion of cheat
-        set -x CHEAT_USE_FZF true
       '';
       interactiveShellInit = ''
         # Starting TMUX on startup, if tmux exists
