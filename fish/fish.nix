@@ -24,14 +24,11 @@
       };
       # TODO: Move stuff to sessionVariables?
       # TODO: Get rid of pyenv
-      # TODO: Setup GPG from other place (probably controlled by gpg service)
       shellInit = ''
         # Disable fish greeting
         set fish_greeting
         # Disable 'activate.fish' auto setting and displaying fish status
         set -x VIRTUAL_ENV_DISABLE_PROMPT 1
-        # GPG key
-        set -x GPG_TTY (tty)
         # Set pyenv root path to default value to avoid anything
         # unexpected if that default would change
         set -x PYENV_ROOT "$HOME/.pyenv"
