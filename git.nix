@@ -62,6 +62,9 @@
         local = "log origin..HEAD --pretty=oneline";
         lg =
           "log --color --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit";
+        prcheck = ''
+          !f() { if [ $# -lt 1 ]; then echo "Usage: git pr <id> [<remote>]  # assuming <remote>[=origin] is on GitHub"; else git checkout -q "$(git rev-parse --verify HEAD)" && git fetch -fv "''${2:-origin}" pull/"$1"/head:pr/"$1" && git checkout pr/"$1"; fi; }; f
+        '';
         recentb = ''
           !r() { refbranch=$1 count=$2; git for-each-ref --sort=-committerdate refs/heads --format='%(refname:short)|%(HEAD)%(color:yellow)%(refname:short)|%(color:bold green)%(committerdate:relative)|%(color:blue)%(subject)|%(color:magenta)%(authorname)%(color:reset)' --color=always --count=''${count:-20} | while read line; do branch=$(echo "$line" | awk 'BEGIN { FS = "|" }; { print $1 }' | tr -d '*'); ahead=$(git rev-list --count "''${refbranch:-origin/master}..''${branch}"); behind=$(git rev-list --count "''${branch}..''${refbranch:-origin/master}"); colorline=$(echo "$line" | sed 's/^[^|]*|//'); echo "$ahead|$behind|$colorline" | awk -F'|' -v OFS='|' '{$5=substr($5,1,70)}1' ; done | ( echo "ahead|behind||branch|lastcommit|message|author\n" && cat) | column -ts'|';}; r'';
         oldestb =
