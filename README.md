@@ -26,7 +26,7 @@ echo "experimental-features = nix-command flakes" > ~/.config/nix/nix.conf
 Configure dotfiles by running
 
 ```console
-$ nix run home-manager/master -- switch --flake github:flaeppe/dotfiles#master
+$ nix run home-manager/master -- switch --no-write-lock-file --refresh --flake github:flaeppe/dotfiles
 ```
 
 Setting `fish` as default shell on macOS
