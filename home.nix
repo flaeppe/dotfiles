@@ -14,6 +14,7 @@
     };
     packages = with pkgs; [
       coreutils
+      croc
       curl
       fd
       htop
