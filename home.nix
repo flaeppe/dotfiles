@@ -20,6 +20,7 @@
       htop
       git-crypt
       jq
+      kubectl
       less
       ripgrep
       tree-sitter
