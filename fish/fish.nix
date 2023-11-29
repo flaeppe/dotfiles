@@ -37,11 +37,6 @@
             tmux new-session
           end
         end
-
-        # Init pyenv
-        if begin; type -q pyenv; end
-          source (pyenv init -|psub)
-        end
       '';
       functions = {
         fish_prompt = {

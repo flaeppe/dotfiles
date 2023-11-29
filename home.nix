@@ -33,10 +33,6 @@
       CLICOLOR = 1;
       # Set date format language for ls
       LANG = "en_US.UTF-8";
-      # TODO: Get rid of pyenv
-      # Set pyenv root path to default value to avoid anything
-      # unexpected if that default would change
-      PYENV_ROOT = "/Users/ludo/.pyenv";
       # Set SSL backend for curl
       PYCURL_SSL_LIBRARY = "openssl";
     };
