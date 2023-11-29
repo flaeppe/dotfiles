@@ -134,6 +134,10 @@
         # Set RGB capability (taken from healthcheck advice)
         ''
           set-option -sa terminal-overrides ',xterm-256color:RGB'
+        '' +
+        # Set scrollback buffer size
+        ''
+          set-option -g history-limit 50000
         ''
       );
     };
