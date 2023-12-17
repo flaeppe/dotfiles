@@ -70,6 +70,13 @@ in
         " Disable mouse (:help default-mouse)
         set mouse=
       '';
+      extraLuaConfig = ''
+        vim.filetype.add({
+          extension = {
+            typ = 'markdown',
+          },
+        })
+      '';
       plugins = with pkgs.vimPlugins; [
         {
           # Make file browsing easier
