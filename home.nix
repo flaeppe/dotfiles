@@ -75,13 +75,15 @@
         map-syntax = [ ".ignore:.gitignore" ];
       };
       themes = {
-        OneHalfDark = builtins.readFile (pkgs.fetchFromGitHub
-          {
+        OneHalfDark = {
+          src = pkgs.fetchFromGitHub {
             owner = "sonph";
             repo = "onehalf";
             rev = "75eb2e97acd74660779fed8380989ee7891eec56";
             sha256 = "F5gbDtGD2QBDGZOjr/OCJJlyQgxvQTsy8IoNNAjnDzQ=";
-          } + "/sublimetext/OneHalfDark.tmTheme");
+          };
+          file = "sublimetext/OneHalfDark.tmTheme";
+        };
       };
     };
 
