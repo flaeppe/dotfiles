@@ -17,7 +17,7 @@
       in
       {
         packages.homeConfigurations = {
-          ludo = home-manager.lib.homeManagerConfiguration {
+          "petter.friberg" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
             modules = [ ./home.nix ];
           };

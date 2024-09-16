@@ -2,8 +2,8 @@
 
 {
   home = {
-    username = "ludo";
-    homeDirectory = "/Users/ludo";
+    username = "petter.friberg";
+    homeDirectory = "/Users/petter.friberg";
     language = {
       base = "en_US.UTF-8";
       collate = "C";
