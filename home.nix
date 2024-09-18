@@ -26,6 +26,10 @@
       tree-sitter
       universal-ctags
     ];
+    # This doesn't work though hm-session-vars.fish is updated..
+    sessionPath = [
+      "$HOME/.local/bin"
+    ];
     sessionVariables = {
       EDITOR = "nvim";
       # Set better color when printing folders
