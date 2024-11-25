@@ -1,4 +1,7 @@
 {
+  # Conditionally used config file (for work repos)
+  xdg.configFile."git/work".source = ./work.conf;
+
   programs = {
     git = {
       enable = true;
@@ -44,6 +47,13 @@
         commit = { verbose = true; };
         tag = { sort = "version:refname"; };
       };
+
+      includes = [
+        {
+          condition = "gitdir:~/anyfin/";
+          path = "~/.config/git/work";
+        }
+      ];
 
       ignores = [
         ".DS_STORE"

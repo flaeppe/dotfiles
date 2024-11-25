@@ -67,7 +67,7 @@
     };
   };
 
-  imports = [ ./git.nix ./fish/fish.nix ./nvim/nvim.nix ];
+  imports = [ ./git/git.nix ./fish/fish.nix ./nvim/nvim.nix ];
 
   programs = {
     home-manager.enable = true;
