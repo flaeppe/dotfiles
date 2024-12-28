@@ -40,7 +40,7 @@
       # Set SSL backend for curl
       PYCURL_SSL_LIBRARY = "openssl";
     };
-    stateVersion = "23.11";
+    stateVersion = "24.11";
     # Setup default tags for universal-ctags
     file.".ctags.d/default.ctags".source = ./nvim/.ctags.d/default.ctags;
     # Add configuration for gpg-agent
