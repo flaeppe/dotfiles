@@ -71,6 +71,7 @@ in
         set mouse=
       '';
       extraLuaConfig = ''
+
         vim.filetype.add({
           extension = {
             typ = 'markdown',
@@ -168,8 +169,15 @@ in
           plugin = fzf-vim;
           type = "viml";
           config = ''
-            " <C-p> to search files
+            " <C-p> to search for files
             nnoremap <silent> <C-p> :Files<CR>
+            " Search text with ripgrep, hidden included, except .git
+            " Almost identical to builtin Rg command
+            command! -bang -nargs=* CustomRg
+              \ call fzf#vim#grep("rg --hidden --glob '!.git/*' --column --line-number --no-heading --color=always --smart-case -- ".fzf#shellescape(<q-args>), fzf#vim#with_preview(), <bang>0)
+            nmap <Leader>f :CustomRg<Space>
+            " Search ctags in the project
+            nmap <C-e> :Tags<CR>
             " FZF floating window support
             let g:fzf_layout = { 'window': 'call FloatingFZF()' }
             function! FloatingFZF()
@@ -203,9 +211,6 @@ in
           config = ''
             let g:gutentags_ctags_tagfile = '.tags'
             nnoremap <Leader>gr :GutentagsUpdate!<CR>
-            " Buffer and ctag search
-            nmap <C-e> :Tags<CR>
-            nmap <Leader>f :Rg<Space>
           '';
         }
         # TODO: Custom Timelog plugin
