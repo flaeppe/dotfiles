@@ -1,5 +1,8 @@
 { config, pkgs, ... }:
 
+# TODO: See https://www.reddit.com/r/NixOS/comments/vc3srj/comment/icbwtvr/ for
+#       a way to improve config with mutable dotfiles/config files
+
 let
   gruvboxBaby = pkgs.fetchFromGitHub {
     owner = "luisiacc";
@@ -13,6 +16,13 @@ in
   # XML formatter for vim
   xdg.configFile."nvim/formatters/xml.vim".source = ./formatters/xml.vim;
 
+  home.packages = with pkgs; [
+    typescript-language-server
+    tree-sitter
+    universal-ctags
+  ];
+  # Setup default tags for universal-ctags
+  home.file.".ctags.d/default.ctags".source = ./.ctags.d/default.ctags;
   programs = {
     neovim = {
       enable = true;
@@ -77,6 +87,26 @@ in
             typ = 'markdown',
           },
         })
+
+        --- Quicklist mappings
+        vim.keymap.set('n', '<Leader>q', '<Cmd>copen<CR>')
+        vim.keymap.set('n', '<Leader>Q', '<Cmd>cclose<CR>')
+        vim.keymap.set('n', '<Leader>qj', '<Cmd>try | cnext | catch | cfirst | catch | endtry<CR>')
+        vim.keymap.set('n', '<Leader>qk', '<Cmd>try | cprevious | catch | clast | catch | endtry<CR>')
+        --- Map <leader>ca to display available code actions
+        vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, silent)
+        --- Map <leader>r to format buffer in normal mode
+        vim.keymap.set('n', '<Leader>l', function() vim.lsp.buf.format { async = true } end, bufopts)
+        --- LSP
+        vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
+        vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
+        vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
+        vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
+        vim.keymap.set('n', '<Leader>rn', vim.lsp.buf.rename, bufopts)
+        vim.keymap.set('n', '<Leader>ts', vim.diagnostic.show, bufopts)
+        vim.keymap.set('n', '<Leader>th', vim.diagnostic.hide, bufopts)
+        vim.keymap.set('n', 'åd', vim.diagnostic.goto_prev, opts)
+        vim.keymap.set('n', '¨d', vim.diagnostic.goto_next, opts)
       '';
       plugins = with pkgs.vimPlugins; [
         {
@@ -213,7 +243,49 @@ in
             nnoremap <Leader>gr :GutentagsUpdate!<CR>
           '';
         }
-        # TODO: Custom Timelog plugin
+        # LSP
+        {
+          plugin = nvim-lspconfig;
+          type = "lua";
+          config = ''
+            local lspconfig = require('lspconfig')
+            lspconfig.pyright.setup{
+              settings = {
+                pyright = {
+                  -- Prefer Ruff's import organizer
+                  disableOrganizeImports = true,
+                },
+              },
+            }
+            lspconfig.ruff.setup{
+              commands = {
+                RuffAutofix = {
+                  function()
+                    vim.lsp.buf.code_action {
+                      context = {
+                        only = { 'source.fixAll.ruff' }
+                      },
+                      apply = true,
+                    }
+                  end,
+                  description = 'Ruff: Fix all auto-fixable problems',
+                },
+                RuffOrganizeImports = {
+                  function()
+                    vim.lsp.buf.code_action {
+                      context = {
+                        only = { 'source.organizeImports.ruff' }
+                      },
+                      apply = true,
+                    }
+                  end,
+                  description = 'Ruff: Format imports',
+                },
+              },
+            }
+            lspconfig.ts_ls.setup{}
+          '';
+        }
       ];
     };
   };
