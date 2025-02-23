@@ -98,20 +98,36 @@ in
         vim.keymap.set('n', '<Leader>Q', '<Cmd>cclose<CR>')
         vim.keymap.set('n', '<Leader>qj', '<Cmd>try | cnext | catch | cfirst | catch | endtry<CR>')
         vim.keymap.set('n', '<Leader>qk', '<Cmd>try | cprevious | catch | clast | catch | endtry<CR>')
-        --- Map <leader>ca to display available code actions
-        vim.keymap.set('n', '<leader>ca', vim.lsp.buf.code_action, silent)
-        --- Map <leader>r to format buffer in normal mode
-        vim.keymap.set('n', '<Leader>l', function() vim.lsp.buf.format { async = true } end, bufopts)
+        --- Display available code actions
+        vim.keymap.set('n', '<Leader>ca', vim.lsp.buf.code_action, silent)
+        --- Format buffer
+        vim.keymap.set('n', '<Leader>ll', function() vim.lsp.buf.format { async = true } end, bufopts)
         --- LSP
         vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
         vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
         vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
         vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
         vim.keymap.set('n', '<Leader>rn', vim.lsp.buf.rename, bufopts)
+        -- Open diagnostic in a floating window
+        vim.keymap.set('n', '<Leader>le', function() vim.diagnostic.open_float(nil, { focus = false }) end, bufopts)
+        -- Show/hide diagnostic
         vim.keymap.set('n', '<Leader>ts', vim.diagnostic.show, bufopts)
         vim.keymap.set('n', '<Leader>th', vim.diagnostic.hide, bufopts)
-        vim.keymap.set('n', 'åd', vim.diagnostic.goto_prev, opts)
-        vim.keymap.set('n', '¨d', vim.diagnostic.goto_next, opts)
+        -- Move to prev/next item
+        vim.keymap.set('n', 'åd', vim.diagnostic.goto_prev, bufopts)
+        vim.keymap.set('n', '¨d', vim.diagnostic.goto_next, bufopts)
+        -- Diagnostic settings
+        vim.diagnostic.config({
+          update_in_insert = true,
+          float = {
+            focusable = false,
+            style = "minimal",
+            border = "rounded",
+            source = "always",
+            header = "",
+            prefix = "",
+          },
+        })
       '';
       plugins = with pkgs.vimPlugins; [
         {
