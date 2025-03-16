@@ -17,8 +17,9 @@ in
   xdg.configFile."nvim/formatters/xml.vim".source = ./formatters/xml.vim;
 
   home.packages = with pkgs; [
-    typescript-language-server
+    nodePackages.graphql-language-service-cli
     tree-sitter
+    typescript-language-server
     universal-ctags
   ];
   # Setup default tags for universal-ctags
@@ -82,8 +83,6 @@ in
         " Enable true colors support
          set termguicolors
          hi LineNr ctermbg=NONE guibg=NONE
-         " Map the leader key to SPACE
-         let mapleader="\<SPACE>"
       '';
       extraLuaConfig = ''
 
@@ -217,6 +216,8 @@ in
           plugin = fzf-vim;
           type = "viml";
           config = ''
+            " Map the leader key to SPACE
+            let mapleader="\<SPACE>"
             " <C-p> to search for files
             nnoremap <silent> <C-p> :Files<CR>
             " Search text with ripgrep, hidden included, except .git
@@ -302,6 +303,7 @@ in
               },
             }
             lspconfig.ts_ls.setup{}
+            lspconfig.graphql.setup{}
           '';
         }
       ];
