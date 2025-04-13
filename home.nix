@@ -110,6 +110,7 @@
 
     tmux = {
       enable = true;
+      sensibleOnTop = false;
       # Set default shell for tmux
       shell = "${pkgs.fish}/bin/fish";
       # Make tmux able to show coloring (i.e. for fish)
