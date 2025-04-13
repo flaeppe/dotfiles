@@ -64,6 +64,8 @@
         # direnv, where local project configuration resides
         ".envrc"
         ".direnv/"
+        # Directory specific ctags config
+        ".ctags.d/"
       ];
 
       aliases = {
