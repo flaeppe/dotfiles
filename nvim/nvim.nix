@@ -17,6 +17,7 @@ in
   xdg.configFile."nvim/formatters/xml.vim".source = ./formatters/xml.vim;
 
   home.packages = with pkgs; [
+    gopls
     nodePackages.graphql-language-service-cli
     tree-sitter
     typescript-language-server
@@ -304,6 +305,7 @@ in
             }
             lspconfig.ts_ls.setup{}
             lspconfig.graphql.setup{}
+            lspconfig.gopls.setup{}
           '';
         }
       ];
