@@ -6,7 +6,7 @@
     git = {
       enable = true;
       userName = "Petter Friberg";
-      userEmail = "petter_friberg@hotmail.com";
+      userEmail = "3703560+flaeppe@users.noreply.github.com";
 
       signing = {
         key = "F188F74B056474E8";
