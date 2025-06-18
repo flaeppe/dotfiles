@@ -23,6 +23,7 @@
       kubectl
       less
       ripgrep
+      (google-cloud-sdk.withExtraComponents [google-cloud-sdk.components.gke-gcloud-auth-plugin])
     ];
     # This doesn't work though hm-session-vars.fish is updated..
     sessionPath = [
