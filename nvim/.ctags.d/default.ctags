@@ -11,7 +11,7 @@
 --exclude=min
 --exclude=node_modules
 --exclude=package-lock.json
---exclude=package.json
+--exclude=pnpm-lock.yaml
 --exclude=tags
 --exclude=.tags
 --exclude=vendor
@@ -19,7 +19,7 @@
 --exclude=.tox
 --exclude=\*.egg-info
 --exclude=.pytest_cache
---exclude=*.json
 --exclude=build
 --exclude=dist
 --exclude=.direnv
+--exclude=coverage
