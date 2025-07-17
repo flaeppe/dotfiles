@@ -8,16 +8,23 @@
   xdg.configFile."nvim/formatters/xml.vim".source = ./formatters/xml.vim;
 
   home.packages = with pkgs; [
-    golangci-lint
-    golangci-lint-langserver
-    gopls
-    nodePackages.graphql-language-service-cli
+    golangci-lint  # Golang linter
+    golangci-lint-langserver  # Language server for golangci-lint
+    gopls  # Official LSP for Go
+    gotools  # Various tools and packages for Go static analysis
+    hadolint  # Dockerfile linter
+    nixd  # Language server for nix
+    nixfmt-classic  # Formatter for nix
+    nodePackages.graphql-language-service-cli  # GrapQL LSP
+    sqruff  # SQL formatter/linter
     tree-sitter
     typescript-language-server
     universal-ctags
   ];
   # Setup default tags for universal-ctags
   home.file.".ctags.d/default.ctags".source = ./.ctags.d/default.ctags;
+  # User config for sqruff
+  home.file.".sqruff".source = ./.sqruff;
   programs = {
     neovim = {
       enable = true;
@@ -57,7 +64,6 @@
         augroup END
         " Formatters
         :command! -range FormatJSON <line1>,<line2>!jq .
-        :command! -range FormatSQL <line1>,<line2>!sqlformat --reindent_aligned --keywords upper --identifiers lower -
         source ~/.config/nvim/formatters/xml.vim
         " Disable unused providers
         let g:loaded_perl_provider = 0
@@ -263,9 +269,32 @@
             lspconfig.ts_ls.setup{}
             lspconfig.graphql.setup{}
             lspconfig.gopls.setup{}
-            lspconfig.golangci_lint_ls.setup {
-                filetypes = {'go', 'gomod'}
-            }
+            lspconfig.golangci_lint_ls.setup{}
+            lspconfig.nixd.setup{}
+          '';
+        }
+        # Formatters (hooked up via LSP)
+        {
+          plugin = none-ls-nvim;
+          type = "lua";
+          config = ''
+            local null_ls = require("null-ls")
+            null_ls.setup({
+              sources = {
+                null_ls.builtins.diagnostics.hadolint,
+                null_ls.builtins.formatting.gofmt,
+                null_ls.builtins.formatting.goimports,
+                null_ls.builtins.formatting.nixfmt,
+                -- SQL
+                -- Passing a shared config file to avoid per project config
+                null_ls.builtins.diagnostics.sqruff.with({
+                  args = { "--config", "${config.home.homeDirectory}/.sqruff", "lint", "--format", "github-annotation-native", "$FILENAME" },
+                }),
+                null_ls.builtins.formatting.sqruff.with({
+                  args = { "--config", "${config.home.homeDirectory}/.sqruff", "fix", "-" },
+                }),
+              }
+            })
           '';
         }
       ];
