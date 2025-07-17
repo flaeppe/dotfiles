@@ -23,12 +23,11 @@
       kubectl
       less
       ripgrep
-      (google-cloud-sdk.withExtraComponents [google-cloud-sdk.components.gke-gcloud-auth-plugin])
+      (google-cloud-sdk.withExtraComponents
+        [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
     ];
     # This doesn't work though hm-session-vars.fish is updated..
-    sessionPath = [
-      "$HOME/.local/bin"
-    ];
+    sessionPath = [ "$HOME/.local/bin" ];
     sessionVariables = {
       EDITOR = "nvim";
       # Set better color when printing folders
@@ -55,12 +54,8 @@
         insert_final_newline = true;
         indent_style = "space";
       };
-      "Makefile" = {
-        indent_style = "tab";
-      };
-      "*.py" = {
-        indent_size = 4;
-      };
+      "Makefile" = { indent_style = "tab"; };
+      "*.py" = { indent_size = 4; };
     };
   };
 
@@ -142,8 +137,7 @@
         # Set scrollback buffer size
         ''
           set-option -g history-limit 50000
-        ''
-      );
+        '');
     };
   };
 }

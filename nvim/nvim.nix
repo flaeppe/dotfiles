@@ -8,15 +8,15 @@
   xdg.configFile."nvim/formatters/xml.vim".source = ./formatters/xml.vim;
 
   home.packages = with pkgs; [
-    golangci-lint  # Golang linter
-    golangci-lint-langserver  # Language server for golangci-lint
-    gopls  # Official LSP for Go
-    gotools  # Various tools and packages for Go static analysis
-    hadolint  # Dockerfile linter
-    nixd  # Language server for nix
-    nixfmt-classic  # Formatter for nix
-    nodePackages.graphql-language-service-cli  # GrapQL LSP
-    sqruff  # SQL formatter/linter
+    golangci-lint # Golang linter
+    golangci-lint-langserver # Language server for golangci-lint
+    gopls # Official LSP for Go
+    gotools # Various tools and packages for Go static analysis
+    hadolint # Dockerfile linter
+    nixd # Language server for nix
+    nixfmt-classic # Formatter for nix
+    nodePackages.graphql-language-service-cli # GrapQL LSP
+    sqruff # SQL formatter/linter
     tree-sitter
     typescript-language-server
     universal-ctags
@@ -134,16 +134,16 @@
           plugin = nerdtree;
           type = "lua";
           config = ''
-             -- NERDTree
-             vim.g.NERDTreeIgnore = {'\\.pyc$', '__pycache__', '\\.js.map$',
-                                     '\\.DS_STORE', 'venv', '\\.mypy_cache',
-                                     '\\.pytest_cache', '\\.nox', '\\.egg-info$',
-                                     '\\.tags'}
-             -- Show hidden files and folders per default in file browser
-             vim.g.NERDTreeShowHidden = 1
-             -- Keymaps
-             vim.keymap.set('n', '<Leader>nn', ':NERDTreeToggle<CR>')
-             vim.keymap.set('n', '<Leader>nf', ':NERDTreeFind<CR>')
+            -- NERDTree
+            vim.g.NERDTreeIgnore = {'\\.pyc$', '__pycache__', '\\.js.map$',
+                                    '\\.DS_STORE', 'venv', '\\.mypy_cache',
+                                    '\\.pytest_cache', '\\.nox', '\\.egg-info$',
+                                    '\\.tags'}
+            -- Show hidden files and folders per default in file browser
+            vim.g.NERDTreeShowHidden = 1
+            -- Keymaps
+            vim.keymap.set('n', '<Leader>nn', ':NERDTreeToggle<CR>')
+            vim.keymap.set('n', '<Leader>nf', ':NERDTreeFind<CR>')
           '';
         }
         {

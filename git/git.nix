@@ -48,12 +48,10 @@
         tag = { sort = "version:refname"; };
       };
 
-      includes = [
-        {
-          condition = "gitdir:~/anyfin/";
-          path = "~/.config/git/work";
-        }
-      ];
+      includes = [{
+        condition = "gitdir:~/anyfin/";
+        path = "~/.config/git/work";
+      }];
 
       ignores = [
         ".DS_STORE"

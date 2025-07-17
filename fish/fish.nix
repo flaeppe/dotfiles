@@ -1,7 +1,7 @@
-{ config, pkgs, ... }:
-{
+{ config, pkgs, ... }: {
   # Fish completions, as there's no available config we do this manually
-  xdg.configFile."fish/completions/workon.fish".source = ./completions/workon.fish;
+  xdg.configFile."fish/completions/workon.fish".source =
+    ./completions/workon.fish;
 
   programs = {
     fish = {
@@ -19,9 +19,7 @@
           };
         }
       ];
-      shellAliases = {
-        ls = "ls -h --color=auto";
-      };
+      shellAliases = { ls = "ls -h --color=auto"; };
       shellInit = ''
         # Disable fish greeting
         set fish_greeting
@@ -75,7 +73,8 @@
           '';
         };
         workon = {
-          description = "Moves you to the project directory and activates the associated virtualenv, if any found";
+          description =
+            "Moves you to the project directory and activates the associated virtualenv, if any found";
           body = ''
             ${builtins.readFile ./functions/workon.fish}
           '';

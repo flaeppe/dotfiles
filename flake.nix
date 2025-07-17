@@ -12,10 +12,8 @@
 
   outputs = { nixpkgs, home-manager, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-      in
-      {
+      let pkgs = nixpkgs.legacyPackages.${system};
+      in {
         packages.homeConfigurations = {
           "petter.friberg" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
