@@ -67,18 +67,18 @@
     bat = {
       enable = true;
       config = {
-        theme = "OneHalfDark";
+        theme = "Kanagawa";
         map-syntax = [ ".ignore:.gitignore" ];
       };
       themes = {
-        OneHalfDark = {
+        Kanagawa = {
           src = pkgs.fetchFromGitHub {
-            owner = "sonph";
-            repo = "onehalf";
-            rev = "75eb2e97acd74660779fed8380989ee7891eec56";
-            sha256 = "F5gbDtGD2QBDGZOjr/OCJJlyQgxvQTsy8IoNNAjnDzQ=";
+            owner = "rebelot";
+            repo = "kanagawa.nvim";
+            rev = "cc3b68b08e6a0cb6e6bf9944932940091e49bb83";
+            sha256 = "0mi15a4cxbrqzwb9xl47scar8ald5xm108r35jxcdrmahinw62rz";
           };
-          file = "sublimetext/OneHalfDark.tmTheme";
+          file = "extras/tmTheme/kanagawa.tmTheme";
         };
       };
     };

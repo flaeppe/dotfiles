@@ -191,30 +191,27 @@
             nmap <Leader>f :CustomRg<Space>
             " Search ctags in the project
             nmap <C-e> :Tags<CR>
-            " FZF floating window support
-            let g:fzf_layout = { 'window': 'call FloatingFZF()' }
-            function! FloatingFZF()
-              let buf = nvim_create_buf(v:false, v:true)
-              call setbufvar(buf, '&signcolumn', 'no')
+            " FZF popup window center of the screen
+            let g:fzf_layout = { 'window': { 'width': 0.9, 'height': 0.9 } }
+            " Customize fzf colors to match color scheme
+            " - fzf#wrap translates this to a set of `--color` options
+            let g:fzf_colors =
+            \ { 'fg':      ['fg', 'Normal'],
+              \ 'bg':      ['bg', 'Normal'],
+              \ 'query':   ['fg', 'Normal'],
+              \ 'hl':      ['fg', 'Comment'],
+              \ 'fg+':     ['fg', 'CursorLine', 'CursorColumn', 'Normal'],
+              \ 'bg+':     ['bg', 'CursorLine', 'CursorColumn'],
+              \ 'hl+':     ['fg', 'Statement'],
+              \ 'info':    ['fg', 'PreProc'],
+              \ 'border':  ['fg', 'Ignore'],
+              \ 'prompt':  ['fg', 'Conditional'],
+              \ 'pointer': ['fg', 'Exception'],
+              \ 'marker':  ['fg', 'Keyword'],
+              \ 'spinner': ['fg', 'Label'],
+              \ 'header':  ['fg', 'Comment'] }
 
-              let width = float2nr(&columns - (&columns * 2 / 10))
-              let height = &lines - 3
-              let y = &lines - 3
-              let x = float2nr((&columns - width) / 2)
-
-              let opts = {
-                    \ 'relative': 'editor',
-                    \ 'row': y,
-                    \ 'col': x,
-                    \ 'width': width,
-                    \ 'height': height
-                    \ }
-
-              call nvim_open_win(buf, v:true, opts)
-            endfunction
             au FileType fzf set nonu nornu
-            " Text and background color of floating window
-            highlight NormalFloat cterm=NONE ctermfg=14 ctermbg=0 gui=NONE guifg=#bfbfbf guibg=#1a1a1a
           '';
         }
         # Incremental tag generation
