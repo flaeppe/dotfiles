@@ -6,6 +6,10 @@
 {
   # XML formatter for vim
   xdg.configFile."nvim/formatters/xml.vim".source = ./formatters/xml.vim;
+  # Plugin and scripts for seamless navigation between nvim and kitty
+  xdg.configFile."kitty/chained_nav.py".source = ./kitty/chained_nav.py;
+  xdg.configFile."kitty/vim_nav.py".source = ./kitty/vim_nav.py;
+  xdg.configFile."nvim/lua/kitty_nav.lua".source = ./lua/kitty_nav.lua;
 
   home.packages = with pkgs; [
     golangci-lint # Golang linter
@@ -91,7 +95,12 @@
             typ = 'markdown',
           },
         })
-
+        --- Navigation
+        local kitty_nav = require('kitty_nav')
+        vim.keymap.set('n', '<C-h>', function() kitty_nav.navigate('h') end)
+        vim.keymap.set('n', '<C-j>', function() kitty_nav.navigate('j') end)
+        vim.keymap.set('n', '<C-k>', function() kitty_nav.navigate('k') end)
+        vim.keymap.set('n', '<C-l>', function() kitty_nav.navigate('l') end)
         --- Quicklist mappings
         vim.keymap.set('n', '<Leader>q', '<Cmd>copen<CR>')
         vim.keymap.set('n', '<Leader>Q', '<Cmd>cclose<CR>')

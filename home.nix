@@ -1,6 +1,12 @@
-{ config, pkgs, ... }:
-
-{
+{ pkgs, ... }:
+let
+  kanagawaRepo = pkgs.fetchFromGitHub {
+    owner = "rebelot";
+    repo = "kanagawa.nvim";
+    rev = "cc3b68b08e6a0cb6e6bf9944932940091e49bb83";
+    sha256 = "0mi15a4cxbrqzwb9xl47scar8ald5xm108r35jxcdrmahinw62rz";
+  };
+in {
   home = {
     username = "petter.friberg";
     homeDirectory = "/Users/petter.friberg";
@@ -72,12 +78,7 @@
       };
       themes = {
         Kanagawa = {
-          src = pkgs.fetchFromGitHub {
-            owner = "rebelot";
-            repo = "kanagawa.nvim";
-            rev = "cc3b68b08e6a0cb6e6bf9944932940091e49bb83";
-            sha256 = "0mi15a4cxbrqzwb9xl47scar8ald5xm108r35jxcdrmahinw62rz";
-          };
+          src = kanagawaRepo;
           file = "extras/tmTheme/kanagawa.tmTheme";
         };
       };
@@ -104,40 +105,32 @@
 
     gpg = { enable = true; };
 
-    tmux = {
+    kitty = {
       enable = true;
-      sensibleOnTop = false;
-      # Set default shell for tmux
-      shell = "${pkgs.fish}/bin/fish";
-      # Make tmux able to show coloring (i.e. for fish)
-      # MUST map with $TERM variable
-      terminal = "screen-256color";
-      # Set window indexing, starting from 1 instead of 0.
-      # Helps with keybindings for quickswitch between windows.
-      baseIndex = 1;
-      # Set vim bindings
-      keyMode = "vi";
-      # Set escape time. (Taken from healthcheck advice)
-      # See: https://github.com/neovim/neovim/wiki/FAQ#esc-in-tmux-or-gnu-screen-is-delayed
-      escapeTime = 10;
-
-      extraConfig = (
-        # Order sessions by name
-        ''
-          bind s choose-tree -sZ -O name
-        '' +
-        # Turn on focus events to support (vim) autoread
-        ''
-          set-option -g focus-events on
-        '' +
-        # Set RGB capability (taken from healthcheck advice)
-        ''
-          set-option -sa terminal-overrides ',xterm-256color:RGB'
-        '' +
-        # Set scrollback buffer size
-        ''
-          set-option -g history-limit 50000
-        '');
+      settings = {
+        allow_remote_control = "socket-only";
+        listen_on = "unix:/tmp/mykitty";
+        kitty_mod = "ctrl+shift";
+      };
+      keybindings = {
+        "cmd+shift+l" = "next_tab";
+        "cmd+shift+h" = "previous_tab";
+        "ctrl+j" = "kitten vim_nav.py bottom ctrl+j";
+        "ctrl+k" = "kitten vim_nav.py top ctrl+k";
+        "ctrl+h" = "kitten vim_nav.py left ctrl+h";
+        "ctrl+l" = "kitten vim_nav.py right ctrl+l";
+        "kitty_mod+1" = "goto_tab 1";
+        "kitty_mod+2" = "goto_tab 2";
+        "kitty_mod+3" = "goto_tab 3";
+        "kitty_mod+4" = "goto_tab 4";
+        "kitty_mod+5" = "goto_tab 5";
+        "kitty_mod+6" = "goto_tab 6";
+        "kitty_mod+7" = "goto_tab 7";
+        "kitty_mod+8" = "goto_tab 8";
+        "kitty_mod+9" = "goto_tab 9";
+        "kitty_mod+0" = "goto_tab 10";
+      };
+      themeFile = "kanagawa";
     };
   };
 }

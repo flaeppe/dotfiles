@@ -8,16 +8,21 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Nix utils for Mac App launchers. Helps launching .app programs from Spotlight
+    mac-app-util.url = "github:hraban/mac-app-util";
   };
 
-  outputs = { nixpkgs, home-manager, flake-utils, ... }:
+  outputs = { nixpkgs, home-manager, flake-utils, mac-app-util, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let pkgs = nixpkgs.legacyPackages.${system};
       in {
         packages.homeConfigurations = {
           "petter.friberg" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
-            modules = [ ./home.nix ];
+            modules = [
+              mac-app-util.homeManagerModules.default
+              ./home.nix
+            ];
           };
         };
       });
