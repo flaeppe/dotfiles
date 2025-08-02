@@ -136,6 +136,21 @@
             prefix = "",
           },
         })
+        -- Customized startup (when nvim started without args)
+        vim.api.nvim_create_autocmd('VimEnter', {
+          pattern = '*',
+          callback = function()
+            if vim.fn.argc() == 0 and vim.fn.empty(vim.api.nvim_get_current_buf()) then
+              -- Only do this if nvim is started without arguments and no files loaded
+              -- This prevents it from running when you open a specific file directory
+              vim.cmd('vsplit')
+              vim.cmd('NERDTreeToggle')
+              vim.cmd('wincmd l') -- Move to the right window (NERDTree is on the left)
+              vim.cmd('normal! <C-w>=') -- Resize
+            end
+          end,
+          once = true, -- Ensure functions only runs once
+        })
       '';
       plugins = with pkgs.vimPlugins; [
         {
