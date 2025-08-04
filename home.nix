@@ -113,6 +113,7 @@ in {
         shell_integration = "enabled";
         # kitty-scrollback.nvim Kitten alias
         action_alias = "kitty_scrollback_nvim kitten ${pkgs.vimPlugins.kitty-scrollback-nvim}/python/kitty_scrollback_nvim.py";
+        font_size = "8.0";
       };
       keybindings = {
         "cmd+shift+l" = "next_tab";
