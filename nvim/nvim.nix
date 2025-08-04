@@ -89,65 +89,7 @@
          hi LineNr ctermbg=NONE guibg=NONE
       '';
       extraLuaConfig = ''
-
-        vim.filetype.add({
-          extension = {
-            typ = 'markdown',
-          },
-        })
-        --- Navigation
-        local kitty_nav = require('kitty_nav')
-        vim.keymap.set('n', '<C-h>', function() kitty_nav.navigate('h') end)
-        vim.keymap.set('n', '<C-j>', function() kitty_nav.navigate('j') end)
-        vim.keymap.set('n', '<C-k>', function() kitty_nav.navigate('k') end)
-        vim.keymap.set('n', '<C-l>', function() kitty_nav.navigate('l') end)
-        --- Quicklist mappings
-        vim.keymap.set('n', '<Leader>q', '<Cmd>copen<CR>')
-        vim.keymap.set('n', '<Leader>Q', '<Cmd>cclose<CR>')
-        vim.keymap.set('n', '<Leader>qj', '<Cmd>try | cnext | catch | cfirst | catch | endtry<CR>')
-        vim.keymap.set('n', '<Leader>qk', '<Cmd>try | cprevious | catch | clast | catch | endtry<CR>')
-        --- Display available code actions
-        vim.keymap.set('n', '<Leader>ca', vim.lsp.buf.code_action, silent)
-        --- Format buffer
-        vim.keymap.set('n', '<Leader>ll', function() vim.lsp.buf.format { async = true } end, bufopts)
-        --- LSP
-        vim.keymap.set('n', 'gD', vim.lsp.buf.declaration, bufopts)
-        vim.keymap.set('n', 'gd', vim.lsp.buf.definition, bufopts)
-        vim.keymap.set('n', 'gi', vim.lsp.buf.implementation, bufopts)
-        vim.keymap.set('n', 'gr', vim.lsp.buf.references, bufopts)
-        vim.keymap.set('n', '<Leader>rn', vim.lsp.buf.rename, bufopts)
-        -- Open diagnostic in a floating window
-        vim.keymap.set('n', '<Leader>le', function() vim.diagnostic.open_float(nil, { focus = false }) end, bufopts)
-        -- Show/hide diagnostic
-        vim.keymap.set('n', '<Leader>ts', vim.diagnostic.show, bufopts)
-        vim.keymap.set('n', '<Leader>th', vim.diagnostic.hide, bufopts)
-        -- Move to prev/next item
-        vim.keymap.set('n', 'åd', vim.diagnostic.goto_prev, bufopts)
-        vim.keymap.set('n', '¨d', vim.diagnostic.goto_next, bufopts)
-        -- Diagnostic settings
-        vim.diagnostic.config({
-          update_in_insert = true,
-          float = {
-            focusable = false,
-            style = "minimal",
-            border = "rounded",
-            source = "always",
-            header = "",
-            prefix = "",
-          },
-        })
-        -- Define a custom command that opens NERDTree and then moves to the buffer on
-        -- the right. Used when starting nvim
-        vim.api.nvim_create_user_command('OpenTreeAndJump', function()
-          vim.cmd('vsplit')
-          vim.cmd('NERDTreeToggle')
-          -- Ensure the cursor is in the buffer window, not the NERDTree window
-          -- If NERDTree opens on the left, the buffer window is on the right
-          if vim.fn.bufexists(vim.fn.bufname('%')) then -- Check if there's an actual buffer
-            vim.cmd('wincmd l') -- Move to the window on the right
-          end
-          vim.cmd('normal! <C-w>=') -- Resize
-        end, {})
+        ${builtins.readFile ./lua/config.lua}
       '';
       plugins = with pkgs.vimPlugins; [
         {
@@ -156,32 +98,15 @@
           type = "lua";
           config = ''
             -- NERDTree
-            vim.g.NERDTreeIgnore = {'\\.pyc$', '__pycache__', '\\.js.map$',
-                                    '\\.DS_STORE', 'venv', '\\.mypy_cache',
-                                    '\\.pytest_cache', '\\.nox', '\\.egg-info$',
-                                    '\\.tags'}
-            -- Show hidden files and folders per default in file browser
-            vim.g.NERDTreeShowHidden = 1
-            -- Keymaps
-            vim.keymap.set('n', '<Leader>nn', ':NERDTreeToggle<CR>')
-            vim.keymap.set('n', '<Leader>nf', ':NERDTreeFind<CR>')
+            ${builtins.readFile ./lua/plugins/nerdtree.lua}
           '';
         }
         {
           plugin = nvim-treesitter.withAllGrammars;
           type = "lua";
           config = ''
-            -- Syntax Highlighting via nvim-treesitter. See:
-            -- https://github.com/nvim-treesitter/nvim-treesitter
-            local treesitter = require('nvim-treesitter.configs')
-            treesitter.setup {
-              highlight = {
-                enable = true,
-              },
-              indent = {
-                enable = true,
-              },
-            }
+            -- Syntax Highlighting via nvim-treesitter
+            ${builtins.readFile ./lua/plugins/treesitter.lua}
           '';
         }
         # Color scheme: https://github.com/rebelot/kanagawa.nvim
@@ -238,10 +163,9 @@
         # Incremental tag generation
         {
           plugin = vim-gutentags;
-          type = "viml";
+          type = "lua";
           config = ''
-            let g:gutentags_ctags_tagfile = '.tags'
-            nnoremap <Leader>gr :GutentagsUpdate!<CR>
+            ${builtins.readFile ./lua/plugins/gutentags.lua}
           '';
         }
         # LSP
@@ -249,46 +173,7 @@
           plugin = nvim-lspconfig;
           type = "lua";
           config = ''
-            local lspconfig = require('lspconfig')
-            lspconfig.pyright.setup{
-              settings = {
-                pyright = {
-                  -- Prefer Ruff's import organizer
-                  disableOrganizeImports = true,
-                },
-              },
-            }
-            lspconfig.ruff.setup{
-              commands = {
-                RuffAutofix = {
-                  function()
-                    vim.lsp.buf.code_action {
-                      context = {
-                        only = { 'source.fixAll.ruff' }
-                      },
-                      apply = true,
-                    }
-                  end,
-                  description = 'Ruff: Fix all auto-fixable problems',
-                },
-                RuffOrganizeImports = {
-                  function()
-                    vim.lsp.buf.code_action {
-                      context = {
-                        only = { 'source.organizeImports.ruff' }
-                      },
-                      apply = true,
-                    }
-                  end,
-                  description = 'Ruff: Format imports',
-                },
-              },
-            }
-            lspconfig.ts_ls.setup{}
-            lspconfig.graphql.setup{}
-            lspconfig.gopls.setup{}
-            lspconfig.golangci_lint_ls.setup{}
-            lspconfig.nixd.setup{}
+            ${builtins.readFile ./lua/plugins/lspconfig.lua}
           '';
         }
         # Formatters (hooked up via LSP)
