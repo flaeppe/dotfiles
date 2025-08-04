@@ -69,6 +69,13 @@
             ${builtins.readFile ./functions/workon.fish}
           '';
         };
+        new-session = {
+          description =
+            "Opens a new, independent Kitty window for a specific session file";
+          body = ''
+            ${builtins.readFile ./functions/new-session.fish}
+          '';
+        };
       };
     };
   };
