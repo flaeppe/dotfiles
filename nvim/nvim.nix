@@ -318,6 +318,14 @@
             })
           '';
         }
+        # Navigate Kitty scrollback with nvim
+        {
+          plugin = kitty-scrollback-nvim;
+          type = "lua";
+          config = ''
+            require('kitty-scrollback').setup()
+          '';
+        }
       ];
     };
   };

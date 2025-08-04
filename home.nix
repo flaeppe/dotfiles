@@ -110,6 +110,9 @@ in {
         allow_remote_control = "socket-only";
         listen_on = "unix:/tmp/mykitty";
         kitty_mod = "ctrl+shift";
+        shell_integration = "enabled";
+        # kitty-scrollback.nvim Kitten alias
+        action_alias = "kitty_scrollback_nvim kitten ${pkgs.vimPlugins.kitty-scrollback-nvim}/python/kitty_scrollback_nvim.py";
       };
       keybindings = {
         "cmd+shift+l" = "next_tab";
@@ -128,6 +131,10 @@ in {
         "kitty_mod+8" = "goto_tab 8";
         "kitty_mod+9" = "goto_tab 9";
         "kitty_mod+0" = "goto_tab 10";
+        # Browse scrollback buffer in nvim
+        "ctrl+f" = "kitty_scrollback_nvim --nvim-args -n";
+        # Browse output of the last shell command in nvim
+        "kitty_mod+g" = "kitty_scrollback_nvim --config ksb_builtin_last_cmd_output";
       };
       themeFile = "kanagawa";
     };
