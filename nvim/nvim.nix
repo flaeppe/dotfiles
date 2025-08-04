@@ -136,21 +136,18 @@
             prefix = "",
           },
         })
-        -- Customized startup (when nvim started without args)
-        vim.api.nvim_create_autocmd('VimEnter', {
-          pattern = '*',
-          callback = function()
-            if vim.fn.argc() == 0 and vim.fn.empty(vim.api.nvim_get_current_buf()) then
-              -- Only do this if nvim is started without arguments and no files loaded
-              -- This prevents it from running when you open a specific file directory
-              vim.cmd('vsplit')
-              vim.cmd('NERDTreeToggle')
-              vim.cmd('wincmd l') -- Move to the right window (NERDTree is on the left)
-              vim.cmd('normal! <C-w>=') -- Resize
-            end
-          end,
-          once = true, -- Ensure functions only runs once
-        })
+        -- Define a custom command that opens NERDTree and then moves to the buffer on
+        -- the right. Used when starting nvim
+        vim.api.nvim_create_user_command('OpenTreeAndJump', function()
+          vim.cmd('vsplit')
+          vim.cmd('NERDTreeToggle')
+          -- Ensure the cursor is in the buffer window, not the NERDTree window
+          -- If NERDTree opens on the left, the buffer window is on the right
+          if vim.fn.bufexists(vim.fn.bufname('%')) then -- Check if there's an actual buffer
+            vim.cmd('wincmd l') -- Move to the window on the right
+          end
+          vim.cmd('normal! <C-w>=') -- Resize
+        end, {})
       '';
       plugins = with pkgs.vimPlugins; [
         {
