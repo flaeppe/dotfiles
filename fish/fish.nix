@@ -1,4 +1,4 @@
-{ config, pkgs, ... }: {
+{ pkgs, ... }: {
   # Fish completions, as there's no available config we do this manually
   xdg.configFile."fish/completions/workon.fish".source =
     ./completions/workon.fish;

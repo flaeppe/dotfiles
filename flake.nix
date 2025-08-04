@@ -19,10 +19,7 @@
         packages.homeConfigurations = {
           "petter.friberg" = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
-            modules = [
-              mac-app-util.homeManagerModules.default
-              ./home.nix
-            ];
+            modules = [ mac-app-util.homeManagerModules.default ./home.nix ];
           };
         };
       });
