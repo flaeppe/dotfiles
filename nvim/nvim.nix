@@ -37,6 +37,7 @@
         ${builtins.readFile ./lua/usercmds.lua}
         ${builtins.readFile ./lua/diagnostic.lua}
         ${builtins.readFile ./lua/keymaps.lua}
+        ${builtins.readFile ./lua/plugins/sql.lua}
       '';
       plugins = with pkgs.vimPlugins; [
         {
