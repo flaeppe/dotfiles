@@ -113,6 +113,10 @@
                     enable = true;
                     enableFishIntegration = false;
                     defaultCommand = "rg --files --hidden --glob '!.git/*'";
+                    fileWidgetOptions = [
+                      "--walker-skip .git,node_modules,.direnv,.venv,venv,.pytest_cache,.ruff_cache,__pycache__"
+                      "--preview 'bat -n --color=always {}'"
+                    ];
                   };
 
                   gh = {
