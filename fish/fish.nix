@@ -1,4 +1,8 @@
 { pkgs, ... }: {
+  # Fuzzy find Git branches with advanced preview and actions. It needs more than a
+  # simple function so we manually declare the config file.
+  xdg.configFile."fish/functions/gb.fish".source =
+    ./functions/git-branches.fish;
   # Fish completions, as there's no available config we do this manually
   xdg.configFile."fish/completions/workon.fish".source =
     ./completions/workon.fish;
