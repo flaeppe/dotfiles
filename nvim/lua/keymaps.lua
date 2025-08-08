@@ -14,6 +14,7 @@ vim.keymap.set('n', '<Leader>ll', function() vim.lsp.buf.format { async = true }
 --- LSP (check :h lsp-defaults for default lsp bindings)
 vim.keymap.set('n', 'grd', vim.lsp.buf.definition, bufopts)
 vim.keymap.set('n', 'grD', vim.lsp.buf.declaration, bufopts)
+vim.keymap.set('n', 'grt', vim.lsp.buf.type_definition, bufopts)
 -- Open diagnostic in a floating window
 vim.keymap.set('n', '<Leader>le', function() vim.diagnostic.open_float(nil, { focus = false }) end, bufopts)
 -- Show/hide diagnostic
