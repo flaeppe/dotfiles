@@ -3,6 +3,10 @@
   # simple function so we manually declare the config file.
   xdg.configFile."fish/functions/gb.fish".source =
     ./functions/git-branches.fish;
+  # Fuzzy find Git hashes with preview and actions. It needs more than a simple function
+  # so we manually declared the config file.
+  xdg.configFile."fish/functions/flog.fish".source =
+    ./functions/flog.fish;
   # Fish completions, as there's no available config we do this manually
   xdg.configFile."fish/completions/workon.fish".source =
     ./completions/workon.fish;
@@ -41,12 +45,6 @@
           description = "Set custom key bindings";
           body = ''
             bind \cc 'commandline ""'  # Control-c will reset the line
-          '';
-        };
-        flog = {
-          description = "Fuzzy git log search that outputs the selected hash";
-          body = ''
-            git log --color=always --decorate --oneline | fzf --ansi --reverse | awk '{ print $1 }'
           '';
         };
         man = {
