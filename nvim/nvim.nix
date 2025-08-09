@@ -20,6 +20,7 @@
     nixfmt-classic # Formatter for nix
     nodePackages.graphql-language-service-cli # GrapQL LSP
     sqruff # SQL formatter/linter
+    stylua # Formatter for Lua code
     tree-sitter
     typescript-language-server
     universal-ctags
@@ -114,6 +115,7 @@
                 null_ls.builtins.formatting.sqruff.with({
                   args = { "--config", "${config.home.homeDirectory}/.sqruff", "fix", "-" },
                 }),
+                null_ls.builtins.formatting.stylua
               }
             })
           '';
