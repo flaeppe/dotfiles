@@ -20,7 +20,6 @@
     nixfmt-classic # Formatter for nix
     nodePackages.graphql-language-service-cli # GrapQL LSP
     sqruff # SQL formatter/linter
-    stylua # Formatter for Lua code
     tree-sitter
     typescript-language-server
     universal-ctags

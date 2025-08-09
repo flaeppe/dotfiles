@@ -41,3 +41,12 @@ $ nix-channel --update
 $ nix flake update
 $ nix run home-manager -- switch --refresh --flake path/to/repo
 ```
+
+Add in an .envrc for local development. There's a devShell declared in flake.nix
+
+```console
+use flake
+
+export VIRTUAL_ENV=.venv
+layout python
+```

@@ -177,5 +177,12 @@
             ];
           };
         };
+        devShell = pkgs.mkShell {
+          buildInputs = [
+            pkgs.pyright
+            pkgs.ruff
+            pkgs.stylua # Formatter for Lua code
+          ];
+        };
       });
 }
