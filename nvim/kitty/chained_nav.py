@@ -17,10 +17,10 @@ def handle_result(args: list[str], answer: str, target_window_id: int, boss: Bos
     if neighbor is not None:
         boss.active_tab.neighboring_window(direction)
     # No neighboring window, move tab on left(<--) and right(-->)
-    elif direction == 'left':
+    elif direction == "left":
         boss.previous_tab()
         # TODO: Focus rightmost window
-    elif direction == 'right':
+    elif direction == "right":
         # Move to next tab
         boss.next_tab()
         # Focus the first window (windows are counted clockwise in every layout)
