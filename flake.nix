@@ -81,8 +81,13 @@
                       insert_final_newline = true;
                       indent_style = "space";
                     };
-                    "Makefile" = { indent_style = "tab"; };
+                    "Makefile" = {
+                      indent_style = "tab";
+                      indent_size = "unset";
+                    };
                     "*.py" = { indent_size = 4; };
+                    "*.lua" = { indent_size = 4; };
+                    "*.fish" = { indent_size = 4; };
                   };
                 };
 
