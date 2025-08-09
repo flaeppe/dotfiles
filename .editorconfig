@@ -1,0 +1,28 @@
+# Top-most EditorConfig file
+root = true
+
+[*]
+# Use spaces instead of tabs for indentation
+indent_style = space
+# Indent with 2 spaces by default.
+indent_size = 2
+# Set the end-of-line character to LF (Unix-style).
+end_of_line = lf
+# Set the character encoding to UTF-8.
+charset = utf-8
+# Remove any whitespace at the end of lines.
+trim_trailing_whitespace = true
+# Ensure that a file ends with a blank line.
+insert_final_newline = true
+
+[*.py]
+indent_size = 4
+
+[*.nix]
+# No override needed, uses global default of 2 spaces.
+
+[*.lua]
+indent_size = 4
+
+[*.fish]
+indent_size = 4
