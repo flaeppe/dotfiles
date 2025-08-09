@@ -22,16 +22,17 @@
           rev = "cc3b68b08e6a0cb6e6bf9944932940091e49bb83";
           sha256 = "0mi15a4cxbrqzwb9xl47scar8ald5xm108r35jxcdrmahinw62rz";
         };
+        username = "petter.friberg";
       in {
         packages.homeConfigurations = {
-          "petter.friberg" = home-manager.lib.homeManagerConfiguration {
+          ${username} = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
             modules = [
               mac-app-util.homeManagerModules.default
               ({ pkgs, ... }: {
                 home = {
-                  username = "petter.friberg";
-                  homeDirectory = "/Users/petter.friberg";
+                  inherit username;
+                  homeDirectory = "/Users/${username}";
                   language = {
                     base = "en_US.UTF-8";
                     collate = "C";
