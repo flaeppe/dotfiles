@@ -7,7 +7,8 @@
   # Plugin and scripts for seamless navigation between nvim and kitty
   xdg.configFile."kitty/chained_nav.py".source = ./kitty/chained_nav.py;
   xdg.configFile."kitty/vim_nav.py".source = ./kitty/vim_nav.py;
-  xdg.configFile."nvim/lua/plugins/kitty_nav.lua".source = ./lua/plugins/kitty_nav.lua;
+  xdg.configFile."nvim/lua/plugins/kitty_nav.lua".source =
+    ./lua/plugins/kitty_nav.lua;
 
   home.packages = with pkgs; [
     golangci-lint # Golang linter

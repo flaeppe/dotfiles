@@ -5,8 +5,7 @@
     ./functions/git-branches.fish;
   # Fuzzy find Git hashes with preview and actions. It needs more than a simple function
   # so we manually declared the config file.
-  xdg.configFile."fish/functions/flog.fish".source =
-    ./functions/flog.fish;
+  xdg.configFile."fish/functions/flog.fish".source = ./functions/flog.fish;
 
   programs = {
     fish = {
