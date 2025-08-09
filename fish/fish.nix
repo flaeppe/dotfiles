@@ -7,9 +7,6 @@
   # so we manually declared the config file.
   xdg.configFile."fish/functions/flog.fish".source =
     ./functions/flog.fish;
-  # Fish completions, as there's no available config we do this manually
-  xdg.configFile."fish/completions/workon.fish".source =
-    ./completions/workon.fish;
 
   programs = {
     fish = {
@@ -62,13 +59,6 @@
             set -x LESS "-R"
 
             command man $argv
-          '';
-        };
-        workon = {
-          description =
-            "Moves you to the project directory and activates the associated virtualenv, if any found";
-          body = ''
-            ${builtins.readFile ./functions/workon.fish}
           '';
         };
         new-session = {
