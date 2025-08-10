@@ -16,6 +16,7 @@
     gopls # Official LSP for Go
     gotools # Various tools and packages for Go static analysis
     hadolint # Dockerfile linter
+    markdownlint-cli # Style checker and lint tool for Markdown
     nixd # Language server for nix
     nixfmt-classic # Formatter for nix
     nodePackages.graphql-language-service-cli # GrapQL LSP
@@ -113,7 +114,9 @@
                 null_ls.builtins.formatting.sqruff.with({
                   args = { "--config", "${config.home.homeDirectory}/.sqruff", "fix", "-" },
                 }),
-                null_ls.builtins.formatting.stylua
+                null_ls.builtins.formatting.stylua,
+                null_ls.builtins.diagnostics.markdownlint,
+                null_ls.builtins.formatting.markdownlint
               }
             })
           '';
