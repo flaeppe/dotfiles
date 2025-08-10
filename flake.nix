@@ -23,6 +23,13 @@
           sha256 = "0mi15a4cxbrqzwb9xl47scar8ald5xm108r35jxcdrmahinw62rz";
         };
         username = "petter.friberg";
+        luarcJsonContent = builtins.toJSON {
+          diagnostics.globals = [ "vim" ];
+          workspace = {
+            ignoreDir = [ ".direnv" ".git" ];
+            library = [ "${pkgs.neovim}/share/nvim/runtime" "$HOME/.config/nvim" ];
+          };
+        };
       in {
         packages.homeConfigurations = {
           ${username} = home-manager.lib.homeManagerConfiguration {
@@ -179,10 +186,14 @@
         };
         devShell = pkgs.mkShell {
           buildInputs = [
+            pkgs.lua-language-server
             pkgs.pyright
             pkgs.ruff
             pkgs.stylua # Formatter for Lua code
           ];
+          shellHook = ''
+            echo '${luarcJsonContent}' > ./.luarc.json
+          '';
         };
       });
 }
