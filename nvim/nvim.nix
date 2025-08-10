@@ -70,7 +70,6 @@
         # Mark which lines have changed
         vim-gitgutter
         # Quick and easy file searching
-        fzfWrapper
         {
           plugin = fzf-lua;
           type = "lua";
