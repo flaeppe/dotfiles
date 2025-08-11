@@ -158,10 +158,12 @@
                     keybindings = {
                       "cmd+shift+l" = "next_tab";
                       "cmd+shift+h" = "previous_tab";
+                      "cmd+t" = "new_tab_with_cwd";
                       "ctrl+j" = "kitten vim_nav.py bottom ctrl+j";
                       "ctrl+k" = "kitten vim_nav.py top ctrl+k";
                       "ctrl+h" = "kitten vim_nav.py left ctrl+h";
                       "ctrl+l" = "kitten vim_nav.py right ctrl+l";
+                      "kitty_mod+t" = "new_tab_with_cwd";
                       "kitty_mod+1" = "goto_tab 1";
                       "kitty_mod+2" = "goto_tab 2";
                       "kitty_mod+3" = "goto_tab 3";
