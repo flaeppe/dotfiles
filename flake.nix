@@ -60,6 +60,7 @@
                     jq
                     kubectl
                     less
+                    openssl
                     ripgrep
                   ];
                   # This doesn't work though hm-session-vars.fish is updated..
