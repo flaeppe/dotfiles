@@ -9,7 +9,16 @@ fzf.setup({
         rg_opts = "--glob '!.git/*' --column --line-number --no-heading --color=always --smart-case --max-columns=4096 -e",
         hidden = true,
     },
+    keymap = {
+        fzf = {
+            -- Send results to quicklist
+            ["ctrl-q"] = "select-all+accept",
+        },
+    },
 })
+vim.keymap.set("n", "F", function()
+    fzf.builtin()
+end, { desc = "View fzf-lua commands" })
 vim.keymap.set("n", "<C-p>", function()
     fzf.files()
 end, { silent = true, desc = "Search files with FZF" })
