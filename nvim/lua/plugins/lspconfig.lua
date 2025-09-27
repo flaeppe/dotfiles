@@ -35,7 +35,14 @@ lspconfig.ruff.setup({
 })
 lspconfig.ts_ls.setup({})
 lspconfig.graphql.setup({})
-lspconfig.gopls.setup({})
+lspconfig.gopls.setup({
+    settings = {
+        gopls = {
+            staticcheck = true,
+            gofumpt = true,
+        }
+    },
+})
 lspconfig.golangci_lint_ls.setup({})
 lspconfig.nixd.setup({})
 lspconfig.lua_ls.setup({})
