@@ -161,6 +161,8 @@
                       "cmd+shift+l" = "next_tab";
                       "cmd+shift+h" = "previous_tab";
                       "cmd+t" = "new_tab_with_cwd";
+                      # Browse scrollback buffer in nvim
+                      "ctrl+f" = "kitty_scrollback_nvim --nvim-args -n";
                       "ctrl+j" = "kitten vim_nav.py bottom ctrl+j";
                       "ctrl+k" = "kitten vim_nav.py top ctrl+k";
                       "ctrl+h" = "kitten vim_nav.py left ctrl+h";
@@ -176,8 +178,7 @@
                       "kitty_mod+8" = "goto_tab 8";
                       "kitty_mod+9" = "goto_tab 9";
                       "kitty_mod+0" = "goto_tab 10";
-                      # Browse scrollback buffer in nvim
-                      "ctrl+f" = "kitty_scrollback_nvim --nvim-args -n";
+                      "option+l" = "toggle_layout stack";
                       # Browse output of the last shell command in nvim
                       "kitty_mod+g" =
                         "kitty_scrollback_nvim --config ksb_builtin_last_cmd_output";
