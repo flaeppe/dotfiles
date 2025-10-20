@@ -51,6 +51,7 @@
                   packages = with pkgs; [
                     coreutils
                     curl
+                    dive
                     fd
                     git-crypt
                     glow
