@@ -3,7 +3,7 @@ os_window_name dotfiles
 focus_os_window
 
 # Tab 1: Code (single pane)
-new_tab code
+new_tab dotfiles
 layout fat
 # Run direnv export explicitly as fish interactive hooks aren't triggered when launching
 launch --cwd ~/.dotfiles fish -i -c 'direnv export fish | source; and nvim -c "OpenTreeAndJump"'

@@ -3,6 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs";
+    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     home-manager = {
       url = "github:nix-community/home-manager";
@@ -12,10 +13,11 @@
     mac-app-util.url = "github:hraban/mac-app-util";
   };
 
-  outputs = { nixpkgs, home-manager, flake-utils, mac-app-util, ... }:
+  outputs = { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, mac-app-util, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
+        unstable = nixpkgs-unstable.legacyPackages.${system};
         kanagawaRepo = pkgs.fetchFromGitHub {
           owner = "rebelot";
           repo = "kanagawa.nvim";
@@ -146,6 +148,7 @@
                   gpg = { enable = true; };
 
                   kitty = {
+                    package = unstable.kitty;
                     enable = true;
                     settings = {
                       allow_remote_control = "socket-only";
@@ -156,11 +159,14 @@
                       action_alias =
                         "kitty_scrollback_nvim kitten ${pkgs.vimPlugins.kitty-scrollback-nvim}/python/kitty_scrollback_nvim.py";
                       font_size = "8.0";
+                      include = "project-sessions.conf";
                     };
                     keybindings = {
                       "cmd+shift+l" = "next_tab";
                       "cmd+shift+h" = "previous_tab";
                       "cmd+t" = "new_tab_with_cwd";
+                      "cmd+s>x" = "close_session";
+                      "cmd+s>/" = "goto_session --sort-by=alphabetical";
                       # Browse scrollback buffer in nvim
                       "ctrl+f" = "kitty_scrollback_nvim --nvim-args -n";
                       "ctrl+j" = "neighboring_window bottom";
