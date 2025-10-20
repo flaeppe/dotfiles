@@ -163,10 +163,10 @@
                       "cmd+t" = "new_tab_with_cwd";
                       # Browse scrollback buffer in nvim
                       "ctrl+f" = "kitty_scrollback_nvim --nvim-args -n";
-                      "ctrl+j" = "kitten vim_nav.py bottom ctrl+j";
-                      "ctrl+k" = "kitten vim_nav.py top ctrl+k";
-                      "ctrl+h" = "kitten vim_nav.py left ctrl+h";
-                      "ctrl+l" = "kitten vim_nav.py right ctrl+l";
+                      "ctrl+j" = "neighboring_window bottom";
+                      "ctrl+k" = "neighboring_window top";
+                      "ctrl+h" = "neighboring_window left";
+                      "ctrl+l" = "neighboring_window right";
                       "kitty_mod+t" = "new_tab_with_cwd";
                       "kitty_mod+1" = "goto_tab 1";
                       "kitty_mod+2" = "goto_tab 2";
