@@ -138,6 +138,7 @@
                   };
 
                   gh = {
+                    package = unstable.gh;
                     enable = true;
                     settings = {
                       aliases = { co = "pr checkout"; };
