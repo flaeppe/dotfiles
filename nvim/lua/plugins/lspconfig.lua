@@ -1,3 +1,4 @@
+-- TODO: require("...") is deprecated, replace it
 local lspconfig = require("lspconfig")
 lspconfig.pyright.setup({
     settings = {
