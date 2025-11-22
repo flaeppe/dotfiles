@@ -1,6 +1,4 @@
--- TODO: require("...") is deprecated, replace it
-local lspconfig = require("lspconfig")
-lspconfig.pyright.setup({
+vim.lsp.config("pyright", {
     settings = {
         pyright = {
             -- Prefer Ruff's import organizer
@@ -8,7 +6,8 @@ lspconfig.pyright.setup({
         },
     },
 })
-lspconfig.ruff.setup({
+vim.lsp.enable("pyright")
+vim.lsp.config("ruff", {
     commands = {
         RuffAutofix = {
             function()
@@ -34,9 +33,10 @@ lspconfig.ruff.setup({
         },
     },
 })
-lspconfig.ts_ls.setup({})
-lspconfig.graphql.setup({})
-lspconfig.gopls.setup({
+vim.lsp.enable("ruff")
+vim.lsp.enable("ts_ls")
+vim.lsp.enable("graphql")
+vim.lsp.config("gopls", {
     settings = {
         gopls = {
             staticcheck = true,
@@ -44,7 +44,8 @@ lspconfig.gopls.setup({
         }
     },
 })
-lspconfig.golangci_lint_ls.setup({})
-lspconfig.nixd.setup({})
-lspconfig.lua_ls.setup({})
-lspconfig.marksman.setup({})
+vim.lsp.enable("gopls")
+vim.lsp.enable("golangci_lint_ls")
+vim.lsp.enable("nixd")
+vim.lsp.enable("lua_ls")
+vim.lsp.enable("marksman")
