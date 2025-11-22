@@ -13,7 +13,8 @@
     mac-app-util.url = "github:hraban/mac-app-util";
   };
 
-  outputs = { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, mac-app-util, ... }:
+  outputs =
+    { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, mac-app-util, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -29,7 +30,8 @@
           diagnostics.globals = [ "vim" ];
           workspace = {
             ignoreDir = [ ".direnv" ".git" ];
-            library = [ "${pkgs.neovim}/share/nvim/runtime" "$HOME/.config/nvim" ];
+            library =
+              [ "${pkgs.neovim}/share/nvim/runtime" "$HOME/.config/nvim" ];
           };
         };
         # Packages built with node2nix
@@ -56,23 +58,24 @@
                     monetary = "sv_SE.UTF-8";
                     time = "en_US.UTF-8";
                   };
-                  packages = with pkgs; [
-                    builtNodePkgs."@github/copilot"
-                    coreutils
-                    curl
-                    dive
-                    fd
-                    git-crypt
-                    glow
-                    (google-cloud-sdk.withExtraComponents
-                      [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
-                    htop
-                    jq
-                    kubectl
-                    less
-                    openssl
-                    ripgrep
-                  ] ++ [ unstable.gemini-cli ];
+                  packages = with pkgs;
+                    [
+                      builtNodePkgs."@github/copilot"
+                      coreutils
+                      curl
+                      dive
+                      fd
+                      git-crypt
+                      glow
+                      (google-cloud-sdk.withExtraComponents
+                        [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
+                      htop
+                      jq
+                      kubectl
+                      less
+                      openssl
+                      ripgrep
+                    ] ++ [ unstable.gemini-cli ];
                   # This doesn't work though hm-session-vars.fish is updated..
                   sessionPath = [ "$HOME/.local/bin" ];
                   sessionVariables = {
