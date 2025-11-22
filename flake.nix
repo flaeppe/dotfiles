@@ -32,6 +32,12 @@
             library = [ "${pkgs.neovim}/share/nvim/runtime" "$HOME/.config/nvim" ];
           };
         };
+        # Packages built with node2nix
+        builtNodePkgs = import ./node-packages {
+          inherit pkgs system;
+          # Pass desired Node.js version from nixpkgs
+          nodejs = pkgs.nodejs;
+        };
       in {
         packages.homeConfigurations = {
           ${username} = home-manager.lib.homeManagerConfiguration {
@@ -51,6 +57,7 @@
                     time = "en_US.UTF-8";
                   };
                   packages = with pkgs; [
+                    builtNodePkgs."@github/copilot"
                     coreutils
                     curl
                     dive
@@ -65,7 +72,7 @@
                     less
                     openssl
                     ripgrep
-                  ];
+                  ] ++ [ unstable.gemini-cli ];
                   # This doesn't work though hm-session-vars.fish is updated..
                   sessionPath = [ "$HOME/.local/bin" ];
                   sessionVariables = {
