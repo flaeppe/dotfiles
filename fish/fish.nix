@@ -30,6 +30,10 @@
         # Disable 'activate.fish' auto setting and displaying fish status
         set -x VIRTUAL_ENV_DISABLE_PROMPT 1
       '';
+      interactiveShellInit = ''
+        # TODO remove when https://github.com/NixOS/nixpkgs/issues/462025 gets resolved
+        set -p fish_complete_path ${pkgs.fish}/share/fish/completions
+      '';
       functions = {
         fish_prompt = {
           description = "Write out the prompt";
