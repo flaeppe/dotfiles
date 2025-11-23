@@ -16,6 +16,7 @@ fzf.setup({
         },
     },
 })
+fzf.register_ui_select()
 vim.keymap.set("n", "F", function()
     fzf.builtin()
 end, { desc = "View fzf-lua commands" })

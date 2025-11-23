@@ -18,7 +18,15 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        unstable = nixpkgs-unstable.legacyPackages.${system};
+        unstable = import nixpkgs-unstable {
+          inherit system;
+
+          config = {
+            allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [
+              "copilot.vim"
+            ];
+          };
+        };
         kanagawaRepo = pkgs.fetchFromGitHub {
           owner = "rebelot";
           repo = "kanagawa.nvim";
@@ -206,6 +214,9 @@
                 };
               })
             ];
+            extraSpecialArgs = {
+              unstable = unstable;
+            };
           };
         };
         devShell = pkgs.mkShell {
