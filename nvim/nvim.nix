@@ -1,10 +1,10 @@
-{ config, pkgs, unstable, ... }:
+{ config, pkgs, unstable, builtNodePkgs, ... }:
 
 # TODO: See https://www.reddit.com/r/NixOS/comments/vc3srj/comment/icbwtvr/ for
 #       a way to improve config with mutable dotfiles/config files
 
 {
-  home.packages = with pkgs; [
+  home.packages = [builtNodePkgs."@github/copilot"] ++ (with pkgs; [
     golangci-lint # Golang linter
     golangci-lint-langserver # Language server for golangci-lint
     gopls # Official LSP for Go
@@ -18,7 +18,7 @@
     tree-sitter
     typescript-language-server
     universal-ctags
-  ];
+  ]);
   # Setup default tags for universal-ctags
   home.file.".ctags.d/default.ctags".source = ./.ctags.d/default.ctags;
   # User config for sqruff

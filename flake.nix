@@ -68,7 +68,6 @@
                   };
                   packages = with pkgs;
                     [
-                      builtNodePkgs."@github/copilot"
                       coreutils
                       curl
                       dive
@@ -216,6 +215,7 @@
             ];
             extraSpecialArgs = {
               unstable = unstable;
+              builtNodePkgs = builtNodePkgs;
             };
           };
         };
