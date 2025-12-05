@@ -9,12 +9,10 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Nix utils for Mac App launchers. Helps launching .app programs from Spotlight
-    mac-app-util.url = "github:hraban/mac-app-util";
   };
 
   outputs =
-    { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, mac-app-util, ... }:
+    { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -53,7 +51,6 @@
           ${username} = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
             modules = [
-              mac-app-util.homeManagerModules.default
               ({ pkgs, ... }: {
                 home = {
                   inherit username;
@@ -95,7 +92,7 @@
                     # Set SSL backend for curl
                     PYCURL_SSL_LIBRARY = "openssl";
                   };
-                  stateVersion = "24.11";
+                  stateVersion = "25.11";
                   # Add configuration for gpg-agent
                   file.".gnupg/gpg-agent.conf".source = ./gnupg/gpg-agent.conf;
                 };
@@ -138,6 +135,7 @@
                       };
                     };
                   };
+
 
                   direnv = {
                     enable = true;
