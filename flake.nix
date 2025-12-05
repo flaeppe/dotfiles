@@ -170,6 +170,7 @@
                       allow_remote_control = "socket-only";
                       listen_on = "unix:/tmp/mykitty";
                       kitty_mod = "ctrl+shift";
+                      shell = "${pkgs.fish}/bin/fish";
                       shell_integration = "enabled";
                       # kitty-scrollback.nvim Kitten alias
                       action_alias =

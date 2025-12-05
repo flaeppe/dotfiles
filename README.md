@@ -29,7 +29,7 @@ Configure dotfiles by running
 nix run home-manager -- switch --no-write-lock-file --refresh --flake github:flaeppe/dotfiles
 ```
 
-Setting `fish` as default shell on macOS
+Setting `fish` as default shell on macOS (optional as kitty terminal sets fish as default shell)
 
 1. Append entry for home-manager managed `fish` binary to `/etc/shells`
 2. Set default shell with `chsh -s ~/.nix-profile/bin/fish`
