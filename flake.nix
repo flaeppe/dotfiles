@@ -63,7 +63,7 @@
                     monetary = "sv_SE.UTF-8";
                     time = "en_US.UTF-8";
                   };
-                  packages = with pkgs;
+                  packages = (with pkgs;
                     [
                       coreutils
                       curl
@@ -75,13 +75,17 @@
                         [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
                       htop
                       jq
-                      kubectl
                       less
                       openssl
                       ripgrep
-                    ] ++ [ unstable.gemini-cli ];
+                    ]) ++ [
+                      unstable.gemini-cli
+                    ];
                   # This doesn't work though hm-session-vars.fish is updated..
-                  sessionPath = [ "$HOME/.local/bin" ];
+                  sessionPath = [
+                    "$HOME/.local/bin"
+                    "/usr/local/bin"
+                  ];
                   sessionVariables = {
                     EDITOR = "nvim";
                     # Set better color when printing folders
