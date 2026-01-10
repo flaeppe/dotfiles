@@ -85,6 +85,7 @@
                   sessionPath = [
                     "$HOME/.local/bin"
                     "/usr/local/bin"
+                    "$HOME/.opencode/bin"
                   ];
                   sessionVariables = {
                     EDITOR = "nvim";
