@@ -11,8 +11,7 @@
     };
   };
 
-  outputs =
-    { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, ... }:
+  outputs = { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
@@ -20,9 +19,8 @@
           inherit system;
 
           config = {
-            allowUnfreePredicate = pkg: builtins.elem (nixpkgs.lib.getName pkg) [
-              "copilot.vim"
-            ];
+            allowUnfreePredicate = pkg:
+              builtins.elem (nixpkgs.lib.getName pkg) [ "copilot.vim" ];
           };
         };
         kanagawaRepo = pkgs.fetchFromGitHub {
@@ -63,24 +61,22 @@
                     monetary = "sv_SE.UTF-8";
                     time = "en_US.UTF-8";
                   };
-                  packages = (with pkgs;
-                    [
-                      coreutils
-                      curl
-                      dive
-                      fd
-                      git-crypt
-                      glow
-                      (google-cloud-sdk.withExtraComponents
-                        [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
-                      htop
-                      jq
-                      less
-                      openssl
-                      ripgrep
-                    ]) ++ [
-                      unstable.gemini-cli
-                    ];
+                  packages = (with pkgs; [
+                    coreutils
+                    curl
+                    dive
+                    fd
+                    git-crypt
+                    glow
+                    (google-cloud-sdk.withExtraComponents
+                      [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
+                    htop
+                    jq
+                    less
+                    openssl
+                    ripgrep
+                    sentry-cli
+                  ]) ++ [ unstable.gemini-cli ];
                   # This doesn't work though hm-session-vars.fish is updated..
                   sessionPath = [
                     "$HOME/.local/bin"
@@ -140,7 +136,6 @@
                       };
                     };
                   };
-
 
                   direnv = {
                     enable = true;
