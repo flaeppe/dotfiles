@@ -77,6 +77,7 @@
         ".direnv/"
         # Directory specific ctags config
         ".ctags.d/"
+        ".worktrees"
       ];
 
     };
