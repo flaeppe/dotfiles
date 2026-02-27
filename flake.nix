@@ -76,13 +76,25 @@
                     openssl
                     ripgrep
                     sentry-cli
-                  ]) ++ [ unstable.gemini-cli ];
-                  # This doesn't work though hm-session-vars.fish is updated..
-                  sessionPath = [
-                    "$HOME/.local/bin"
-                    "/usr/local/bin"
-                    "$HOME/.opencode/bin"
+                  ]) ++ [
+                    unstable.gemini-cli
+                    (pkgs.writeShellScriptBin "opencode" ''
+                      set -euo pipefail
+                      _env_file="''${XDG_CONFIG_HOME:-$HOME/.config}/opencode/.env"
+                      if [[ -f "$_env_file" ]]; then
+                        set -a
+                        source "$_env_file"
+                        set +a
+                      fi
+                      _superpowers="''${XDG_CONFIG_HOME:-$HOME/.config}/opencode/superpowers"
+                      if [[ -d "$_superpowers/.git" ]]; then
+                        ${pkgs.git}/bin/git -C "$_superpowers" pull --ff-only --quiet 2>/dev/null &
+                      fi
+                      exec "$HOME/.opencode/bin/opencode" "$@"
+                    '')
                   ];
+                  # This doesn't work though hm-session-vars.fish is updated..
+                  sessionPath = [ "$HOME/.local/bin" "/usr/local/bin" ];
                   sessionVariables = {
                     EDITOR = "nvim";
                     # Set better color when printing folders
