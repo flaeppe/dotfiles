@@ -49,7 +49,7 @@
           ${username} = home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
             modules = [
-              ({ pkgs, ... }: {
+              ({ pkgs, lib, ... }: {
                 home = {
                   inherit username;
                   homeDirectory = "/Users/${username}";
@@ -80,12 +80,11 @@
                     unstable.gemini-cli
                     (pkgs.writeShellScriptBin "opencode" ''
                       set -euo pipefail
-                      _env_file="''${XDG_CONFIG_HOME:-$HOME/.config}/opencode/.env"
-                      if [[ -f "$_env_file" ]]; then
-                        set -a
-                        source "$_env_file"
-                        set +a
-                      fi
+                      # Load secrets from pass into environment (skip if missing)
+                      _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
+                      _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
+                      _v="$(_pass dev/github-private-pat)";  [[ -n "$_v" ]] && export GITHUB_PRIVATE_PAT="$_v"
+                      _v="$(_pass dev/github-anyfin-pat)";   [[ -n "$_v" ]] && export GITHUB_ANYFIN_PAT="$_v"
                       _superpowers="''${XDG_CONFIG_HOME:-$HOME/.config}/opencode/superpowers"
                       if [[ -d "$_superpowers/.git" ]]; then
                         ${pkgs.git}/bin/git -C "$_superpowers" pull --ff-only --quiet 2>/dev/null &
@@ -108,6 +107,36 @@
                   stateVersion = "25.11";
                   # Add configuration for gpg-agent
                   file.".gnupg/gpg-agent.conf".source = ./gnupg/gpg-agent.conf;
+
+                  activation = {
+                    # Write ~/.sentryclirc from pass
+                    writeSentryclirc =
+                      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+                        _token="$(${pkgs.pass}/bin/pass show dev/sentry-token 2>/dev/null || true)"
+                        if [[ -n "$_token" ]]; then
+                          printf '[auth]\ntoken=%s\n' "$_token" > "$HOME/.sentryclirc"
+                          chmod 600 "$HOME/.sentryclirc"
+                        fi
+                      '';
+
+                    # Write opencode auth files from pass
+                    writeOpencodeAuth =
+                      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+                        _dir="$HOME/.local/share/opencode"
+                        ${pkgs.coreutils}/bin/mkdir -p "$_dir"
+                        _auth="$(${pkgs.pass}/bin/pass show dev/opencode-auth 2>/dev/null || true)"
+                        if [[ -n "$_auth" ]]; then
+                          printf '%s\n' "$_auth" > "$_dir/auth.json"
+                          chmod 600 "$_dir/auth.json"
+                        fi
+                        _mcp="$(${pkgs.pass}/bin/pass show dev/opencode-mcp-auth 2>/dev/null || true)"
+                        if [[ -n "$_mcp" ]]; then
+                          printf '%s\n' "$_mcp" > "$_dir/mcp-auth.json"
+                          chmod 600 "$_dir/mcp-auth.json"
+                        fi
+                      '';
+
+                  };
                 };
                 editorconfig = {
                   enable = true;
@@ -180,6 +209,11 @@
 
                   gpg = { enable = true; };
 
+                  password-store = {
+                    enable = true;
+                    settings = { PASSWORD_STORE_CLIP_TIME = "45"; };
+                  };
+
                   kitty = {
                     package = unstable.kitty;
                     enable = true;
@@ -227,6 +261,7 @@
                     themeFile = "kanagawa";
                   };
                 };
+
               })
             ];
             extraSpecialArgs = {

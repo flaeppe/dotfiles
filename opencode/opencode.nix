@@ -20,10 +20,5 @@
       source = ./skills;
       recursive = true;
     };
-
-    "opencode/plans" = {
-      source = ./plans;
-      recursive = true;
-    };
   };
 }

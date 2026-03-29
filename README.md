@@ -7,15 +7,6 @@ dotfiles
 sh <(curl -L https://nixos.org/nix/install)
 ```
 
-[Install home manager](https://nix-community.github.io/home-manager/index.xhtml#ch-installation)
-
-```bash
-# Install home-manager from e.g. 'release-23.11' branch
-nix-channel --add https://github.com/nix-community/home-manager/archive/release-23.11.tar.gz home-manager
-nix-channel --update
-nix-shell '<home-manager>' -A install
-```
-
 Enable nix experimental features
 
 ```bash
@@ -37,7 +28,6 @@ Setting `fish` as default shell on macOS (optional as kitty terminal sets fish a
 Update packages by running
 
 ```bash
-nix-channel --update
 nix flake update
 nix run home-manager -- switch --refresh --flake path/to/repo
 ```
@@ -50,3 +40,11 @@ use flake
 export VIRTUAL_ENV=.venv
 layout python
 ```
+
+## Secrets
+
+Secrets are managed by [pass](https://www.passwordstore.org/) (GPG-encrypted, git-synced).
+The opencode wrapper reads secrets from `pass` at launch. Home Manager activation
+scripts write `~/.sentryclirc` and opencode auth files from `pass` on `home-manager switch`.
+
+GPG private keys are backed up in iCloud Keychain.
