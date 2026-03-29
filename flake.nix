@@ -136,6 +136,28 @@
                         fi
                       '';
 
+                    # Write SSH keys from pass
+                    writeSshKeys = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+                      _ssh="$HOME/.ssh"
+                      ${pkgs.coreutils}/bin/mkdir -p "$_ssh"
+                      chmod 700 "$_ssh"
+                      _write_key() {
+                        local pass_path="$1" file="$2" mode="$3"
+                        local content
+                        content="$(${pkgs.pass}/bin/pass show "$pass_path" 2>/dev/null || true)"
+                        if [[ -n "$content" && ! -e "$_ssh/$file" ]]; then
+                          printf '%s\n' "$content" > "$_ssh/$file"
+                          chmod "$mode" "$_ssh/$file"
+                        fi
+                      }
+                      _write_key ssh/id-ed25519              id_ed25519              600
+                      _write_key ssh/id-ed25519-pub          id_ed25519.pub          644
+                      _write_key ssh/id-rsa                  id_rsa                  600
+                      _write_key ssh/id-rsa-pub              id_rsa.pub              644
+                      _write_key ssh/google-compute-engine       google_compute_engine       600
+                      _write_key ssh/google-compute-engine-pub   google_compute_engine.pub   644
+                    '';
+
                   };
                 };
                 editorconfig = {
