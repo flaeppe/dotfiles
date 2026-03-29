@@ -132,11 +132,11 @@
                       PATH="${passPath}:$PATH"; export PATH
                       mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
                       ${ptf} ssh/id-ed25519              "$HOME/.ssh/id_ed25519"              600
-                      ${ptf} ssh/id-ed25519-pub          "$HOME/.ssh/id_ed25519.pub"          644
+                      ${ptf} ssh/id-ed25519.pub          "$HOME/.ssh/id_ed25519.pub"          644
                       ${ptf} ssh/id-rsa                  "$HOME/.ssh/id_rsa"                  600
-                      ${ptf} ssh/id-rsa-pub              "$HOME/.ssh/id_rsa.pub"              644
+                      ${ptf} ssh/id-rsa.pub              "$HOME/.ssh/id_rsa.pub"              644
                       ${ptf} ssh/google-compute-engine     "$HOME/.ssh/google_compute_engine"     600
-                      ${ptf} ssh/google-compute-engine-pub "$HOME/.ssh/google_compute_engine.pub" 644
+                      ${ptf} ssh/google-compute-engine.pub "$HOME/.ssh/google_compute_engine.pub" 644
                     '';
                   };
                 };
