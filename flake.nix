@@ -108,56 +108,36 @@
                   # Add configuration for gpg-agent
                   file.".gnupg/gpg-agent.conf".source = ./gnupg/gpg-agent.conf;
 
-                  activation = {
-                    # Write ~/.sentryclirc from pass
+                  activation = let
+                    ptf = "${pkgs.bash}/bin/bash ${./scripts/pass-to-file.sh}";
+                    passPath = "${pkgs.pass}/bin:${pkgs.coreutils}/bin";
+                  in {
                     writeSentryclirc =
                       lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-                        _token="$(${pkgs.pass}/bin/pass show dev/sentry-token 2>/dev/null || true)"
-                        if [[ -n "$_token" ]]; then
-                          printf '[auth]\ntoken=%s\n' "$_token" > "$HOME/.sentryclirc"
-                          chmod 600 "$HOME/.sentryclirc"
-                        fi
+                        PATH="${passPath}:$PATH" \
+                          ${pkgs.bash}/bin/bash ${
+                            ./scripts/write-sentryclirc.sh
+                          }
                       '';
 
-                    # Write opencode auth files from pass
                     writeOpencodeAuth =
                       lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-                        _dir="$HOME/.local/share/opencode"
-                        ${pkgs.coreutils}/bin/mkdir -p "$_dir"
-                        _auth="$(${pkgs.pass}/bin/pass show dev/opencode-auth 2>/dev/null || true)"
-                        if [[ -n "$_auth" ]]; then
-                          printf '%s\n' "$_auth" > "$_dir/auth.json"
-                          chmod 600 "$_dir/auth.json"
-                        fi
-                        _mcp="$(${pkgs.pass}/bin/pass show dev/opencode-mcp-auth 2>/dev/null || true)"
-                        if [[ -n "$_mcp" ]]; then
-                          printf '%s\n' "$_mcp" > "$_dir/mcp-auth.json"
-                          chmod 600 "$_dir/mcp-auth.json"
-                        fi
+                        PATH="${passPath}:$PATH"; export PATH
+                        _dir="$HOME/.local/share/opencode"; mkdir -p "$_dir"
+                        ${ptf} dev/opencode-auth     "$_dir/auth.json"     600
+                        ${ptf} dev/opencode-mcp-auth "$_dir/mcp-auth.json" 600
                       '';
 
-                    # Write SSH keys from pass
                     writeSshKeys = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-                      _ssh="$HOME/.ssh"
-                      ${pkgs.coreutils}/bin/mkdir -p "$_ssh"
-                      chmod 700 "$_ssh"
-                      _write_key() {
-                        local pass_path="$1" file="$2" mode="$3"
-                        local content
-                        content="$(${pkgs.pass}/bin/pass show "$pass_path" 2>/dev/null || true)"
-                        if [[ -n "$content" && ! -e "$_ssh/$file" ]]; then
-                          printf '%s\n' "$content" > "$_ssh/$file"
-                          chmod "$mode" "$_ssh/$file"
-                        fi
-                      }
-                      _write_key ssh/id-ed25519              id_ed25519              600
-                      _write_key ssh/id-ed25519-pub          id_ed25519.pub          644
-                      _write_key ssh/id-rsa                  id_rsa                  600
-                      _write_key ssh/id-rsa-pub              id_rsa.pub              644
-                      _write_key ssh/google-compute-engine       google_compute_engine       600
-                      _write_key ssh/google-compute-engine-pub   google_compute_engine.pub   644
+                      PATH="${passPath}:$PATH"; export PATH
+                      mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
+                      ${ptf} ssh/id-ed25519              "$HOME/.ssh/id_ed25519"              600
+                      ${ptf} ssh/id-ed25519-pub          "$HOME/.ssh/id_ed25519.pub"          644
+                      ${ptf} ssh/id-rsa                  "$HOME/.ssh/id_rsa"                  600
+                      ${ptf} ssh/id-rsa-pub              "$HOME/.ssh/id_rsa.pub"              644
+                      ${ptf} ssh/google-compute-engine     "$HOME/.ssh/google_compute_engine"     600
+                      ${ptf} ssh/google-compute-engine-pub "$HOME/.ssh/google_compute_engine.pub" 644
                     '';
-
                   };
                 };
                 editorconfig = {
