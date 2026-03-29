@@ -1,0 +1,180 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "anthropic/claude-opus-4-6",
+  "small_model": "anthropic/claude-haiku-4-5",
+  "autoupdate": "notify",
+  "default_agent": "plan",
+
+  "instructions": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    ".claude/CLAUDE.md",
+    ".claude/rules/*.md",
+    ".github/copilot-instructions.md",
+    ".github/instructions/*.instructions.md",
+    ".cursor/rules/*.mdc",
+    ".cursorrules",
+    ".windsurf/rules/*.md",
+    "CONVENTIONS.md",
+    "CONTRIBUTING.md"
+  ],
+
+  "provider": {
+    "anthropic": {
+      "options": {
+        "timeout": 600000,
+        "setCacheKey": true
+      }
+    },
+    "openai": {
+      "options": {
+        "timeout": 600000
+      }
+    },
+    "github": {
+      "options": {}
+    }
+  },
+
+  "agent": {},
+
+    "mcp": {
+      "atlassian": {
+        "type": "remote",
+        "url": "https://mcp.atlassian.com/v1/sse",
+        "enabled": false
+      },
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        "headers": {
+          "CONTEXT7_API_KEY": "{env:CONTEXT7_API_KEY}"
+        },
+        "enabled": true
+      },
+      "github-anyfin": {
+        "type": "remote",
+        "url": "https://api.githubcopilot.com/mcp",
+        "headers": {
+          "Authorization": "Bearer {env:GITHUB_ANYFIN_PAT}"
+        },
+        "enabled": true
+      },
+      "github-private": {
+        "type": "remote",
+        "url": "https://api.githubcopilot.com/mcp",
+        "headers": {
+          "Authorization": "Bearer {env:GITHUB_PRIVATE_PAT}"
+        },
+        "enabled": false
+      },
+      "nixos": {
+        "type": "local",
+        "command": ["nix", "run", "github:utensils/mcp-nixos", "--"],
+        "enabled": false
+      },
+      "pg-aiguide": {
+        "type": "remote",
+        "url": "https://mcp.tigerdata.com/docs",
+        "enabled": false
+      },
+      "sentry": {
+        "type": "remote",
+        "url": "https://mcp.sentry.dev/mcp",
+        "enabled": false
+      },
+      "linear": {
+        "type": "remote",
+        "url": "https://mcp.linear.app/mcp",
+        "enabled": false
+      }
+    },
+
+  "formatter": {
+    "prettier": {
+      "command": ["npx", "prettier", "--write", "$FILE"],
+      "extensions": [".js", ".ts", ".jsx", ".tsx", ".json"]
+    },
+    "ruff": {
+      "command": ["ruff", "format", "$FILE"],
+      "extensions": [".py"]
+    },
+    "gofmt": {
+      "command": ["gofmt", "-w", "$FILE"],
+      "extensions": [".go"]
+    }
+  },
+
+  "compaction": {
+    "auto": true,
+    "prune": true
+  },
+
+  "watcher": {
+    "ignore": [
+      "node_modules/**",
+      "dist/**",
+      ".git/**",
+      "*.log",
+      "__pycache__/**",
+      ".pytest_cache/**",
+      "vendor/**"
+    ]
+  },
+
+  "plugin": [
+    "@simonwjackson/opencode-direnv",
+    "opencode-claude-auth"
+  ],
+
+  "permission": {
+    "bash": {
+      "rm -rf /*": "deny",
+      "sudo rm -rf /*": "deny",
+
+      "gh browse *": "allow",
+      "gh issue list *": "allow",
+      "gh issue view *": "allow",
+      "gh issue status *": "allow",
+      "gh pr list *": "allow",
+      "gh pr view *": "allow",
+      "gh pr status *": "allow",
+      "gh pr diff *": "allow",
+      "gh pr checks *": "allow",
+      "gh release list *": "allow",
+      "gh release view *": "allow",
+      "gh repo view *": "allow",
+      "gh repo list *": "allow",
+      "gh search *": "allow",
+      "gh run list *": "allow",
+      "gh run view *": "allow",
+      "gh label list *": "allow",
+      "gh *": "ask",
+
+      "gcloud": "ask",
+      "gcloud *": "ask",
+      "git add": "ask",
+      "git add *": "ask",
+      "git push": "ask",
+      "git push *": "ask",
+      "git reset": "ask",
+      "git reset *": "ask",
+      "nix": "ask",
+      "nix *": "ask",
+      "nix-*": "ask",
+      "nixos-*": "ask",
+      "psql": "ask",
+      "psql *": "ask",
+      "createdb": "ask",
+      "createdb *": "ask",
+      "dropdb": "ask",
+      "dropdb *": "ask",
+      "rm": "ask",
+      "rm *": "ask"
+    }
+  },
+
+  "tools": {
+    "pg-aiguide_view_skill": true
+  }
+}

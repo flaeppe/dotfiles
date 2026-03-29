@@ -130,7 +130,12 @@
                   };
                 };
 
-                imports = [ ./git/git.nix ./fish/fish.nix ./nvim/nvim.nix ];
+                imports = [
+                  ./git/git.nix
+                  ./fish/fish.nix
+                  ./nvim/nvim.nix
+                  ./opencode/opencode.nix
+                ];
 
                 programs = {
                   home-manager.enable = true;
