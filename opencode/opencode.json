@@ -52,11 +52,11 @@
         },
         "enabled": true
       },
-      "github-anyfin": {
+      "github-work": {
         "type": "remote",
         "url": "https://api.githubcopilot.com/mcp",
         "headers": {
-          "Authorization": "Bearer {env:GITHUB_ANYFIN_PAT}"
+          "Authorization": "Bearer {env:GITHUB_WORK_PAT}"
         },
         "enabled": true
       },
