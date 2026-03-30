@@ -29,6 +29,9 @@
         set fish_greeting
         # Disable 'activate.fish' auto setting and displaying fish status
         set -x VIRTUAL_ENV_DISABLE_PROMPT 1
+        # /usr/local/bin is not sourced by fish via path_helper; add it at low priority
+        # so tools like OrbStack's docker are available without overriding Nix binaries
+        fish_add_path --append /usr/local/bin
       '';
       interactiveShellInit = ''
         # TODO remove when https://github.com/NixOS/nixpkgs/issues/462025 gets resolved
