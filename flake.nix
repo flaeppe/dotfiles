@@ -86,7 +86,7 @@
                       _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
                       _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
                       _v="$(_pass dev/github-private-pat)";  [[ -n "$_v" ]] && export GITHUB_PRIVATE_PAT="$_v"
-                      _v="$(_pass dev/github-anyfin-pat)";   [[ -n "$_v" ]] && export GITHUB_WORK_PAT="$_v"
+                      _v="$(_pass dev/github-work-pat)";     [[ -n "$_v" ]] && export GITHUB_WORK_PAT="$_v"
                       _superpowers="''${XDG_CONFIG_HOME:-$HOME/.config}/opencode/superpowers"
                       if [[ -d "$_superpowers/.git" ]]; then
                         ${pkgs.git}/bin/git -C "$_superpowers" pull --ff-only --quiet 2>/dev/null &
@@ -95,7 +95,7 @@
                     '')
                   ];
                   # This doesn't work though hm-session-vars.fish is updated..
-                  sessionPath = [ "$HOME/.local/bin" "/usr/local/bin" ];
+                  sessionPath = [ "$HOME/.local/bin" ];
                   sessionVariables = {
                     EDITOR = "nvim";
                     # Set better color when printing folders
@@ -139,6 +139,11 @@
                       ${ptf} ssh/id-rsa.pub              "$HOME/.ssh/id_rsa.pub"              644
                       ${ptf} ssh/google-compute-engine     "$HOME/.ssh/google_compute_engine"     600
                       ${ptf} ssh/google-compute-engine.pub "$HOME/.ssh/google_compute_engine.pub" 644
+                    '';
+
+                    writeNpmrc = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+                      PATH="${passPath}:$PATH"; export PATH
+                      ${ptf} dev/npm-token "$HOME/.npmrc" 600
                     '';
                   };
                 };
