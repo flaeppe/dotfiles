@@ -72,6 +72,7 @@
                       [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
                     htop
                     jq
+                    k9s
                     kubectl
                     less
                     openssl
