@@ -70,7 +70,7 @@
       },
       "nixos": {
         "type": "local",
-        "command": ["nix", "run", "github:utensils/mcp-nixos", "--"],
+        "command": ["uvx", "mcp-nixos"],
         "enabled": false
       },
       "pg-aiguide": {
@@ -132,6 +132,7 @@
       "rm -rf /*": "deny",
       "sudo rm -rf /*": "deny",
 
+      "gh *": "ask",
       "gh browse *": "allow",
       "gh issue list *": "allow",
       "gh issue view *": "allow",
@@ -149,8 +150,8 @@
       "gh run list *": "allow",
       "gh run view *": "allow",
       "gh label list *": "allow",
-      "gh *": "ask",
 
+      "git *": "ask",
       "git status": "allow",
       "git status *": "allow",
       "git diff": "allow",
@@ -163,7 +164,6 @@
       "git branch *": "allow",
       "git rev-parse *": "allow",
       "git remote -v": "allow",
-      "git *": "ask",
 
       "gcloud": "ask",
       "gcloud *": "ask",
