@@ -78,6 +78,7 @@
                     openssl
                     ripgrep
                     sentry-cli
+                    uv
                   ]) ++ [
                     unstable.gemini-cli
                     (pkgs.writeShellScriptBin "opencode" ''
