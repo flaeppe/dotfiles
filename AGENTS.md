@@ -20,7 +20,20 @@ Load the `nix` skill before making any changes. This is mandatory, no exceptions
 - `nvim/` — Neovim configuration (module imported via `nvim/nvim.nix`)
 - `gnupg/` — GPG agent configuration
 - `node-packages/` — Node packages built with node2nix
-- `~/.config/opencode/` — OpenCode configuration (external directory, auto-allowed via `opencode.json`)
+- `opencode/` — OpenCode configuration (module imported via `opencode/opencode.nix`)
+  - `opencode.json` — Main OpenCode config (providers, MCP servers, permissions, formatters)
+  - `tui.json` — TUI theme/layout config
+  - `agent/` — Custom agent definitions (plan, build, code-reviewer, etc.)
+  - `command/` — Custom slash commands
+  - `skills/` — Agent skills (commit, golang, nix, python, typescript, etc.)
+  - `AGENTS.md` — Global instructions loaded by OpenCode in every session
+- `scripts/` — Activation scripts run by Home Manager
+  - `pass-to-file.sh` — Helper to write secrets from `pass` to files
+  - `write-sentryclirc.sh` — Writes `.sentryclirc` from `pass`
+
+## Secrets Management
+
+Secrets are managed via `pass` and written to disk during `home-manager switch` via activation scripts in `flake.nix`. Some secrets are also injected into wrapper scripts at launch time.
 
 ## Linting and Formatting
 
