@@ -1,24 +1,28 @@
 ---
 name: commit
-description: Use when creating git commits - emphasizes context and intent over diff summaries
+description: Use when creating git commits
 ---
 
 ## Commit Message Guidelines
 
 Use these guidelines when creating git commits.
 
-### Core Principle: Context Over Diff
+### Core Principle: Diff-Grounded Intent
 
-The commit message should be derived from **session context**—what was planned, discussed, and why the change was made. The diff is for verification only, not the primary source for the message.
+The commit message explains **why** the changes in the diff were made. Every claim in the message must be grounded in what the diff actually shows or directly concludable from it.
 
-If session context is unclear or insufficient, **ask for clarification** before committing.
+Session context may inform your understanding of the diff, but must not leak into the message. If a reader with only the diff and the commit message would be confused by a statement, remove it.
+
+If the diff alone is insufficient to understand the intent, **ask for clarification** before committing.
 
 ### Why, Not What
 
-The diff already shows what changed. The message must explain **why**:
-- What problem does this solve?
-- What was the motivation or intent?
-- What decision led to this approach?
+The diff already shows what changed. The message must explain **why those specific changes** were made:
+- What problem do the changes in the diff solve?
+- What was the motivation behind this particular approach?
+- What does this change enable or fix, as evidenced by the diff?
+
+The "why" must be answerable from the diff itself—not from alternatives discussed, things not included, or reasoning that only makes sense with conversation history.
 
 ### Anti-Patterns (Never Do This)
 
@@ -30,6 +34,12 @@ These read like diff summaries—avoid them:
 - "Fix typo in variable name"
 
 If your message could be auto-generated from the diff, rewrite it.
+
+These leak conversation context—also avoid them:
+- "Didn't include X because..." (X isn't in the diff)
+- "As discussed, we decided to..."
+- "Avoids the approach we considered..."
+- Any justification for what was *not* changed
 
 ### Format: Conventional Commits
 
@@ -72,7 +82,7 @@ body
 
 ### Process
 
-1. Recall session context—what was the goal? why this approach?
-2. Review staged diff to verify scope
-3. If context is unclear, ask the user
-4. Write message from context, not from diff
+1. Review the staged diff—what changed, and why does the code show that intent?
+2. If the diff alone doesn't make the intent clear, ask the user
+3. Write the message grounded in the diff; every statement must be verifiable from it
+4. If you find yourself explaining something not in the diff, cut it
