@@ -46,5 +46,3 @@ layout python
 Secrets are managed by [pass](https://www.passwordstore.org/) (GPG-encrypted, git-synced).
 The opencode wrapper reads secrets from `pass` at launch. Home Manager activation
 scripts write `~/.sentryclirc` and opencode auth files from `pass` on `home-manager switch`.
-
-GPG private keys are backed up in iCloud Keychain.
