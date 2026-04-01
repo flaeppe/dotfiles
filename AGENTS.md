@@ -14,6 +14,8 @@ Load the `nix` skill before making any changes. This is mandatory, no exceptions
 
 ## Repository Structure
 
+Home Manager symlinks these files into `~/.config/` and `~/.local/` — this repo is the source of truth, not the symlink targets.
+
 - `flake.nix` — Flake definition with Home Manager configuration
 - `fish/` — Fish shell configuration (module imported via `fish/fish.nix`)
 - `git/` — Git configuration (module imported via `git/git.nix`)
