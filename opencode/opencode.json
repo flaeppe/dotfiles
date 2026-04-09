@@ -124,7 +124,7 @@
 
   "plugin": [
     "@simonwjackson/opencode-direnv",
-    "opencode-claude-auth"
+    "opencode-claude-auth@latest"
   ],
 
   "permission": {
