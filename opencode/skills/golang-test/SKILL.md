@@ -1,5 +1,10 @@
+---
 name: golang-test
 description: Use when writing tests in Go with testify
+user-invocable: true
+paths:
+  - "**/*_test.go"
+---
 
 # Go Testing
 
@@ -7,7 +12,7 @@ description: Use when writing tests in Go with testify
 
 Go testing patterns using testify for assertions and the standard library testing package.
 
-**REQUIRED BACKGROUND:** You MUST understand the `test` and `golang` skills before using this skill.
+**REQUIRED BACKGROUND:** See also the `/test` and `/golang` skills.
 
 ## Reference Documentation
 

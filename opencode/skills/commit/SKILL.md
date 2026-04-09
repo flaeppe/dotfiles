@@ -1,6 +1,7 @@
 ---
 name: commit
 description: Use when creating git commits
+user-invocable: true
 ---
 
 ## Commit Message Guidelines

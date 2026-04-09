@@ -1,6 +1,7 @@
 ---
 name: general
 description: Use when researching complex questions or executing multi-step tasks that need multiple searches
+user-invocable: true
 ---
 
 # General Research Guidelines

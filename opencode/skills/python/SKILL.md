@@ -1,6 +1,9 @@
 ---
 name: python
 description: Use when editing Python files - covers type safety, immutability patterns, and functional-first design
+user-invocable: true
+paths:
+  - "**/*.py"
 ---
 
 # Python Guidelines

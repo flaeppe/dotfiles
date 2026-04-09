@@ -1,6 +1,9 @@
 ---
 name: typescript
 description: Use when editing TypeScript or JavaScript files - emphasizes strict typing, immutable defaults, and boundary parsing
+user-invocable: true
+paths:
+  - "**/*.{ts,tsx,js,jsx}"
 ---
 
 # TypeScript/JavaScript Guidelines

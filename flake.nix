@@ -81,6 +81,14 @@
                     uv
                   ]) ++ [
                     unstable.gemini-cli
+                    (pkgs.writeShellScriptBin "claude" ''
+                      set -euo pipefail
+                      _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
+                      _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
+                      _v="$(_pass dev/github-private-pat)";  [[ -n "$_v" ]] && export GITHUB_PRIVATE_PAT="$_v"
+                      _v="$(_pass dev/github-work-pat)";     [[ -n "$_v" ]] && export GITHUB_WORK_PAT="$_v"
+                      exec "$HOME/.local/bin/claude" "$@"
+                    '')
                     (pkgs.writeShellScriptBin "opencode" ''
                       set -euo pipefail
                       # Load secrets from pass into environment (skip if missing)
@@ -174,6 +182,7 @@
                   ./fish/fish.nix
                   ./nvim/nvim.nix
                   ./opencode/opencode.nix
+                  ./claude/claude.nix
                 ];
 
                 programs = {

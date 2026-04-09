@@ -1,5 +1,10 @@
+---
 name: vitest
 description: Use when writing tests in TypeScript/JavaScript with Vitest
+user-invocable: true
+paths:
+  - "**/*.{test,spec}.{ts,tsx,js,jsx}"
+---
 
 # Vitest
 
@@ -7,7 +12,7 @@ description: Use when writing tests in TypeScript/JavaScript with Vitest
 
 Vitest-specific patterns and mechanics. This skill covers framework features, not testing philosophy.
 
-**REQUIRED BACKGROUND:** You MUST understand the `test` and `typescript` skills before using this skill.
+**REQUIRED BACKGROUND:** See also the `/test` and `/typescript` skills.
 
 ## Reference Documentation
 

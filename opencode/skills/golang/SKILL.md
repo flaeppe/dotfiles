@@ -1,6 +1,9 @@
 ---
 name: golang
 description: Use when editing Go code - emphasizes small interfaces, explicit errors, and safe concurrency
+user-invocable: true
+paths:
+  - "**/*.go"
 ---
 
 # Go Guidelines

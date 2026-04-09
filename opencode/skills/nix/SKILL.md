@@ -1,6 +1,9 @@
 ---
 name: nix
 description: Use when editing Nix code or flakes - covers flake structure, derivations, and module patterns
+user-invocable: true
+paths:
+  - "**/*.nix"
 ---
 
 # Nix Guidelines

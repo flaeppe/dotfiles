@@ -1,5 +1,12 @@
+---
 name: pytest
 description: Use when writing tests in Python with pytest
+user-invocable: true
+paths:
+  - "**/test_*.py"
+  - "**/*_test.py"
+  - "**/conftest.py"
+---
 
 # pytest
 
@@ -7,7 +14,7 @@ description: Use when writing tests in Python with pytest
 
 pytest-specific patterns and mechanics. This skill covers framework features, not testing philosophy.
 
-**REQUIRED BACKGROUND:** You MUST understand the `test` and `python` skills before using this skill.
+**REQUIRED BACKGROUND:** See also the `/test` and `/python` skills.
 
 ## Reference Documentation
 

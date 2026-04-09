@@ -47,6 +47,7 @@ Treat me as experienced - skip beginner explanations.
 - Parse, don't validate: instead of repeatedly checking raw data, parse it _once_ at the boundary of the system. After parsing, trust the type system.
 - Write self-documenting code. Comment "why" not "what".
 - Function/class/or any other docstrings should never describe HOW only WHAT.
+- Inclusive over exclusive conditions: match what you want, not what you don't. Exclusive checks (`not in`, `!=`) silently pass unknown future values; inclusive checks (`in`, `==`) safely ignore them.
 - Prioritize readability. Split functions when it improves clarity, not dogmatically.
 
 ### Error Handling

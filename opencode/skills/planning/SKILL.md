@@ -1,6 +1,7 @@
 ---
 name: planning
 description: Use when planning multi-step work that will span multiple PRs or sessions — covers incremental decomposition, plan file conventions, and chronological trace structure
+user-invocable: true
 ---
 
 # Planning
@@ -159,9 +160,13 @@ isolation.
 
 ## Resuming Existing Plans
 
-When continuing work on an existing plan:
+Before starting, check if a plan directory already exists:
+- Single-repo: `_private/.plan/` in the project root
+- Multi-repo: `~/anyfin/.plan/`
 
-1. Read existing files, highest number first
-2. Understand current state and what's been completed
-3. Add a new file for the next phase of work
-4. Reference what it builds on
+If one exists, read the existing files (highest number first) to understand
+current state before continuing. Then:
+
+1. Understand what's been completed and what remains
+2. Add a new file for the next phase of work
+3. Reference what it builds on

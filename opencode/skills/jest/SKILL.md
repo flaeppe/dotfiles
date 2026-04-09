@@ -1,5 +1,10 @@
+---
 name: jest
 description: Use when writing tests in TypeScript/JavaScript with Jest
+user-invocable: true
+paths:
+  - "**/*.{test,spec}.{ts,tsx,js,jsx}"
+---
 
 # Jest
 
@@ -7,7 +12,7 @@ description: Use when writing tests in TypeScript/JavaScript with Jest
 
 Jest and Vitest are API-compatible. Follow the `vitest` skill for all patterns and principles.
 
-**REQUIRED BACKGROUND:** You MUST understand the `test`, `typescript`, and `vitest` skills before using this skill.
+**REQUIRED BACKGROUND:** See also the `/test`, `/typescript`, and `/vitest` skills.
 
 ## API Mapping
 

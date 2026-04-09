@@ -44,5 +44,6 @@ layout python
 ## Secrets
 
 Secrets are managed by [pass](https://www.passwordstore.org/) (GPG-encrypted, git-synced).
-The opencode wrapper reads secrets from `pass` at launch. Home Manager activation
-scripts write `~/.sentryclirc` and opencode auth files from `pass` on `home-manager switch`.
+The opencode and claude wrapper scripts read secrets from `pass` at launch. Home Manager
+activation scripts write `~/.sentryclirc` and opencode auth files from `pass` on
+`home-manager switch`.

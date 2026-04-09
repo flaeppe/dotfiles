@@ -1,5 +1,14 @@
+---
 name: test
 description: Use when writing, reviewing, structuring, or updating tests in any language - covers test design philosophy, naming, organization, the valid_data pattern, and updating repeated test code (assertions, setup, mocks)
+user-invocable: true
+paths:
+  - "**/*_test.go"
+  - "**/test_*.py"
+  - "**/*_test.py"
+  - "**/conftest.py"
+  - "**/*.{test,spec}.{ts,tsx,js,jsx}"
+---
 
 # Testing
 

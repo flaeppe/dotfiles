@@ -39,11 +39,6 @@
   "agent": {},
 
     "mcp": {
-      "atlassian": {
-        "type": "remote",
-        "url": "https://mcp.atlassian.com/v1/sse",
-        "enabled": false
-      },
       "context7": {
         "type": "remote",
         "url": "https://mcp.context7.com/mcp",
@@ -80,7 +75,7 @@
       },
       "sentry": {
         "type": "remote",
-        "url": "https://mcp.sentry.dev/mcp",
+        "url": "https://mcp.sentry.dev/mcp/anyfin",
         "enabled": false
       },
       "linear": {

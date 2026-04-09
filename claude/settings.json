@@ -1,0 +1,70 @@
+{
+  "effortLevel": "high",
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git branch*)",
+      "Bash(git rev-parse *)",
+      "Bash(git remote -v)",
+      "Bash(git tag*)",
+      "Bash(git stash list*)",
+      "Bash(gh browse*)",
+      "Bash(gh issue list*)",
+      "Bash(gh issue view*)",
+      "Bash(gh issue status*)",
+      "Bash(gh pr list*)",
+      "Bash(gh pr view*)",
+      "Bash(gh pr status*)",
+      "Bash(gh pr diff*)",
+      "Bash(gh pr checks*)",
+      "Bash(gh release list*)",
+      "Bash(gh release view*)",
+      "Bash(gh repo view*)",
+      "Bash(gh repo list*)",
+      "Bash(gh search*)",
+      "Bash(gh run list*)",
+      "Bash(gh run view*)",
+      "Bash(gh label list*)",
+      "Bash(direnv status*)"
+    ],
+    "deny": [
+      "Bash(rm -rf /*)",
+      "Bash(sudo rm -rf /*)"
+    ]
+  },
+  "mcpServers": {
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
+      }
+    },
+    "github-work": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_WORK_PAT}"
+      }
+    },
+    "github-private": {
+      "type": "http",
+      "url": "https://api.githubcopilot.com/mcp",
+      "headers": {
+        "Authorization": "Bearer ${GITHUB_PRIVATE_PAT}"
+      }
+    },
+    "nixos": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-nixos"]
+    },
+    "pg-aiguide": {
+      "type": "http",
+      "url": "https://mcp.tigerdata.com/docs"
+    }
+  }
+}
