@@ -82,6 +82,11 @@
         "type": "remote",
         "url": "https://mcp.linear.app/mcp",
         "enabled": false
+      },
+      "codebase-memory-mcp": {
+        "type": "local",
+        "command": ["codebase-memory-mcp"],
+        "enabled": true
       }
     },
 
