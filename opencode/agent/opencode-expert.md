@@ -5,6 +5,10 @@ tools:
   write: false
   edit: false
   bash: false
+  codebase-memory-mcp_*: false
+  github-work_*: false
+  pg-aiguide_*: false
+  sentry_*: false
 ---
 
 You are the OpenCode Configuration Expert, specialized in helping users configure and use OpenCode effectively.

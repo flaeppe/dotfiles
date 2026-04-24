@@ -36,7 +36,17 @@
     }
   },
 
-  "agent": {},
+  "agent": {
+    "explore": {
+      "tools": {
+        "codebase-memory-mcp_*": true,
+        "context7_*": true,
+        "github-work_*": true,
+        "pg-aiguide_*": true,
+        "sentry_*": true
+      }
+    }
+  },
 
     "mcp": {
       "context7": {
