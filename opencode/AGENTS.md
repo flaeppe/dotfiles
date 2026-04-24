@@ -45,10 +45,16 @@ Treat me as experienced - skip beginner explanations.
 - Explicit > implicit. Verbose > clever.
 - Early returns to reduce nesting. Avoid else after return/throw.
 - Parse, don't validate: instead of repeatedly checking raw data, parse it _once_ at the boundary of the system. After parsing, trust the type system.
-- Write self-documenting code. Comment "why" not "what".
-- Function/class/or any other docstrings should never describe HOW only WHAT.
 - Inclusive over exclusive conditions: match what you want, not what you don't. Exclusive checks (`not in`, `!=`) silently pass unknown future values; inclusive checks (`in`, `==`) safely ignore them.
 - Prioritize readability. Split functions when it improves clarity, not dogmatically.
+
+### Comments & Docstrings
+- Write self-documenting code. Comments explain "why", never "what" the code does.
+- Docstrings describe WHAT a function/class does, never HOW it does it internally.
+- **No session-context comments** — every comment must make sense to a reader with zero knowledge of the conversation, PR, or task that produced the code. Don't justify design choices by referencing the current session ("we chose X because..." or "this avoids the problem where..."). If the reasoning matters long-term, phrase it as a standalone technical note.
+- **No cross-reference assumptions** — don't reference behavior of other modules as justification (e.g. "matches how service B handles this"). That coupling drifts silently when the referenced code changes. State the local reason instead.
+- **No diff-relative comments** — never describe what the code replaced (e.g. "batch query instead of row-by-row loop"). The old code won't exist after merge. Describe what the current code does and why, not what it improved upon.
+- Remove commented-out code before completing a task.
 
 ### Error Handling
 - Use specific error types, never generic Error() or Exception().
@@ -153,4 +159,4 @@ Before completing any task:
 - Verify the code compiles/lints without errors.
 - Check for obvious bugs (null checks, edge cases, off-by-one errors).
 - Ensure consistent formatting with the rest of the codebase.
-- Remove debug statements and commented-out code.
+- Remove debug statements and commented-out code (see Comments & Docstrings).
