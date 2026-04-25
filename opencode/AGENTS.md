@@ -48,6 +48,23 @@ Treat me as experienced - skip beginner explanations.
 - Inclusive over exclusive conditions: match what you want, not what you don't. Exclusive checks (`not in`, `!=`) silently pass unknown future values; inclusive checks (`in`, `==`) safely ignore them.
 - Prioritize readability. Split functions when it improves clarity, not dogmatically.
 
+### Boundary Layers
+
+**Business logic must not live in boundary/protocol/schema layers.** Handlers,
+controllers, resolvers, and schema definitions are glue — they are not where
+logic belongs. Unless explicitly told otherwise, design systems so that:
+
+1. **Business logic exists as a plain language-level API** — functions and classes
+   that can be called without any protocol awareness. This is the source of truth.
+2. **Boundary layers do exactly two things:**
+   - Parse foreign data (request bodies, messages, events) into the types the
+     business logic expects.
+   - Convert errors propagating from business logic into protocol-appropriate
+     responses (HTTP status codes, GraphQL errors, gRPC status, etc.).
+
+The litmus test: adding a new exposure layer (e.g. REST, CLI, message consumer)
+should be trivial — just parsing and error mapping, no logic duplication.
+
 ### Comments & Docstrings
 - Write self-documenting code. Comments explain "why", never "what" the code does.
 - Docstrings describe WHAT a function/class does, never HOW it does it internally.
