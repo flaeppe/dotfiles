@@ -10,9 +10,22 @@ Use these guidelines when creating git commits.
 
 ### Core Principle: Diff-Grounded Intent
 
-The commit message explains **why** the changes in the diff were made. Every claim in the message must be grounded in what the diff actually shows or directly concludable from it.
+The commit message describes the final committed state — what the diff shows,
+and why those specific changes were made. Every claim is grounded in what the
+diff actually shows or is directly concludable from it.
 
-Session context may inform your understanding of the diff, but must not leak into the message. If a reader with only the diff and the commit message would be confused by a statement, remove it.
+The message describes the final state only. If multiple approaches were tried
+during the session, only the landed approach exists in the diff — describe that,
+not the journey.
+
+BAD: "Switch to BFS after the recursive approach hit stack limits"
+GOOD: "Walk role hierarchy iteratively to support arbitrary depth"
+
+BAD: "Refactor inventory sync to use batch queries instead of fetching rows individually"
+GOOD: "Batch-load inventory to reduce query count per sync cycle"
+
+BAD: "As discussed, we decided to extract the validation logic"
+GOOD: "Extract validation into a dedicated layer for reuse across handlers"
 
 If the diff alone is insufficient to understand the intent, **ask for clarification** before committing.
 
