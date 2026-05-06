@@ -68,6 +68,24 @@ should be trivial — just parsing and error mapping, no logic duplication.
 ### Comments & Docstrings
 - Write self-documenting code. Comments explain "why", never "what" the code does.
 - Docstrings describe WHAT a function/class does, never HOW it does it internally.
+  A docstring is a contract: inputs, outputs, side effects. Nothing else — no
+  implementation details, algorithms, internal mechanics, or design rationale.
+  Keep them terse. If the function name and type signature already say it, skip
+  the docstring entirely.
+
+  BAD: "Fetches stock from each warehouse using asyncio.gather, deduplicates
+  by SKU using a dict, and sums quantities."
+  GOOD: "Consolidate stock levels across warehouses into a single inventory by SKU."
+
+  BAD: "Walks the role hierarchy recursively, collects inherited permissions
+  into a set, then intersects with the ACL entries."
+  GOOD: "Resolve the effective permissions a user has on a resource."
+
+  BAD: "Uses a Redis sorted set where each request is stored as a member scored
+  by its timestamp. On each check the window is trimmed and the remaining
+  cardinality is compared against the limit."
+  GOOD: "Sliding-window rate limiter. Enforces a maximum request count per
+  identifier within a rolling time window."
 - **No session-context comments** — every comment must make sense to a reader with zero knowledge of the conversation, PR, or task that produced the code. Don't justify design choices by referencing the current session ("we chose X because..." or "this avoids the problem where..."). If the reasoning matters long-term, phrase it as a standalone technical note.
 - **No cross-reference assumptions** — don't reference behavior of other modules as justification (e.g. "matches how service B handles this"). That coupling drifts silently when the referenced code changes. State the local reason instead.
 - **No diff-relative comments** — never describe what the code replaced (e.g. "batch query instead of row-by-row loop"). The old code won't exist after merge. Describe what the current code does and why, not what it improved upon.
