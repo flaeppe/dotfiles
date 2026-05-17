@@ -97,21 +97,44 @@ Keep assertions focused:
 
 ## Test Organization
 
-Group tests by **what they protect**, not by test type.
+The unit of organization is the **behavioral scope**, not the source file.
+A 1:1 source-to-test mapping is common for narrow tests. For broader/flow
+tests, the unit is the business capability at a chosen altitude — the entry
+point may be shared code, but each capability gets its own suite.
 
-**The cohesion test:** If one business rule changes, which tests should break? Those tests belong together.
+**The one-sentence scope rule:** Write the file's scope as one sentence.
+Every test in the file must obviously belong. If you need "and," you've
+drifted into two scopes — split.
 
-**Signs of poor organization:**
-- One change breaks tests in many unrelated directories
-- You can't find tests for a feature without searching
-- Duplicate coverage across locations
-- Same domain scattered by "unit" vs "integration"
+- Good: "Drives the id-only verification flow end-to-end from webhook events."
+- Bad: "Tests the webhook handler and the order intake." Two scopes — two files.
+
+**The change-axis rule:** Tests belong in the same file if they break for the
+same *kind* of change. `test_rejects_negative_amount` and `test_rejects_zero_amount`
+share an axis (validation) — same file. `test_can_place_order` and
+`test_can_view_order_history` are different axes (intake vs. read model) —
+different files, even if both touch `OrderService`.
+
+**When to split:** Rules govern *growth*, not retroactive re-cutting. Small
+files stay together even with mild axis drift — splitting a 60-line file
+into three 20-line slices costs more than it saves. The trigger is when one
+axis grows complex enough to earn its own house: its own fixtures, helpers,
+or setup that doesn't apply to the rest. Size is the smoke signal — when a
+file feels big, check whether one axis has outgrown cohabitation.
+Navigability splits (happy vs. failure, per-input-class) come *after* scope
+is tight, not instead of it.
 
 **Within a test file:**
 1. Happy path(s) first
 2. Boundary/validation tests
 3. Error handling tests
 4. Edge cases
+
+**Signs of poor organization:**
+- One change breaks tests across unrelated directories
+- You can't find tests for a feature without searching
+- Duplicate coverage across locations
+- Same domain split by test type ("unit" vs. "integration")
 
 ## Parametrization
 
