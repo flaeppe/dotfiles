@@ -74,4 +74,11 @@ in {
       ./hooks/cbm-session-reminder
     } "$HOME/.claude/hooks/cbm-session-reminder"
   '';
+
+  # Status line script (referenced by settings.json statusLine.command)
+  home.activation.claudeStatusLine = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    install -m 755 ${
+      ./statusline-command.sh
+    } "$HOME/.claude/statusline-command.sh"
+  '';
 }
