@@ -21,7 +21,7 @@ let
 
   # Skills shared with OpenCode -- user-invocable in Claude Code
   # (single source in opencode/skills/, deployed as ~/.claude/skills/)
-  sharedSkills = [ "general" "planning" "docs-expert" "deps-expert" ];
+  sharedSkills = [ "general" "planning" "docs-expert" "deps-expert" "correlation-expert" ];
 
   sharedRuleEntries = builtins.listToAttrs (map (name: {
     name = ".claude/rules/${name}.md";
