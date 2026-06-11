@@ -186,6 +186,31 @@ If unsure about base branch, **ASK**.
 - Check for existing similar implementations before writing new code.
 - Read test files to understand expected behavior of existing implementations.
 
+### Knowledge Base (kb)
+My work documents are indexed in a local knowledge base, exposed as the `kb`
+MCP server (`kb_find`: hybrid semantic search). It holds whatever I decide to
+make searchable - e.g. repo docs/READMEs, the payments inventory, external
+integration docs, planning documents. When the tool is available:
+
+- Search it before answering questions about prior decisions, existing
+  documentation, integrations, "where is X", or "do we support X" - don't
+  answer such questions from memory alone.
+- It complements code exploration: kb carries the documented intent and
+  context around the code (and around external parties the code talks to),
+  while codebase-memory tools carry the code structure itself. When working
+  in a repo, a kb search scoped to it (e.g. `tags=["repo:api"]`) can surface
+  context the code doesn't show.
+- `service:<name>` tags join external specs with the implementation notes
+  that integrate against them (the tag appears on both sides). For
+  spec-vs-implementation questions ("do we follow X", gap analysis), filter
+  on the service tag (e.g. `tags=["service:seb-camt"]`) to retrieve the spec
+  and our documented reality together.
+- Results are chunks with metadata; read the file at `path` when the chunk
+  isn't enough. Files on disk are the source of truth.
+- Planning documents are excluded from results by default; pass
+  `include=["plans"]` when asked about plans, and always check for existing
+  plans before creating a new planning document.
+
 ---
 
 ## Quality Checklist
