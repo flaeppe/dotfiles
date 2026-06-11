@@ -6,6 +6,8 @@
   # Fuzzy find Git hashes with preview and actions. It needs more than a simple function
   # so we manually declared the config file.
   xdg.configFile."fish/functions/flog.fish".source = ./functions/flog.fish;
+  # Personal knowledge base CLI (~/kb): sync/add/eval against local Qdrant.
+  xdg.configFile."fish/functions/kb.fish".source = ./functions/kb.fish;
 
   programs = {
     fish = {
