@@ -45,38 +45,6 @@
       "Bash(* gcloud*)"
     ]
   },
-  "mcpServers": {
-    "context7": {
-      "type": "http",
-      "url": "https://mcp.context7.com/mcp",
-      "headers": {
-        "CONTEXT7_API_KEY": "${CONTEXT7_API_KEY}"
-      }
-    },
-    "github-work": {
-      "type": "http",
-      "url": "https://api.githubcopilot.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${GITHUB_WORK_PAT}"
-      }
-    },
-    "github-private": {
-      "type": "http",
-      "url": "https://api.githubcopilot.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${GITHUB_PRIVATE_PAT}"
-      }
-    },
-    "nixos": {
-      "type": "stdio",
-      "command": "uvx",
-      "args": ["mcp-nixos"]
-    },
-    "pg-aiguide": {
-      "type": "http",
-      "url": "https://mcp.tigerdata.com/docs"
-    }
-  },
   "hooks": {
     "PreToolUse": [
       {
