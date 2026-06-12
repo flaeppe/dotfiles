@@ -89,13 +89,16 @@ origin site/page, last-updated date, one line on what the page covers.
 
 ### 5. Wire up and verify
 
-1. `golden.toml`: add ≥1 case per major document. Write the query from
+1. `~/kb/facets.toml`: add a one-line description for the new facet under
+   `[tags]` (`"service:<facet>" = "..."`) — the server returns these in
+   zero-hit tag listings and stamps them into the kb_find docstring.
+2. `golden.toml`: add ≥1 case per major document. Write the query from
    memory as you would actually ask it — never by copying phrases out of
    the converted doc (that inflates keyword matching).
-2. `kb sync`, then `kb eval` — all cases must hit.
-3. Live check: `kb_find` with `tags=["service:<facet>"]` and a real
+3. `kb sync`, then `kb eval` — all cases must hit.
+4. Live check: `kb_find` with `tags=["service:<facet>"]` and a real
    question; confirm spec chunks come back with sensible text.
-4. If the doc had very large tables, sanity-check chunk sizes (the
+5. If the doc had very large tables, sanity-check chunk sizes (the
    chunker splits oversized tables and repeats headers — verify, don't
    assume).
 
