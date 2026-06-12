@@ -13,39 +13,39 @@ pcr-cert-service) — follow it; each rule exists because skipping it bit us.
 
 ## Inputs
 
-1. **Raw documents** under `~/kb/_private/<facet>/` (PDFs, spreadsheets,
-   saved HTML, WSDL/XSD, sample files). `_private/` is gitignored and never
+1. **Raw documents** under `~/kb/raw/<facet>/` (PDFs, spreadsheets,
+   saved HTML, WSDL/XSD, sample files). `raw/` is gitignored and never
    indexed — it is the archive, `external/` holds the searchable versions.
 2. **Facet name** — the directory `~/kb/external/<facet>/` and the derived
    `service:<facet>` tag. Lowercase kebab, vendor-scoped (`seb-camt`,
    `pcr-cert-service`). Ask if not given.
 3. **Version on the wire** — when the set contains multiple spec versions,
    ask which version production actually speaks. Convert ONLY that one.
-   Newer versions stay un-unpacked in `_private/` as forward reference.
+   Newer versions stay un-unpacked in `raw/` as forward reference.
 
 ## Hard rules
 
 - **Never re-convert over hand-edited output.** Converted files carry
-  manual figure descriptions; `convert.py` refuses to overwrite without
+  manual figure descriptions; `kb convert` refuses to overwrite without
   `--force` — treat `--force` as "I accept losing hand edits".
 - **Stem collisions**: a PDF and a spreadsheet of the same document share a
   stem — pass `--name` to give each its own output file.
 - **Never claim a vendor sample shows what our services produce.** Phrase
   inline samples as "the message version/scheme <service> targets; whether
   our actual output matches is a gap-analysis question".
-- **No pipe-masked failures**: don't chain `convert.py ... | grep ... && mv`
+- **No pipe-masked failures**:  don't chain `kb convert ... | grep ... && mv`
   — the guard's exit code gets swallowed by the pipe. Run steps separately.
 
 ## Procedure
 
-### 1. Convert (from `~/kb`, with `uv run --extra convert`)
+### 1. Convert (the `kb convert` CLI; docling needs the convert extra: `uv run --extra convert kb convert ...` from ~/kb)
 
 | Source | Command | Notes |
 |---|---|---|
-| born-digital PDF | `convert.py pdf F --service <facet> --images --no-ocr` | `--images` extracts figures into `<stem>_artifacts/` |
+| born-digital PDF | `kb convert pdf F --service <facet> --images --no-ocr` | `--images` extracts figures into `<stem>_artifacts/` |
 | scanned PDF | same without `--no-ocr` | |
-| xlsx | `convert.py xlsx F --service <facet> [--name STEM]` | one `##` per worksheet |
-| saved HTML | `convert.py html F --service <facet> [--name STEM]` | chrome cleanup follows |
+| xlsx | `kb convert xlsx F --service <facet> [--name STEM] [--sheet TITLE ...]` | one `##` per worksheet |
+| saved HTML | `kb convert html F --service <facet> [--name STEM]` | chrome cleanup follows |
 | WSDL / XSD / XML | no converter — hand-write a note | prose intro (operations, key types, endpoints) + the file(s) verbatim in ```xml fences |
 
 ### 2. Figure exercise (PDFs with `--images`)
@@ -82,7 +82,7 @@ origin site/page, last-updated date, one line on what the page covers.
 ### 4. Samples
 
 - Write a samples index note (`<facet>_samples_index.md`): what sample
-  files exist in `_private/`, grouped by what they demonstrate.
+  files exist in `raw/`, grouped by what they demonstrate.
 - Inline the 1–3 highest-value samples verbatim (```xml fences) in their
   own notes with a prose intro — these answer "what does X actually look
   like" queries. Apply the no-overclaim rule above.
