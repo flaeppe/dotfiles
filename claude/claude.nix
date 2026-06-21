@@ -57,6 +57,7 @@ in {
     ".claude/skills/test-expert".source = ./skills/test-expert;
     ".claude/skills/commit-msg".source = ./skills/commit-msg;
     ".claude/skills/analyze".source = ./skills/analyze;
+    ".claude/skills/prompt".source = ./skills/prompt;
   };
 
   # Deploy as writable copy (not symlink) so `claude plugin install` can write to it
