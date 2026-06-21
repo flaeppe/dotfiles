@@ -58,6 +58,7 @@ in {
     ".claude/skills/commit-msg".source = ./skills/commit-msg;
     ".claude/skills/analyze".source = ./skills/analyze;
     ".claude/skills/prompt".source = ./skills/prompt;
+    ".claude/skills/upgrade-risk".source = ./skills/upgrade-risk;
   };
 
   # Deploy as writable copy (not symlink) so `claude plugin install` can write to it
