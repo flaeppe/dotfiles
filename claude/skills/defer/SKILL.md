@@ -21,6 +21,29 @@ one file.
 The whole point is that THIS session has context a fresh one won't. Pull that
 context from here — don't ask me to re-explain what's already on screen.
 
+## Before writing: check for an existing plan
+
+Planning docs are ingested into the kb, so search there first to avoid
+duplicating something I already captured. Planning docs are excluded from kb
+results by default — pass `include=["plans"]`:
+
+```
+kb_find(query="<the task in a few words>", include=["plans"])
+```
+
+If a similar or identical plan turns up, don't silently write a new file.
+Present the match briefly — title, path, status, and a one-line gist (enough to
+recognize it, not the whole file) — then let me choose, and **recommend one**
+with a short reason:
+
+- **Extend** — add a new `NNN` file in that plan's directory that builds on it
+  (set `Builds on:` in the header).
+- **Amend** — fold the new detail into the existing file.
+- **Separate** — this is genuinely distinct; create a fresh plan.
+
+Only when the search comes back clean (or I pick "separate") do you write a new
+file.
+
 ## File location, numbering, and header
 
 Follow the `planning` skill's **File Conventions** exactly — location
@@ -52,7 +75,10 @@ look thorough.
 
 ## Process
 
-1. Resolve current branch/repo to pick the location and next `NNN` (per planning).
-2. Write the one file with planning's header block, Status: Draft.
-3. Report the path. The file alone must be enough to resume in a clean session —
+1. Search the kb (`include=["plans"]`) for an existing plan on this work. If one
+   matches, present it and let me choose extend/amend/separate (recommend one);
+   only continue to a new file if it's clean or I pick separate.
+2. Resolve current branch/repo to pick the location and next `NNN` (per planning).
+3. Write the one file with planning's header block, Status: Draft.
+4. Report the path. The file alone must be enough to resume in a clean session —
    if you couldn't resume from it cold, add the missing load-bearing detail.
