@@ -21,7 +21,7 @@ let
 
   # Skills shared with OpenCode -- user-invocable in Claude Code
   # (single source in opencode/skills/, deployed as ~/.claude/skills/)
-  sharedSkills = [ "general" "planning" "docs-expert" "deps-expert" "correlation-expert" "kb-ingest" ];
+  sharedSkills = [ "general" "planning" "docs-expert" "deps-expert" "correlation-expert" ];
 
   # Claude subagents -- thin wrappers that load the matching skill, dispatchable
   # in their own context via the Agent tool (single source stays in the skill).
