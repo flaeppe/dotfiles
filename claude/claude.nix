@@ -23,6 +23,15 @@ let
   # (single source in opencode/skills/, deployed as ~/.claude/skills/)
   sharedSkills = [ "general" "planning" "docs-expert" "deps-expert" "correlation-expert" "kb-ingest" ];
 
+  # Claude subagents -- thin wrappers that load the matching skill, dispatchable
+  # in their own context via the Agent tool (single source stays in the skill).
+  claudeAgents = [ "docs-expert" "correlation-expert" "deps-expert" ];
+
+  claudeAgentEntries = builtins.listToAttrs (map (name: {
+    name = ".claude/agents/${name}.md";
+    value = { source = ./agents + "/${name}.md"; };
+  }) claudeAgents);
+
   sharedRuleEntries = builtins.listToAttrs (map (name: {
     name = ".claude/rules/${name}.md";
     value = { source = "${opencode}/skills/${name}/SKILL.md"; };
@@ -41,7 +50,7 @@ let
     };
   }) sharedSkills);
 in {
-  home.file = sharedRuleEntries // alwaysRuleEntries // sharedSkillEntries // {
+  home.file = sharedRuleEntries // alwaysRuleEntries // sharedSkillEntries // claudeAgentEntries // {
     # Global instructions -- shared, single source in opencode/AGENTS.md
     ".claude/CLAUDE.md".source = "${opencode}/AGENTS.md";
 
