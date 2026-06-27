@@ -2,7 +2,6 @@
 name: defer
 description: Capture deferrable work from the live session as a self-contained plan file to resume in a clean session later
 user-invocable: true
-disable-model-invocation: true
 ---
 
 Capture the work described below as ONE self-contained plan file, so I can drop
