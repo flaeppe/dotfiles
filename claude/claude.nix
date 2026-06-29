@@ -1,6 +1,12 @@
-{ lib, ... }:
+{ lib, unstable, ... }:
 let
   opencode = ../opencode;
+
+  # MCP binary from nixpkgs-unstable; tracks the channel on `nix flake update`.
+  # Provides only the executable -- the discovery hook + skill are wired below.
+  # Do NOT run `codebase-memory-mcp install`/`update`: it mutates ~/.claude
+  # (hooks, settings.json, skills) which this flake owns and would revert.
+  inherit (unstable) codebase-memory-mcp;
 
   # Rules shared with OpenCode -- auto-loaded by paths in Claude Code
   # (single source in opencode/skills/, deployed as ~/.claude/rules/)
@@ -92,5 +98,13 @@ in {
     install -m 755 ${
       ./statusline-command.sh
     } "$HOME/.claude/statusline-command.sh"
+  '';
+
+  # Pin the MCP binary at the stable ~/.local/bin path that the MCP
+  # registration (~/.claude.json) and the discovery hook both reference.
+  home.activation.claudeCbmBinary = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    mkdir -p "$HOME/.local/bin"
+    ln -sf ${codebase-memory-mcp}/bin/codebase-memory-mcp \
+      "$HOME/.local/bin/codebase-memory-mcp"
   '';
 }

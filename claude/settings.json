@@ -48,7 +48,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Grep|Glob|Read|Search",
+        "matcher": "Grep|Glob",
         "hooks": [
           {
             "type": "command",

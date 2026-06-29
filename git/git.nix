@@ -78,6 +78,9 @@
         # Directory specific ctags config
         ".ctags.d/"
         ".worktrees"
+        # codebase-memory-mcp per-repo exclude (cbm ignores the global gitignore,
+        # so .direnv must be re-excluded per repo); user-specific, never committed
+        ".cbmignore"
       ];
 
     };
