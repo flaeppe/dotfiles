@@ -50,6 +50,8 @@ Every file starts with:
 ### File Lifecycle
 
 - **Never delete or rewrite old files** — they are the trace
+- **Rewrite exception:** revise a file in place only on explicit approval —
+  the default stays append-only
 - **New file for:** new phase, new discovery, significant pivot, execution findings
 - **Same file for:** minor status updates only
 - Cross-reference between files using relative filenames
@@ -90,6 +92,15 @@ From the full scope in 001, extract independently deployable increments.
 **Sequencing:** Order increments so each builds on the last. Foundations
 first — extract pieces that support future work before the work that
 depends on them.
+
+**Merge-gates vs. try-out track:** separate what truly must land on the
+stable branch first (a shared platform surface, someone else's base) from
+what can be proven on a deploy-free surface (dev sandbox, remote preview,
+feature flag). Keep the merge-gated set minimal — batch same-surface
+prerequisites into one increment — and route the riskiest architectural
+bet through the try-out track first; merges then harvest proven slices.
+A sequence where several increments must merge before the first real
+feedback arrives is a waterfall in disguise.
 
 **One file per increment.** Each file documents: what changes, why it's
 independent, what it enables for later increments.
@@ -149,6 +160,10 @@ isolation.
 
 - **Mechanical splits:** Don't extract random renames or moves just to hit
   a line count. Every increment must make sense on its own.
+- **Capability slicing:** Don't cut one increment per feature when they're
+  all small derivations over the same surface. Slice by surface — what must
+  build and merge together. Fewer coherent increments beat a long queue
+  that serializes feedback.
 - **Monolith plans:** Don't write one giant plan file. Split into research
   (001) and increments (002+).
 - **Retroactive editing:** Don't modify old plan files to match new reality.
