@@ -58,7 +58,10 @@ Every file starts with:
 
 ## The Decomposition Procedure
 
-This procedure is mandatory for all multi-step work.
+This procedure is mandatory for all multi-step work. First choose the plan's
+**shape**: **one file** for a single design plus a mechanical rollout over
+similar items (rollout as a checklist, no 002+); **multi-file** (001 + a file
+per increment) when increments each carry distinct design worth its own document.
 
 ### Phase 1: Research & Full Scope → 001
 
@@ -164,8 +167,7 @@ isolation.
   all small derivations over the same surface. Slice by surface — what must
   build and merge together. Fewer coherent increments beat a long queue
   that serializes feedback.
-- **Monolith plans:** Don't write one giant plan file. Split into research
-  (001) and increments (002+).
+- **Monolith plans:** In multi-file mode, don't dump the whole effort in 001 — split.
 - **Retroactive editing:** Don't modify old plan files to match new reality.
   Add new files that document what changed and why.
 - **Skipping research:** Don't jump to increments without understanding the
