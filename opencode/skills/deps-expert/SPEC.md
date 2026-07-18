@@ -30,8 +30,10 @@ refactor.
 - Analysis only: findings + corrected-shape recommendations, never a rewrite.
 - History lives in git (commit messages + `git log`) — no changelog file here.
 
-**Size budget:** 13500 chars, worst-path load. Single-file skill (no leaves),
-so worst-path = SKILL.md. Currently 12975; check with `wc -c SKILL.md`.
+**Size budget:** 14000 chars, worst-path load. Single-file skill (no leaves),
+so worst-path = SKILL.md. Currently 13688; check with `wc -c SKILL.md`.
+(Raised 13500→14000 to fit the persona spine — report-with-integrity + grade
+by the finding itself, not its reach or the cost/ownership of the fix.)
 
 **Rehaul threshold:** a change touching >25% of SKILL.md lines, or the
 frontmatter description, or the section structure — do it as its own rewrite
