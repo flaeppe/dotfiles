@@ -184,7 +184,11 @@ shape:
 Direction: arrows go from less-stable to more-stable (Stable
 Dependencies Principle). The business layer depends on the domain types
 it owns; boundary layers depend on business logic; nothing higher should
-be aware of 3rd-party specifics.
+be aware of 3rd-party specifics. Symmetrically, nothing below the
+boundary should be aware of the boundary's protocol — transport error
+classes, request/response objects, resolver/handler context, and status
+codes are boundary vocabulary that must not appear in domain, business,
+or persistence code (Rule 2).
 
 This is a template, not a mandate. Re-articulate it for *this* codebase
 before applying it.
@@ -205,12 +209,30 @@ Detect: `query_graph` for strongly-connected components of size > 1.
 ### 2. Layer Violations
 
 Once layers are named, no edge should go "upward." Business must not
-import boundary handlers; domain must not import infrastructure.
+import boundary handlers; domain must not import infrastructure. The
+easily-missed form is a new edge onto protocol/framework code — a
+transport error or response type pulled into a domain module (e.g. a
+GraphQL `GqlValidationError` thrown in a service). Fix: the domain owns
+the error; the boundary converts it to the protocol-specific one.
 
-Detect: classify each module by layer (by path convention or naming);
-flag edges that go upward.
+Detect: classify each module by layer (path/naming); flag upward edges,
+including any import of a protocol/framework symbol from a module below
+the boundary.
 
-### 3. Awareness Leaks
+### 3. Foreign-Error Throws
+
+An error is a named node with an owner. Throwing an error your module
+imported from another package or domain is instantly suspect — the throw
+site has taken on that node's vocabulary as its own. A module's own
+`./errors` is the same node and fine; an error owned by a different
+name/domain — a 3rd party's, another bounded context's, or the
+boundary's protocol (Rule 2) — is not. Investigate: usually the fix is a
+locally-owned error the owner translates at its boundary.
+
+Detect: `search_graph` for throw sites; flag any whose error type is
+imported from a different package/domain node than the throw site.
+
+### 4. Awareness Leaks
 
 A "high" module mentioning a "low" concept by name. Most common case:
 business logic referencing 3rd-party-specific type or function names.
@@ -219,7 +241,7 @@ Detect: `search_graph` for 3rd-party type/function names; check the
 modules that reference them; flag references outside the
 integration/schema/persistence layer.
 
-### 4. 3rd-Party Scatter
+### 5. 3rd-Party Scatter
 
 A single 3rd party touched directly from many places in business code,
 rather than channelled through one integration module.
@@ -227,7 +249,7 @@ rather than channelled through one integration module.
 Detect: find every import of the 3rd-party package. If more than the
 designated integration module imports it directly, the boundary leaks.
 
-### 5. Cross-Context Coupling
+### 6. Cross-Context Coupling
 
 Two bounded contexts (feature domains) depending on each other directly
 rather than through a shared kernel, an event, or an explicit
@@ -237,7 +259,7 @@ Detect: list imports between feature directories. Direct edges that
 don't go through `shared/`, an events channel, or an explicit interface
 are suspect.
 
-### 6. Co-Change Without Import
+### 7. Co-Change Without Import
 
 Two modules that change together (per git log) but don't import each
 other. Usually means a hidden coupling — the boundary cuts through a
@@ -245,14 +267,14 @@ single concept and updates have to be coordinated by hand.
 
 Detect: correlate touch dates from `git log` on suspect modules.
 
-### 7. Fan-Out Hubs
+### 8. Fan-Out Hubs
 
 A module importing many others. Sometimes legitimate (orchestrators);
 often a sign of misplaced responsibility.
 
 Detect: rank modules by out-degree. Investigate the top.
 
-### 8. Stable Abstractions (SAP)
+### 9. Stable Abstractions (SAP)
 
 The more stable a module (more things depend on it), the more abstract
 it should be. Concrete implementations should be unstable (few
@@ -271,8 +293,8 @@ Findings grouped by severity:
 **Critical** — cycles, layer violations. Block any refactor; these are
 graph corruption.
 
-**Major** — awareness leaks, 3rd-party scatter, cross-context coupling.
-The graph mostly works but has structural rot.
+**Major** — foreign-error throws, awareness leaks, 3rd-party scatter,
+cross-context coupling. The graph mostly works but has structural rot.
 
 **Minor** — naming drift, mild fan-out asymmetry, stable-abstractions
 mismatch. Worth fixing but not urgent.
