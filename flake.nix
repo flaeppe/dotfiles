@@ -253,6 +253,7 @@
                       "cmd+shift+h" = "previous_tab";
                       "cmd+p" = "select_tab";
                       "cmd+t" = "new_tab_with_cwd";
+                      "cmd+enter" = "new_window_with_cwd";
                       "cmd+s>x" = "close_session";
                       "cmd+s>/" = "goto_session --sort-by=alphabetical";
                       # Browse scrollback buffer in nvim
