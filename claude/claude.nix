@@ -23,11 +23,13 @@ let
   ];
 
   # Always-loaded rules (no paths = loaded in every session, like CLAUDE.md)
-  alwaysRules = [ "commit" ];
+  alwaysRules = [ ];
 
   # Skills shared with OpenCode -- user-invocable in Claude Code
   # (single source in opencode/skills/, deployed as ~/.claude/skills/)
-  sharedSkills = [ "general" "planning" "docs-expert" "deps-expert" "correlation-expert" ];
+  # `commit` is a skill here (loaded on demand when committing, e.g. via the
+  # commit-msg wrapper), not an always-rule.
+  sharedSkills = [ "commit" "general" "planning" "docs-expert" "deps-expert" "correlation-expert" ];
 
   # Claude subagents -- thin wrappers that load the matching skill, dispatchable
   # in their own context via the Agent tool (single source stays in the skill).
