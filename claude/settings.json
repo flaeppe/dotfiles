@@ -4,6 +4,10 @@
     "command": "bash ~/.claude/statusline-command.sh"
   },
   "effortLevel": "high",
+  "enabledPlugins": {
+    "pg@aiguide": true,
+    "context7-plugin@context7-marketplace": true
+  },
   "permissions": {
     "allow": [
       "Bash(git status*)",
