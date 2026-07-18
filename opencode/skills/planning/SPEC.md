@@ -1,4 +1,4 @@
-# Charter — planning skill
+# Spec — planning skill
 
 **Purpose:** Structure multi-step work into a durable plan artifact so it
 survives across PRs and sessions. It plans the work; it does not perform it.

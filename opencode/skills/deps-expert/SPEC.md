@@ -1,4 +1,4 @@
-# Charter — deps-expert skill
+# Spec — deps-expert skill
 
 **Purpose:** Treat the whole codebase as one dependency graph — named nodes
 (functions, types, modules, packages) joined by edges (imports, calls, type

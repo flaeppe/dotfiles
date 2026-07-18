@@ -6,7 +6,7 @@ calls, type references, throws), and it audits that graph with a single question
 **who is aware of what, and why?**
 
 This README is the concept map. The runnable discipline is `SKILL.md`; the
-design contract (invariants, size budget, rehaul bar) is `CHARTER.md`.
+design contract (invariants, size budget, rehaul bar) is `SPEC.md`.
 
 ## The core idea
 
@@ -106,7 +106,7 @@ error, even sideways between peers).
 | File | Role |
 |---|---|
 | `SKILL.md` | the runnable discipline (loaded at runtime) |
-| `CHARTER.md` | design contract: purpose, invariants, size budget, rehaul threshold |
+| `SPEC.md` | design contract: purpose, invariants, size budget, rehaul threshold |
 | `README.md` | this concept map |
 
 History lives in git — one commit per change, the *why* in its message. There is
