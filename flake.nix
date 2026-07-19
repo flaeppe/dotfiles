@@ -298,6 +298,7 @@
             extraSpecialArgs = {
               unstable = unstable;
               isWork = true;
+              multiRepoRoot = "~/anyfin";
             };
           };
         };

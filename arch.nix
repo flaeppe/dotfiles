@@ -10,7 +10,6 @@
       coreutils
       curl
       fd
-      fzf
       gnumake
       jq
       less
@@ -25,7 +24,6 @@
       wget
       xclip
       zip
-      zoxide
     ];
 
     sessionVariables = {
@@ -70,7 +68,7 @@
       enable = true;
       enableFishIntegration = true;
       defaultCommand = "rg --files --hidden --glob '!.git/*'";
-      fileWidgetOptions = [
+      fileWidget.options = [
         "--walker-skip .git,node_modules,.direnv,.venv,venv,.pytest_cache,.ruff_cache,__pycache__"
         "--preview 'bat -n --color=always {}'"
       ];

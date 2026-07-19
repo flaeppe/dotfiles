@@ -15,7 +15,6 @@
     nixfmt # Formatter for nix
     graphql-language-service-cli # GrapQL LSP
     sqruff # SQL formatter/linter
-    tree-sitter
     typescript-language-server
     universal-ctags
   ]);
@@ -49,7 +48,46 @@
             '';
           }
           {
-            plugin = nvim-treesitter.withAllGrammars;
+            plugin = nvim-treesitter.withPlugins (p:
+              with p; [
+                # Core languages
+                go
+                typescript
+                tsx
+                javascript
+                python
+                # Config/infra
+                nix
+                json
+                yaml
+                toml
+                dockerfile
+                bash
+                ini
+                properties
+                # Docs/misc
+                markdown
+                markdown_inline
+                sql
+                graphql
+                lua
+                gitcommit
+                gitignore
+                gitattributes
+                fish
+                proto
+                html
+                css
+                vim
+                vimdoc
+                comment
+                regex
+                jsdoc
+                diff
+                make
+                kitty
+                editorconfig
+              ]);
             type = "lua";
             config = ''
               -- Syntax Highlighting via nvim-treesitter
