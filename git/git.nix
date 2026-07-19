@@ -1,16 +1,14 @@
+{ lib, isWork ? false, ... }:
 {
-  # Conditionally used config file (for work repos)
-  xdg.configFile."git/work".source = ./work.conf;
+  # Work-only configuration and signing must not leak into a personal machine.
+  xdg.configFile = lib.optionalAttrs isWork {
+    "git/work".source = ./work.conf;
+  };
 
   programs = {
     diff-so-fancy = { enableGitIntegration = true; };
     git = {
       enable = true;
-
-      signing = {
-        key = "F188F74B056474E8";
-        signByDefault = true;
-      };
 
       settings = {
         user = {
@@ -60,11 +58,6 @@
 
       };
 
-      includes = [{
-        condition = "gitdir:~/anyfin/";
-        path = "~/.config/git/work";
-      }];
-
       ignores = [
         ".DS_STORE"
         ".venv"
@@ -82,7 +75,22 @@
         # so .direnv must be re-excluded per repo); user-specific, never committed
         ".cbmignore"
       ];
-
-    };
+    } // (if isWork then {
+      signing = {
+        key = "F188F74B056474E8";
+        signByDefault = true;
+      };
+      includes = [{
+        condition = "gitdir:~/anyfin/";
+        path = "~/.config/git/work";
+      }];
+    } else {
+      # Personal key, generated 2026-07-19 on this arch machine; UID matches
+      # the GitHub-noreply email above so commits show as Verified.
+      signing = {
+        key = "241A4D1D445179C7";
+        signByDefault = true;
+      };
+    });
   };
 }

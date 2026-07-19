@@ -1,4 +1,4 @@
-{ lib, unstable, ... }:
+{ lib, unstable, multiRepoRoot ? "~/anyfin", ... }:
 let
   opencode = ../opencode;
 
@@ -50,15 +50,34 @@ let
     value = { source = "${opencode}/skills/${name}/SKILL.md"; };
   }) alwaysRules);
 
+  # Skills whose content names a "multi-repo work" root -- ~/anyfin at the
+  # work/macOS config. Rendered per-file with that path substituted rather
+  # than symlinked verbatim, so each home-manager config can point it at its
+  # own filesystem layout (e.g. ~/repos here). Assumes a flat skill directory
+  # (no subdirectories); add handling for those if a skill here grows one.
+  multiRepoRootSkills = [ "planning" "docs-expert" ];
+
+  renderSkillFile = name: file:
+    lib.replaceStrings [ "~/anyfin" ] [ multiRepoRoot ]
+      (builtins.readFile "${opencode}/skills/${name}/${file}");
+
+  renderedSkillEntries = builtins.listToAttrs (builtins.concatMap (name:
+    map (file: {
+      name = ".claude/skills/${name}/${file}";
+      value.text = renderSkillFile name file;
+    }) (builtins.attrNames (builtins.readDir "${opencode}/skills/${name}"))
+  ) multiRepoRootSkills);
+
   sharedSkillEntries = builtins.listToAttrs (map (name: {
     name = ".claude/skills/${name}";
     value = {
       source = "${opencode}/skills/${name}";
       recursive = true;
     };
-  }) sharedSkills);
+  }) (builtins.filter (name: !builtins.elem name multiRepoRootSkills) sharedSkills));
 in {
-  home.file = sharedRuleEntries // alwaysRuleEntries // sharedSkillEntries // claudeAgentEntries // {
+  home.file = sharedRuleEntries // alwaysRuleEntries // sharedSkillEntries
+    // renderedSkillEntries // claudeAgentEntries // {
     # Global instructions -- shared, single source in opencode/AGENTS.md
     ".claude/CLAUDE.md".source = "${opencode}/AGENTS.md";
 

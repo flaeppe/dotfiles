@@ -1,0 +1,110 @@
+# Arch/X11 i3 configuration.  Keep the familiar i3/vim navigation model.
+
+set $mod Mod4
+set $left h
+set $down j
+set $up k
+set $right l
+
+font pango:Iosevka 10
+floating_modifier $mod
+
+# Applications and session services.
+bindsym $mod+Return exec --no-startup-id kitty
+bindsym $mod+d exec --no-startup-id rofi -show drun -show-icons
+# Shift+l is already the Vim-style "move right" binding below.
+bindsym $mod+Control+l exec --no-startup-id i3lock -n -c 000000
+exec --no-startup-id dunst
+exec --no-startup-id xss-lock --transfer-sleep-lock -- i3lock -n -c 000000
+# Force an ssh-add prompt at session start so a forgotten passphrase doesn't
+# sit as a silently-empty agent. Skipped entirely if the agent already holds
+# a cached identity (e.g. i3 restart, or agent survived a resume). Closes
+# itself on success; stays open so the error is readable if ssh-add fails.
+exec --no-startup-id sh -c 'ssh-add -l >/dev/null 2>&1 || kitty -e sh -c "ssh-add; ec=\$?; if [ \$ec -ne 0 ]; then echo \"ssh-add failed (exit \$ec) - press any key to close\"; read -n1 -s; fi; exit \$ec"'
+
+# Window control.
+bindsym $mod+Shift+q kill
+bindsym $mod+$left focus left
+bindsym $mod+$down focus down
+bindsym $mod+$up focus up
+bindsym $mod+$right focus right
+bindsym $mod+Left focus left
+bindsym $mod+Down focus down
+bindsym $mod+Up focus up
+bindsym $mod+Right focus right
+bindsym $mod+Shift+$left move left
+bindsym $mod+Shift+$down move down
+bindsym $mod+Shift+$up move up
+bindsym $mod+Shift+$right move right
+bindsym $mod+Shift+Left move left
+bindsym $mod+Shift+Down move down
+bindsym $mod+Shift+Up move up
+bindsym $mod+Shift+Right move right
+bindsym $mod+b split h
+bindsym $mod+v split v
+bindsym $mod+f fullscreen toggle
+bindsym $mod+s layout stacking
+bindsym $mod+w layout tabbed
+bindsym $mod+e layout toggle split
+bindsym $mod+Shift+space floating toggle
+bindsym $mod+space focus mode_toggle
+bindsym $mod+a focus parent
+
+# Workspaces.
+set $ws1 "1"
+set $ws2 "2"
+set $ws3 "3"
+set $ws4 "4"
+set $ws5 "5"
+set $ws6 "6"
+set $ws7 "7"
+set $ws8 "8"
+set $ws9 "9"
+set $ws10 "10"
+bindsym $mod+1 workspace $ws1
+bindsym $mod+2 workspace $ws2
+bindsym $mod+3 workspace $ws3
+bindsym $mod+4 workspace $ws4
+bindsym $mod+5 workspace $ws5
+bindsym $mod+6 workspace $ws6
+bindsym $mod+7 workspace $ws7
+bindsym $mod+8 workspace $ws8
+bindsym $mod+9 workspace $ws9
+bindsym $mod+0 workspace $ws10
+bindsym $mod+Shift+1 move container to workspace $ws1
+bindsym $mod+Shift+2 move container to workspace $ws2
+bindsym $mod+Shift+3 move container to workspace $ws3
+bindsym $mod+Shift+4 move container to workspace $ws4
+bindsym $mod+Shift+5 move container to workspace $ws5
+bindsym $mod+Shift+6 move container to workspace $ws6
+bindsym $mod+Shift+7 move container to workspace $ws7
+bindsym $mod+Shift+8 move container to workspace $ws8
+bindsym $mod+Shift+9 move container to workspace $ws9
+bindsym $mod+Shift+0 move container to workspace $ws10
+
+# Session and configuration controls.
+bindsym $mod+Shift+c reload
+bindsym $mod+Shift+r restart
+bindsym $mod+Shift+e exec --no-startup-id i3-nagbar -t warning -m 'Exit i3 and end this X session?' -B 'Yes, exit i3' 'i3-msg exit'
+bindsym $mod+x move workspace to output right
+
+mode "resize" {
+  bindsym $left resize shrink width 10 px or 10 ppt
+  bindsym $down resize grow height 10 px or 10 ppt
+  bindsym $up resize shrink height 10 px or 10 ppt
+  bindsym $right resize grow width 10 px or 10 ppt
+  bindsym Left resize shrink width 10 px or 10 ppt
+  bindsym Down resize grow height 10 px or 10 ppt
+  bindsym Up resize shrink height 10 px or 10 ppt
+  bindsym Right resize grow width 10 px or 10 ppt
+  bindsym Return mode "default"
+  bindsym Escape mode "default"
+  bindsym $mod+r mode "default"
+}
+bindsym $mod+r mode "resize"
+
+bar {
+  position top
+  font pango:Iosevka 10
+  status_command i3status-rs ~/.config/i3status-rust/config.toml
+}

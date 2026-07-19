@@ -27,6 +27,12 @@
       shellInit = ''
         # Disable fish greeting
         set fish_greeting
+        # Prompt colours are declared here instead of relying on Fish's
+        # per-machine universal variables, keeping Darwin and Arch identical.
+        set -g fish_color_user brgreen
+        set -g fish_color_host normal
+        set -g fish_color_cwd green
+        set -g fish_color_error brred
         # Disable 'activate.fish' auto setting and displaying fish status
         set -x VIRTUAL_ENV_DISABLE_PROMPT 1
         # /usr/local/bin is not sourced by fish via path_helper; add it at low priority

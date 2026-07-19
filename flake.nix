@@ -12,7 +12,34 @@
   };
 
   outputs = { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, ... }:
-    flake-utils.lib.eachDefaultSystem (system:
+    let
+      archSystem = "x86_64-linux";
+      archPkgs = nixpkgs.legacyPackages.${archSystem};
+      archUnstable = import nixpkgs-unstable {
+        system = archSystem;
+        config.allowUnfreePredicate = pkg:
+          builtins.elem (nixpkgs.lib.getName pkg) [ "copilot.vim" ];
+      };
+    in {
+      # The Linux-personal target deliberately starts small.  It must remain
+      # independent of the pass-backed and work-only macOS configuration below.
+      homeConfigurations.arch = home-manager.lib.homeManagerConfiguration {
+        pkgs = archPkgs;
+        extraSpecialArgs = {
+          isWork = false;
+          unstable = archUnstable;
+          multiRepoRoot = "~/repos";
+        };
+        modules = [
+          ./arch.nix
+          ./claude/claude.nix
+          ./fish/fish.nix
+          ./git/git.nix
+          ./i3/i3.nix
+          ./nvim/nvim.nix
+        ];
+      };
+    } // flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         unstable = import nixpkgs-unstable {
@@ -73,7 +100,6 @@
                     ripgrep
                     uv
                   ]) ++ [
-                    unstable.gemini-cli
                     (pkgs.writeShellScriptBin "claude" ''
                       set -euo pipefail
                       _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
@@ -269,7 +295,10 @@
 
               })
             ];
-            extraSpecialArgs = { unstable = unstable; };
+            extraSpecialArgs = {
+              unstable = unstable;
+              isWork = true;
+            };
           };
         };
         devShell = pkgs.mkShell {
