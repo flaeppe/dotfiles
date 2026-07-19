@@ -77,7 +77,6 @@
                     less
                     openssl
                     ripgrep
-                    sentry-cli
                     uv
                   ]) ++ [
                     unstable.gemini-cli
@@ -123,14 +122,6 @@
                     ptf = "${pkgs.bash}/bin/bash ${./scripts/pass-to-file.sh}";
                     passPath = "${pkgs.pass}/bin:${pkgs.coreutils}/bin";
                   in {
-                    writeSentryclirc =
-                      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-                        PATH="${passPath}:$PATH" \
-                          ${pkgs.bash}/bin/bash ${
-                            ./scripts/write-sentryclirc.sh
-                          }
-                      '';
-
                     writeOpencodeAuth =
                       lib.hm.dag.entryAfter [ "writeBoundary" ] ''
                         PATH="${passPath}:$PATH"; export PATH
@@ -211,7 +202,7 @@
                     enable = true;
                     enableFishIntegration = false;
                     defaultCommand = "rg --files --hidden --glob '!.git/*'";
-                    fileWidgetOptions = [
+                    fileWidget.options = [
                       "--walker-skip .git,node_modules,.direnv,.venv,venv,.pytest_cache,.ruff_cache,__pycache__"
                       "--preview 'bat -n --color=always {}'"
                     ];

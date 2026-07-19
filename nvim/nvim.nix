@@ -12,8 +12,8 @@
     hadolint # Dockerfile linter
     markdownlint-cli # Style checker and lint tool for Markdown
     nixd # Language server for nix
-    nixfmt-classic # Formatter for nix
-    nodePackages.graphql-language-service-cli # GrapQL LSP
+    nixfmt # Formatter for nix
+    graphql-language-service-cli # GrapQL LSP
     sqruff # SQL formatter/linter
     tree-sitter
     typescript-language-server
@@ -27,7 +27,9 @@
     neovim = {
       enable = true;
       defaultEditor = true;
-      extraLuaConfig = ''
+      withRuby = true;
+      withPython3 = true;
+      initLua = ''
         ${builtins.readFile ./lua/options.lua}
         ${builtins.readFile ./lua/autocmds.lua}
         ${builtins.readFile ./lua/usercmds.lua}
