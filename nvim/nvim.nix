@@ -1,10 +1,10 @@
-{ config, pkgs, unstable, builtNodePkgs, ... }:
+{ config, pkgs, unstable, ... }:
 
 # TODO: See https://www.reddit.com/r/NixOS/comments/vc3srj/comment/icbwtvr/ for
 #       a way to improve config with mutable dotfiles/config files
 
 {
-  home.packages = [builtNodePkgs."@github/copilot"] ++ (with pkgs; [
+  home.packages = (with pkgs; [
     golangci-lint # Golang linter
     golangci-lint-langserver # Language server for golangci-lint
     gopls # Official LSP for Go
@@ -133,13 +133,6 @@
             type = "lua";
             config = ''
               ${builtins.readFile ./lua/plugins/copilot.lua}
-            '';
-          }
-          {
-            plugin = unstable.vimPlugins.CopilotChat-nvim;
-            type = "lua";
-            config = ''
-              ${builtins.readFile ./lua/plugins/copilot-chat.lua}
             '';
           }
         ];

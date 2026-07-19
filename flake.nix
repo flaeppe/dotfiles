@@ -38,12 +38,6 @@
               [ "${pkgs.neovim}/share/nvim/runtime" "$HOME/.config/nvim" ];
           };
         };
-        # Packages built with node2nix
-        builtNodePkgs = import ./node-packages {
-          inherit pkgs system;
-          # Pass desired Node.js version from nixpkgs
-          nodejs = pkgs.nodejs;
-        };
       in {
         packages.homeConfigurations = {
           ${username} = home-manager.lib.homeManagerConfiguration {
@@ -275,10 +269,7 @@
 
               })
             ];
-            extraSpecialArgs = {
-              unstable = unstable;
-              builtNodePkgs = builtNodePkgs;
-            };
+            extraSpecialArgs = { unstable = unstable; };
           };
         };
         devShell = pkgs.mkShell {
