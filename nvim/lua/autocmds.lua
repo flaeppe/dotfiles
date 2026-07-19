@@ -7,3 +7,14 @@ vim.api.nvim_create_autocmd("BufWritePre", {
     pattern = "",
     command = ":%s/\\s\\+$//e",
 })
+
+-- gopls and marksman (see lspconfig.lua) both list filetypes Neovim doesn't
+-- detect on its own -- without these, the LSP simply never attaches for
+-- these extensions.
+vim.filetype.add({
+    extension = {
+        tmpl = "gotmpl",
+        gotmpl = "gotmpl",
+        mdx = "markdown.mdx",
+    },
+})

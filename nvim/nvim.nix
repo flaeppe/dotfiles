@@ -41,6 +41,17 @@
       plugins = with pkgs.vimPlugins;
         [
           {
+            # File icons for fzf-lua's picker UI. fzf-lua only lazily
+            # requires this on first icon render, so without an eager
+            # require here checkhealth won't see it in package.loaded even
+            # though it's fully functional.
+            plugin = nvim-web-devicons;
+            type = "lua";
+            config = ''
+              require('nvim-web-devicons').setup()
+            '';
+          }
+          {
             # Make file browsing easier
             plugin = nerdtree;
             type = "lua";
