@@ -11,10 +11,12 @@
     gotools # Various tools and packages for Go static analysis
     hadolint # Dockerfile linter
     markdownlint-cli # Style checker and lint tool for Markdown
+    marksman # Language server for Markdown
     nixd # Language server for nix
     nixfmt # Formatter for nix
     graphql-language-service-cli # GrapQL LSP
     sqruff # SQL formatter/linter
+    stylua # Formatter for Lua
     typescript-language-server
     universal-ctags
   ]);

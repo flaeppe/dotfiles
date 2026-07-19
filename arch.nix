@@ -13,6 +13,7 @@
       gnumake
       jq
       less
+      noto-fonts-color-emoji
       nodejs
       pkg-config
       python3
@@ -34,6 +35,13 @@
     # It must win over Arch's /usr/bin/nvim in shells and desktop sessions.
     sessionPath = [ "$HOME/.nix-profile/bin" "$HOME/.local/bin" ];
   };
+
+  # This host isn't NixOS, so fontconfig isn't Nix-managed system-wide --
+  # without this, packages like noto-fonts-color-emoji above install into the
+  # Nix store but never get registered with fc-list/apps (unlike Iosevka,
+  # which is only visible because it's a separate pacman-installed system
+  # font under /usr/share/fonts).
+  fonts.fontconfig.enable = true;
 
   # Nix reads this user configuration after the first switch.  The system
   # daemon remains owned by Arch; this only enables the modern CLI and flakes.
