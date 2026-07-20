@@ -1,0 +1,39 @@
+== Focus / move (vim: hjkl) ==
+mod+h / j / k / l          focus left / down / up / right
+mod+Left/Down/Up/Right      focus left / down / up / right
+mod+shift+h / j / k / l    move window left / down / up / right
+mod+a                      focus parent container
+
+== Layout ==
+mod+b                      split horizontal
+mod+v                      split vertical
+mod+e                      toggle split layout
+mod+s                      stacking layout
+mod+w                      tabbed layout
+mod+f                      fullscreen toggle
+mod+shift+space            toggle floating
+mod+space                  toggle focus tiling/floating
+
+== Scratchpad ==
+mod+shift+minus            send focused window to scratchpad
+mod+minus                  show scratchpad window / cycle to next
+
+== Workspaces ==
+mod+1..0                   switch to workspace 1-10
+mod+shift+1..0             move window to workspace 1-10
+mod+x                      move workspace to output right
+
+== Resize mode ==
+mod+r                      enter resize mode
+  hjkl / arrows              shrink/grow width/height
+  Return / Escape / mod+r    leave resize mode
+
+== Apps / session ==
+mod+Return                 open kitty
+mod+d                      rofi launcher (drun)
+mod+ctrl+l                 lock screen
+mod+shift+q                kill focused window
+mod+shift+c                reload i3 config
+mod+shift+r                restart i3
+mod+shift+e                exit i3 (confirm)
+mod+shift+?                this cheatsheet

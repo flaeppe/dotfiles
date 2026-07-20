@@ -50,6 +50,12 @@ bindsym $mod+Shift+space floating toggle
 bindsym $mod+space focus mode_toggle
 bindsym $mod+a focus parent
 
+# Scratchpad: a hidden holding area, not a workspace. Stash any window with
+# the first bind; the second pops the most recent one up, or cycles to the
+# next stashed window if pressed again while one is already shown.
+bindsym $mod+Shift+minus move scratchpad
+bindsym $mod+minus scratchpad show
+
 # Workspaces.
 set $ws1 "1"
 set $ws2 "2"
@@ -87,6 +93,11 @@ bindsym $mod+Shift+c reload
 bindsym $mod+Shift+r restart
 bindsym $mod+Shift+e exec --no-startup-id i3-nagbar -t warning -m 'Exit i3 and end this X session?' -B 'Yes, exit i3' 'i3-msg exit'
 bindsym $mod+x move workspace to output right
+# mod+? -- matches the tmux/vim convention of "?" for a keybinding reference.
+# Bound via the "question" keysym rather than "slash": i3 binds by physical
+# keycode, and on this (se-mac) layout "slash" shares a keycode with "7",
+# colliding with the mod+shift+7 workspace binding above.
+bindsym $mod+Shift+question exec --no-startup-id rofi -dmenu -p "i3 keys" -no-custom < ~/.config/i3/cheatsheet.txt
 
 mode "resize" {
   bindsym $left resize shrink width 10 px or 10 ppt

@@ -5,6 +5,7 @@
   # modules avoids pretending that its session semantics apply to macOS.
   xdg.configFile = {
     "i3/config".source = ./config;
+    "i3/cheatsheet.txt".source = ./cheatsheet.txt;
     "i3status-rust/config.toml".source = ./i3status-rust.toml;
   };
 
