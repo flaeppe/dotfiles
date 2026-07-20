@@ -177,6 +177,15 @@
               require('kitty-scrollback').setup()
             '';
           }
+          # Pretty-render markdown (code highlighting, mermaid, etc.) in a
+          # live browser preview
+          {
+            plugin = markdown-preview-nvim;
+            type = "lua";
+            config = ''
+              ${builtins.readFile ./lua/plugins/markdown-preview.lua}
+            '';
+          }
         ] ++ [
           # GitHub Copilot
           {
