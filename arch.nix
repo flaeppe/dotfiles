@@ -13,11 +13,13 @@
       gnumake
       jq
       less
+      maim
       noto-fonts-color-emoji
       nodejs
       pkg-config
       python3
       ripgrep
+      slop
       tmux
       tree
       unzip

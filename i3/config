@@ -12,6 +12,16 @@ floating_modifier $mod
 # Applications and session services.
 bindsym $mod+Return exec --no-startup-id kitty
 bindsym $mod+d exec --no-startup-id rofi -show drun -show-icons
+# Region screenshot straight to the clipboard: slop (via maim -s) drives the
+# drag-select, xclip owns the X clipboard. pipefail is needed so a canceled
+# (Escape) selection skips the success notification instead of copying an
+# empty image and claiming success. dunstify piggybacks on the dunst that's
+# already running as the notification daemon.
+#
+# Bound to a mod combo rather than the "Print" keysym: this Apple Magic
+# Keyboard (se-mac layout) has no Print Screen / F13 key to send it, unlike a
+# PC board.
+bindsym $mod+Shift+s exec --no-startup-id bash -o pipefail -c 'maim -s | xclip -selection clipboard -t image/png && dunstify "Screenshot copied to clipboard"'
 # Shift+l is already the Vim-style "move right" binding below.
 bindsym $mod+Control+l exec --no-startup-id i3lock -n -c 000000
 exec --no-startup-id dunst

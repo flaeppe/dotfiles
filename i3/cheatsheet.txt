@@ -31,6 +31,7 @@ mod+r                      enter resize mode
 == Apps / session ==
 mod+Return                 open kitty
 mod+d                      rofi launcher (drun)
+mod+shift+s                region screenshot to clipboard
 mod+ctrl+l                 lock screen
 mod+shift+q                kill focused window
 mod+shift+c                reload i3 config
