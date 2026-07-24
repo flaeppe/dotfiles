@@ -24,6 +24,9 @@
   home.file.".ctags.d/default.ctags".source = ./.ctags.d/default.ctags;
   # User config for sqruff
   home.file.".sqruff".source = ./.sqruff;
+  # Persistent blacklist for the fzf-lua grep picker (gitignore syntax);
+  # add more entries here and switch to apply.
+  home.file.".config/nvim/grep-blacklist".source = ./grep-blacklist;
   programs = {
     neovim = {
       enable = true;

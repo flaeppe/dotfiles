@@ -70,6 +70,9 @@
         ".direnv/"
         # Directory specific ctags config
         ".ctags.d/"
+        # Per-project fzf-lua file-picker excludes (fd/rg's git-independent
+        # ignore convention); user-specific, never committed
+        ".ignore"
         ".worktrees"
         # codebase-memory-mcp per-repo exclude (cbm ignores the global gitignore,
         # so .direnv must be re-excluded per repo); user-specific, never committed
