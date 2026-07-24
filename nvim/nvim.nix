@@ -189,7 +189,21 @@
         ] ++ [
           # GitHub Copilot
           {
-            plugin = unstable.vimPlugins.copilot-vim;
+            # copilot-language-server bundles unsigned native modules
+            # (crypt32*.node) for OS keychain access. Unsigned code has no
+            # stable identity for macOS to remember, so it reprompts for
+            # keychain access on every launch regardless of "Always Allow" --
+            # ad-hoc signing gives it one. Darwin-only: /usr/bin/codesign
+            # doesn't exist on Linux, where this plugin is unaffected.
+            plugin = if pkgs.stdenv.isDarwin then
+              unstable.vimPlugins.copilot-vim.overrideAttrs (old: {
+                postFixup = ''
+                  ${old.postFixup or ""}
+                  find $out -name '*.node' -exec /usr/bin/codesign --force --sign - {} \;
+                '';
+              })
+            else
+              unstable.vimPlugins.copilot-vim;
             type = "lua";
             config = ''
               ${builtins.readFile ./lua/plugins/copilot.lua}
