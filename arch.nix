@@ -84,6 +84,15 @@
       ];
     };
 
+    gh = {
+      package = unstable.gh;
+      enable = true;
+      settings = {
+        aliases = { co = "pr checkout"; };
+        git_protocol = "ssh";
+      };
+    };
+
     # X11 has no OS-level pasteboard daemon like macOS -- xclip talks to the
     # X selection directly. Arch-only: macOS already has real pbcopy/pbpaste.
     fish.shellAliases = {
