@@ -50,13 +50,6 @@
               builtins.elem (nixpkgs.lib.getName pkg) [ "copilot.vim" ];
           };
         };
-        kanagawaRepo = pkgs.fetchFromGitHub {
-          owner = "rebelot";
-          repo = "kanagawa.nvim";
-          rev = "cc3b68b08e6a0cb6e6bf9944932940091e49bb83";
-          sha256 = "0mi15a4cxbrqzwb9xl47scar8ald5xm108r35jxcdrmahinw62rz";
-        };
-        username = "petter.friberg";
         luarcJsonContent = builtins.toJSON {
           diagnostics.globals = [ "vim" ];
           workspace = {
@@ -66,242 +59,23 @@
           };
         };
       in {
-        packages.homeConfigurations = {
-          ${username} = home-manager.lib.homeManagerConfiguration {
+        packages.homeConfigurations."petter.friberg" =
+          home-manager.lib.homeManagerConfiguration {
             inherit pkgs;
-            modules = [
-              ({ pkgs, lib, ... }: {
-                home = {
-                  inherit username;
-                  homeDirectory = "/Users/${username}";
-                  language = {
-                    base = "en_US.UTF-8";
-                    collate = "C";
-                    ctype = "en_US.UTF-8";
-                    messages = "en_US.UTF-8";
-                    monetary = "sv_SE.UTF-8";
-                    time = "en_US.UTF-8";
-                  };
-                  packages = (with pkgs; [
-                    coreutils
-                    curl
-                    dive
-                    fd
-                    git-crypt
-                    glow
-                    (google-cloud-sdk.withExtraComponents
-                      [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
-                    htop
-                    jq
-                    k9s
-                    kubectl
-                    less
-                    openssl
-                    ripgrep
-                    uv
-                  ]) ++ [
-                    (pkgs.writeShellScriptBin "claude" ''
-                      set -euo pipefail
-                      _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
-                      _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
-                      _v="$(_pass dev/github-private-pat)";  [[ -n "$_v" ]] && export GITHUB_PRIVATE_PAT="$_v"
-                      _v="$(_pass dev/github-work-pat)";     [[ -n "$_v" ]] && export GITHUB_WORK_PAT="$_v"
-                      exec "$HOME/.local/bin/claude" "$@"
-                    '')
-                    (pkgs.writeShellScriptBin "opencode" ''
-                      set -euo pipefail
-                      # Load secrets from pass into environment (skip if missing)
-                      _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
-                      _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
-                      _v="$(_pass dev/github-private-pat)";  [[ -n "$_v" ]] && export GITHUB_PRIVATE_PAT="$_v"
-                      _v="$(_pass dev/github-work-pat)";     [[ -n "$_v" ]] && export GITHUB_WORK_PAT="$_v"
-                      _superpowers="''${XDG_CONFIG_HOME:-$HOME/.config}/opencode/superpowers"
-                      if [[ -d "$_superpowers/.git" ]]; then
-                        ${pkgs.git}/bin/git -C "$_superpowers" pull --ff-only --quiet 2>/dev/null &
-                      fi
-                      exec "$HOME/.opencode/bin/opencode" "$@"
-                    '')
-                  ];
-                  # This doesn't work though hm-session-vars.fish is updated..
-                  sessionPath = [ "$HOME/.local/bin" ];
-                  sessionVariables = {
-                    EDITOR = "nvim";
-                    # Set better color when printing folders
-                    LSCOLORS = "gxfxcxdxbxegedabagacad";
-                    CLICOLOR = 1;
-                    # Set date format language for ls
-                    LANG = "en_US.UTF-8";
-                    # Set SSL backend for curl
-                    PYCURL_SSL_LIBRARY = "openssl";
-                  };
-                  stateVersion = "25.11";
-                  # Add configuration for gpg-agent
-                  file.".gnupg/gpg-agent.conf".source = ./gnupg/gpg-agent.conf;
-
-                  activation = let
-                    ptf = "${pkgs.bash}/bin/bash ${./scripts/pass-to-file.sh}";
-                    passPath = "${pkgs.pass}/bin:${pkgs.coreutils}/bin";
-                  in {
-                    writeOpencodeAuth =
-                      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-                        PATH="${passPath}:$PATH"; export PATH
-                        _dir="$HOME/.local/share/opencode"; mkdir -p "$_dir"
-                        ${ptf} dev/opencode-auth     "$_dir/auth.json"     600
-                        ${ptf} dev/opencode-mcp-auth "$_dir/mcp-auth.json" 600
-                      '';
-
-                    writeSshKeys = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-                      PATH="${passPath}:$PATH"; export PATH
-                      mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"
-                      ${ptf} ssh/id-ed25519              "$HOME/.ssh/id_ed25519"              600
-                      ${ptf} ssh/id-ed25519.pub          "$HOME/.ssh/id_ed25519.pub"          644
-                      ${ptf} ssh/id-rsa                  "$HOME/.ssh/id_rsa"                  600
-                      ${ptf} ssh/id-rsa.pub              "$HOME/.ssh/id_rsa.pub"              644
-                      ${ptf} ssh/google-compute-engine     "$HOME/.ssh/google_compute_engine"     600
-                      ${ptf} ssh/google-compute-engine.pub "$HOME/.ssh/google_compute_engine.pub" 644
-                    '';
-
-                    writeNpmrc = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-                      PATH="${passPath}:$PATH"; export PATH
-                      ${ptf} dev/npm-token "$HOME/.npmrc" 600
-                    '';
-                  };
-                };
-                editorconfig = {
-                  enable = true;
-                  settings = {
-                    "*" = {
-                      charset = "utf-8";
-                      end_of_line = "lf";
-                      indent_size = 2;
-                      trim_trailing_whitespace = true;
-                      insert_final_newline = true;
-                      indent_style = "space";
-                    };
-                    "Makefile" = {
-                      indent_style = "tab";
-                      indent_size = "unset";
-                    };
-                    "*.py" = { indent_size = 4; };
-                    "*.lua" = { indent_size = 4; };
-                    "*.fish" = { indent_size = 4; };
-                  };
-                };
-
-                imports = [
-                  ./git/git.nix
-                  ./fish/fish.nix
-                  ./nvim/nvim.nix
-                  ./opencode/opencode.nix
-                  ./claude/claude.nix
-                ];
-
-                programs = {
-                  home-manager.enable = true;
-
-                  bat = {
-                    enable = true;
-                    config = {
-                      theme = "Kanagawa";
-                      map-syntax = [ ".ignore:.gitignore" ];
-                    };
-                    themes = {
-                      Kanagawa = {
-                        src = kanagawaRepo;
-                        file = "extras/tmTheme/kanagawa.tmTheme";
-                      };
-                    };
-                  };
-
-                  direnv = {
-                    enable = true;
-                    nix-direnv.enable = true;
-                  };
-
-                  fzf = {
-                    enable = true;
-                    enableFishIntegration = false;
-                    defaultCommand = "rg --files --hidden --glob '!.git/*'";
-                    fileWidget.options = [
-                      "--walker-skip .git,node_modules,.direnv,.venv,venv,.pytest_cache,.ruff_cache,__pycache__"
-                      "--preview 'bat -n --color=always {}'"
-                    ];
-                  };
-
-                  gh = {
-                    package = unstable.gh;
-                    enable = true;
-                    settings = {
-                      aliases = { co = "pr checkout"; };
-                      git_protocol = "ssh";
-                    };
-                  };
-
-                  gpg = { enable = true; };
-
-                  password-store = {
-                    enable = true;
-                    settings = { PASSWORD_STORE_CLIP_TIME = "45"; };
-                  };
-
-                  kitty = {
-                    package = unstable.kitty;
-                    enable = true;
-                    settings = {
-                      allow_remote_control = "socket-only";
-                      listen_on = "unix:/tmp/mykitty";
-                      kitty_mod = "ctrl+shift";
-                      shell = "${pkgs.fish}/bin/fish";
-                      shell_integration = "enabled";
-                      # kitty-scrollback.nvim Kitten alias
-                      action_alias =
-                        "kitty_scrollback_nvim kitten ${pkgs.vimPlugins.kitty-scrollback-nvim}/python/kitty_scrollback_nvim.py";
-                      font_size = "8.0";
-                      include = "project-sessions.conf";
-                    };
-                    keybindings = {
-                      "cmd+shift+l" = "next_tab";
-                      "cmd+shift+h" = "previous_tab";
-                      "cmd+p" = "select_tab";
-                      "cmd+t" = "new_tab_with_cwd";
-                      "cmd+enter" = "new_window_with_cwd";
-                      "cmd+s>x" = "close_session";
-                      "cmd+s>/" = "goto_session --sort-by=alphabetical";
-                      # Browse scrollback buffer in nvim
-                      "ctrl+f" = "kitty_scrollback_nvim --nvim-args -n";
-                      "ctrl+j" = "neighboring_window bottom";
-                      "ctrl+k" = "neighboring_window top";
-                      "ctrl+h" = "neighboring_window left";
-                      "ctrl+l" = "neighboring_window right";
-                      "kitty_mod+t" = "new_tab_with_cwd";
-                      "kitty_mod+1" = "goto_tab 1";
-                      "kitty_mod+2" = "goto_tab 2";
-                      "kitty_mod+3" = "goto_tab 3";
-                      "kitty_mod+4" = "goto_tab 4";
-                      "kitty_mod+5" = "goto_tab 5";
-                      "kitty_mod+6" = "goto_tab 6";
-                      "kitty_mod+7" = "goto_tab 7";
-                      "kitty_mod+8" = "goto_tab 8";
-                      "kitty_mod+9" = "goto_tab 9";
-                      "kitty_mod+0" = "goto_tab 10";
-                      "option+l" = "toggle_layout stack";
-                      # Browse output of the last shell command in nvim
-                      "kitty_mod+g" =
-                        "kitty_scrollback_nvim --config ksb_builtin_last_cmd_output";
-                    };
-                    themeFile = "kanagawa";
-                  };
-                };
-
-              })
-            ];
             extraSpecialArgs = {
               unstable = unstable;
               isWork = true;
               multiRepoRoot = "~/anyfin";
             };
+            modules = [
+              ./darwin.nix
+              ./claude/claude.nix
+              ./fish/fish.nix
+              ./git/git.nix
+              ./nvim/nvim.nix
+              ./opencode/opencode.nix
+            ];
           };
-        };
         devShell = pkgs.mkShell {
           buildInputs = [
             pkgs.lua-language-server
