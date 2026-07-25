@@ -77,6 +77,13 @@
         # codebase-memory-mcp per-repo exclude (cbm ignores the global gitignore,
         # so .direnv must be re-excluded per repo); user-specific, never committed
         ".cbmignore"
+        # Per-repo sqruff dialect. The editor picks the nearest .sqruff and falls
+        # back to the shared one, so this is a local override of which SQL
+        # dialect a repo is read as, not part of the repo's build.
+        ".sqruff"
+        # Marks a repo as one the Postgres language server should attach to, and
+        # carries local database connection details; opt-in per machine.
+        "postgres-language-server.jsonc"
       ];
     } // (if isWork then {
       signing = {

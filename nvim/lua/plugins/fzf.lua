@@ -59,9 +59,53 @@ end, { desc = "View fzf-lua commands" })
 vim.keymap.set("n", "<C-p>", function()
     fzf.files()
 end, { silent = true, desc = "Search files with FZF" })
+-- Symbol navigation.
+--
+-- ctags and the LSP have complementary blind spots, so both stay bound rather
+-- than one replacing the other. ctags indexes every language in the repo at
+-- once, needs no running server, and survives syntax errors -- but it tags
+-- every `const x = () => {}` as a plain constant, never descends into object
+-- literals (so resolver maps and route tables yield one tag for the whole
+-- object), and has no GraphQL parser at all. The LSP is type-accurate and
+-- knows dependencies, but only answers for servers attached to the current
+-- buffer, so in a mixed Go/TS repo it sees one language at a time.
+--
+-- <C-e> therefore prefers the accurate source and degrades to tags; <Leader>e
+-- forces the repo-wide polyglot index.
+local function lsp_supports(method)
+    for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+        if client:supports_method(method) then
+            return true
+        end
+    end
+    return false
+end
 vim.keymap.set("n", "<C-e>", function()
+    if lsp_supports("workspace/symbol") then
+        return fzf.lsp_live_workspace_symbols()
+    end
     fzf.tags()
-end, { desc = "Search ctags" })
+end, { desc = "Project symbols (LSP, ctags fallback)" })
+vim.keymap.set("n", "<Leader>e", function()
+    fzf.tags()
+end, { desc = "Project symbols (ctags, every language at once)" })
+vim.keymap.set("n", "<Leader>d", function()
+    if lsp_supports("textDocument/documentSymbol") then
+        return fzf.lsp_document_symbols()
+    end
+    fzf.btags()
+end, { desc = "Document symbols (LSP, ctags fallback)" })
+-- Call hierarchy has no ctags equivalent: tags record where a name is defined,
+-- never who reaches it.
+vim.keymap.set("n", "<Leader>ci", function()
+    fzf.lsp_incoming_calls()
+end, { desc = "Incoming calls" })
+vim.keymap.set("n", "<Leader>co", function()
+    fzf.lsp_outgoing_calls()
+end, { desc = "Outgoing calls" })
+vim.keymap.set("n", "<Leader>cr", function()
+    fzf.lsp_references({ includeDeclaration = false })
+end, { desc = "References" })
 vim.keymap.set("n", "<Leader>f", function()
     fzf.grep_project()
 end, { remap = true, silent = true, desc = "Search text with ripgrep" })

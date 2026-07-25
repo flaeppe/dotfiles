@@ -20,6 +20,12 @@ end, bufopts)
 -- Show/hide diagnostic
 vim.keymap.set("n", "<Leader>ts", vim.diagnostic.show, bufopts)
 vim.keymap.set("n", "<Leader>th", vim.diagnostic.hide, bufopts)
+-- Inlay hints resolve inferred types in place, which is the fastest way to
+-- check what a chain of generics or an untyped return actually produced. Left
+-- off by default because they shift text horizontally as you read.
+vim.keymap.set("n", "<Leader>ti", function()
+    vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = 0 }), { bufnr = 0 })
+end, bufopts)
 -- Move to next item
 vim.keymap.set("n", "¨d", function() vim.diagnostic.jump({ count = 1, float = true }) end, bufopts)
 -- Move to previous item

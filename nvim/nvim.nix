@@ -1,10 +1,11 @@
-{ config, pkgs, unstable, ... }:
+{ pkgs, unstable, ... }:
 
 # TODO: See https://www.reddit.com/r/NixOS/comments/vc3srj/comment/icbwtvr/ for
 #       a way to improve config with mutable dotfiles/config files
 
 {
   home.packages = (with pkgs; [
+    ast-grep # Structural (AST-aware) code search across TS/Go/Python
     golangci-lint # Golang linter
     golangci-lint-langserver # Language server for golangci-lint
     gopls # Official LSP for Go
@@ -15,18 +16,27 @@
     nixd # Language server for nix
     nixfmt # Formatter for nix
     graphql-language-service-cli # GrapQL LSP
+    postgres-language-server # SQL LSP built on the real Postgres grammar
     sqruff # SQL formatter/linter
     stylua # Formatter for Lua
-    typescript-language-server
+    # vtsls over typescript-language-server: same tsserver underneath, but it
+    # exposes the tsserver-only commands (see lspconfig.lua).
+    vtsls
     universal-ctags
   ]);
-  # Setup default tags for universal-ctags
+  # Setup default tags for universal-ctags (every *.ctags in ~/.ctags.d is
+  # loaded automatically)
   home.file.".ctags.d/default.ctags".source = ./.ctags.d/default.ctags;
+  home.file.".ctags.d/graphql.ctags".source = ./.ctags.d/graphql.ctags;
   # User config for sqruff
   home.file.".sqruff".source = ./.sqruff;
   # Persistent blacklist for the fzf-lua grep picker (gitignore syntax);
   # add more entries here and switch to apply.
   home.file.".config/nvim/grep-blacklist".source = ./grep-blacklist;
+  # Extra treesitter queries, merged with the ones nvim-treesitter ships via a
+  # leading `; extends` directive.
+  home.file.".config/nvim/queries/ecma/injections.scm".source =
+    ./queries/ecma/injections.scm;
   programs = {
     neovim = {
       enable = true;
@@ -110,6 +120,15 @@
               ${builtins.readFile ./lua/plugins/treesitter.lua}
             '';
           }
+          # Structural motions/selections (]f, af, at) driven by the same
+          # parsers as highlighting. Must load after nvim-treesitter.
+          {
+            plugin = nvim-treesitter-textobjects;
+            type = "lua";
+            config = ''
+              ${builtins.readFile ./lua/plugins/textobjects.lua}
+            '';
+          }
           # Color scheme: https://github.com/rebelot/kanagawa.nvim
           # TIP: Use 'colorscheme kanagawa-lotus' for a bright scheme
           {
@@ -145,31 +164,20 @@
               ${builtins.readFile ./lua/plugins/lspconfig.lua}
             '';
           }
-          # Formatters (hooked up via LSP)
+          # Symbol outline, backed by the LSP where one is attached
+          {
+            plugin = aerial-nvim;
+            type = "lua";
+            config = ''
+              ${builtins.readFile ./lua/plugins/aerial.lua}
+            '';
+          }
+          # Formatters and linters (hooked up via LSP)
           {
             plugin = none-ls-nvim;
             type = "lua";
             config = ''
-              local null_ls = require("null-ls")
-              null_ls.setup({
-                sources = {
-                  null_ls.builtins.diagnostics.hadolint,
-                  null_ls.builtins.formatting.gofmt,
-                  null_ls.builtins.formatting.goimports,
-                  null_ls.builtins.formatting.nixfmt,
-                  -- SQL
-                  -- Passing a shared config file to avoid per project config
-                  null_ls.builtins.diagnostics.sqruff.with({
-                    args = { "--config", "${config.home.homeDirectory}/.sqruff", "lint", "--format", "github-annotation-native", "$FILENAME" },
-                  }),
-                  null_ls.builtins.formatting.sqruff.with({
-                    args = { "--config", "${config.home.homeDirectory}/.sqruff", "fix", "-" },
-                  }),
-                  null_ls.builtins.formatting.stylua,
-                  null_ls.builtins.diagnostics.markdownlint,
-                  null_ls.builtins.formatting.markdownlint
-                }
-              })
+              ${builtins.readFile ./lua/plugins/none-ls.lua}
             '';
           }
           # Navigate Kitty scrollback with nvim

@@ -1,0 +1,51 @@
+## GraphQL support for universal-ctags.
+##
+## ctags 6.2.1 ships no GraphQL parser at all, so every .graphql file is absent
+## from the tag index. The LSP covers schema files, but only inside a project
+## with a graphql-config root and only while a server is running -- a
+## regex-based tag index covers the whole federated graph across every repo
+## with neither. Kinds are kept distinct so a type is skimmable from an
+## operation in the picker.
+##
+## Note: --map-<LANG>= replaces the extension map, so every entry needs the
+## leading + to append instead.
+
+--langdef=GraphQL
+--map-GraphQL=+.graphql
+--map-GraphQL=+.graphqls
+--map-GraphQL=+.gql
+
+--kinddef-GraphQL=t,type,object types
+--kinddef-GraphQL=i,interface,interfaces
+--kinddef-GraphQL=e,enum,enums
+--kinddef-GraphQL=u,union,unions
+--kinddef-GraphQL=n,input,input objects
+--kinddef-GraphQL=s,scalar,scalars
+--kinddef-GraphQL=d,directive,directives
+--kinddef-GraphQL=f,fragment,fragments
+--kinddef-GraphQL=q,query,operations
+--kinddef-GraphQL=m,mutation,mutations
+--kinddef-GraphQL=b,subscription,subscriptions
+
+## `extend type X` is matched as X as well: in a federated subgraph the
+## extension is often the only place a type's fields are declared.
+--regex-GraphQL=/^[ \t]*(extend[ \t]+)?type[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/t/
+--regex-GraphQL=/^[ \t]*(extend[ \t]+)?interface[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/i/
+--regex-GraphQL=/^[ \t]*(extend[ \t]+)?enum[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/e/
+--regex-GraphQL=/^[ \t]*(extend[ \t]+)?union[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/u/
+--regex-GraphQL=/^[ \t]*(extend[ \t]+)?input[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/n/
+--regex-GraphQL=/^[ \t]*(extend[ \t]+)?scalar[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/s/
+--regex-GraphQL=/^[ \t]*directive[ \t]+@([A-Za-z_][A-Za-z0-9_]*)/\1/d/
+--regex-GraphQL=/^[ \t]*fragment[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\1/f/
+--regex-GraphQL=/^[ \t]*query[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\1/q/
+--regex-GraphQL=/^[ \t]*mutation[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\1/m/
+--regex-GraphQL=/^[ \t]*subscription[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\1/b/
+
+## Operations written inside gql`...` template literals. The regex runs over the
+## raw text, so it reaches into the template that the TypeScript parser treats
+## as an opaque string. Named operations and fragments become jumpable by their
+## GraphQL name rather than only by the constant they are assigned to.
+--kinddef-TypeScript=Q,gqlOperation,GraphQL operations and fragments
+--regex-TypeScript=/^[ \t]*(query|mutation|subscription|fragment)[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/Q/
+--kinddef-JavaScript=Q,gqlOperation,GraphQL operations and fragments
+--regex-JavaScript=/^[ \t]*(query|mutation|subscription|fragment)[ \t]+([A-Za-z_][A-Za-z0-9_]*)/\2/Q/
