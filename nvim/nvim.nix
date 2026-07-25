@@ -49,6 +49,7 @@
         ${builtins.readFile ./lua/usercmds.lua}
         ${builtins.readFile ./lua/diagnostic.lua}
         ${builtins.readFile ./lua/keymaps.lua}
+        ${builtins.readFile ./lua/keylog.lua}
         ${builtins.readFile ./lua/plugins/sql.lua}
       '';
       plugins = with pkgs.vimPlugins;
@@ -146,6 +147,9 @@
             type = "lua";
             config = ''
               ${builtins.readFile ./lua/plugins/fzf.lua}
+              -- Rendered through an fzf-lua picker, so it loads with fzf-lua
+              -- rather than as its own plugin entry.
+              ${builtins.readFile ./lua/plugins/dojo.lua}
             '';
           }
           # Incremental tag generation
