@@ -20,6 +20,10 @@ vim.opt.clipboard = "unnamedplus"
 vim.opt.relativenumber = true
 -- Disable mouse
 vim.opt.mouse = ""
+-- No swap files. Their only payoff is crash recovery, which goes unused, while
+-- a stale swap left by a killed process blocks reopening the file behind an
+-- "another program may be editing" prompt.
+vim.opt.swapfile = false
 -- Enable true colors support
 vim.opt.termguicolors = true
 -- Always display statusbar
