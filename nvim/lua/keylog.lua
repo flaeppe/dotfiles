@@ -10,10 +10,14 @@
 -- data can then be applied to history already collected, which would be
 -- impossible if capture pre-summarised into counters.
 --
--- One file per day, so a review can read a date range without parsing months of
--- history, and so pruning is a file deletion rather than a rewrite. Records are
--- self-contained -- `t` is absolute -- so a file stays readable no matter how
--- many editor sessions appended to it.
+-- One file per session per day, so a review can read a date range without
+-- parsing months of history, and so pruning is a file deletion rather than a
+-- rewrite. Per session and not merely per day because several nvim instances are
+-- normally open at once, and one shared file breaks under that two ways:
+-- interleaved appends splice two keystreams into a sequence nobody typed --
+-- inventing adjacencies, which is precisely what a review reasons over -- and
+-- concurrent writes tear records apart at the 4096-byte stdio buffer boundary.
+-- Records are self-contained (`t` is absolute), so files merge on read.
 --
 -- `:KeylogToggle` stops recording for the session -- for pairing or screen
 -- sharing. `:KeylogStatus` reports where the files are and how large they got.
@@ -40,7 +44,13 @@ local RECORDED_MODES = {
 local enabled = true
 local pending = {}
 local filetype = ""
-local written_files = {}
+local last_path = nil
+-- When the current batch opened, and where. A file's opening context has to
+-- describe the first keystroke in it, not the flush that happened to write it.
+local batch_start_ms = nil
+local batch_cwd = nil
+
+local PID = vim.fn.getpid()
 
 -- hrtime() rather than now(): now() returns the event loop's cached timestamp,
 -- which does not advance within a single loop iteration, and several keys can
@@ -55,7 +65,13 @@ local function now_ms()
 end
 
 local function log_path()
-    return string.format("%s/keys-%s.jsonl", DIR, os.date("%Y-%m-%d"))
+    return string.format("%s/keys-%s-%d.jsonl", DIR, os.date("%Y-%m-%d"), PID)
+end
+
+-- Which project the keys belong to. A record carrying `cwd` is context rather
+-- than a keystroke, and applies to every record after it until the next one.
+local function context(cwd)
+    return { cwd = cwd or vim.fn.getcwd(), nvim = tostring(vim.version()), pid = PID }
 end
 
 local function flush()
@@ -70,16 +86,13 @@ local function flush()
     if not fd then
         return
     end
-    -- One context record the first time this session touches a given day's
-    -- file, so a review can tell which project the keys belong to. Sessions
-    -- spanning midnight land in both days' files and get one in each.
-    if not written_files[path] then
-        written_files[path] = true
-        fd:write(vim.json.encode({
-            session = now_ms(),
-            cwd = vim.fn.getcwd(),
-            nvim = tostring(vim.version()),
-        }) .. "\n")
+    -- Opens every file this session writes with context, which also covers a
+    -- session running past midnight into a second day's file.
+    if path ~= last_path then
+        last_path = path
+        local ctx = context(batch_cwd)
+        ctx.t = batch_start_ms
+        table.insert(lines, 1, vim.json.encode(ctx))
     end
     fd:write(table.concat(lines, "\n") .. "\n")
     fd:close()
@@ -87,6 +100,10 @@ end
 
 local function record(entry)
     entry.t = now_ms()
+    if #pending == 0 then
+        batch_start_ms = entry.t
+        batch_cwd = vim.fn.getcwd()
+    end
     table.insert(pending, vim.json.encode(entry))
     if #pending >= 200 then
         flush()
@@ -100,8 +117,8 @@ local function prune()
         return
     end
     for name, kind in iter do
-        local year, month, day = name:match("^keys%-(%d+)%-(%d+)%-(%d+)%.jsonl$")
-        if kind == "file" and year then
+        local year, month, day = name:match("^keys%-(%d+)%-(%d+)%-(%d+)[%-.]")
+        if kind == "file" and year and name:match("%.jsonl$") then
             local stamp = os.time({
                 year = tonumber(year),
                 month = tonumber(month),
@@ -121,6 +138,16 @@ prune()
 vim.api.nvim_create_autocmd({ "BufEnter", "FileType" }, {
     callback = function()
         filetype = vim.bo.filetype
+    end,
+})
+
+-- :cd mid-session moves the keys to a different project, so context is recorded
+-- inline as well as at the top of the file.
+vim.api.nvim_create_autocmd("DirChanged", {
+    callback = function()
+        if enabled then
+            record(context())
+        end
     end,
 })
 
@@ -175,22 +202,27 @@ end, { desc = "Pause or resume keystroke logging" })
 
 vim.api.nvim_create_user_command("KeylogStatus", function()
     flush()
-    local days, bytes = 0, 0
+    local files, bytes = 0, 0
+    local days = {}
     local ok, iter = pcall(vim.fs.dir, DIR)
     if ok then
         for name, kind in iter do
-            if kind == "file" and name:match("^keys%-.*%.jsonl$") then
-                days = days + 1
+            local date = name:match("^keys%-(%d+%-%d+%-%d+)")
+            if kind == "file" and date and name:match("%.jsonl$") then
+                files = files + 1
+                days[date] = true
                 bytes = bytes + math.max(vim.fn.getfsize(DIR .. "/" .. name), 0)
             end
         end
     end
     vim.notify(
         string.format(
-            "keylog %s\n%s\n%d day file(s), %.1f MiB total, keeping %d days",
+            "keylog %s\n%s\nthis session: %s\n%d file(s) across %d day(s), %.1f MiB total, keeping %d days",
             enabled and "recording" or "paused",
             DIR,
-            days,
+            vim.fs.basename(log_path()),
+            files,
+            vim.tbl_count(days),
             bytes / 1024 / 1024,
             RETENTION_DAYS
         )
