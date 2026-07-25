@@ -41,7 +41,11 @@ local RECORDED_MODES = {
     ["\19"] = true,
 }
 
-local enabled = true
+-- kitty-scrollback sets this in the environment of the overlay window it opens
+-- nvim in. Paging a terminal buffer is reading, not editing: it would contribute
+-- long j-runs and searches that have no better alternative to suggest, and it
+-- starts a session per invocation.
+local enabled = vim.env.KITTY_SCROLLBACK_NVIM == nil
 local pending = {}
 local filetype = ""
 local last_path = nil
