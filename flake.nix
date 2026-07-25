@@ -2,8 +2,12 @@
   description = "Dotfiles";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs";
-    nixpkgs-unstable.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    # Track the nixpkgs-unstable *channel* rather than the repository's default
+    # branch. An unpinned github:nixos/nixpkgs resolves to master, which carries
+    # the same package versions but is not a channel: the channel branch only
+    # advances once Hydra has built and cached a jobset, so substitutes exist
+    # instead of every closure being rebuilt locally.
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
     home-manager = {
       url = "github:nix-community/home-manager";
@@ -11,15 +15,20 @@
     };
   };
 
-  outputs = { nixpkgs, nixpkgs-unstable, home-manager, flake-utils, ... }:
+  outputs = { nixpkgs, home-manager, flake-utils, ... }:
     let
+      # The same nixpkgs, re-imported to permit the unfree packages opted into
+      # by name. Modules receive this as `unstable`; it is no longer a newer
+      # nixpkgs than `pkgs`, only a less restrictive one.
+      unfreePkgs = system:
+        import nixpkgs {
+          inherit system;
+          config.allowUnfreePredicate = pkg:
+            builtins.elem (nixpkgs.lib.getName pkg) [ "copilot.vim" ];
+        };
       archSystem = "x86_64-linux";
       archPkgs = nixpkgs.legacyPackages.${archSystem};
-      archUnstable = import nixpkgs-unstable {
-        system = archSystem;
-        config.allowUnfreePredicate = pkg:
-          builtins.elem (nixpkgs.lib.getName pkg) [ "copilot.vim" ];
-      };
+      archUnstable = unfreePkgs archSystem;
     in {
       # The Linux-personal target deliberately starts small.  It must remain
       # independent of the pass-backed and work-only macOS configuration below.
@@ -42,14 +51,7 @@
     } // flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        unstable = import nixpkgs-unstable {
-          inherit system;
-
-          config = {
-            allowUnfreePredicate = pkg:
-              builtins.elem (nixpkgs.lib.getName pkg) [ "copilot.vim" ];
-          };
-        };
+        unstable = unfreePkgs system;
         luarcJsonContent = builtins.toJSON {
           diagnostics.globals = [ "vim" ];
           workspace = {
