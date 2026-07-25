@@ -70,8 +70,20 @@ end, { silent = true, desc = "Search files with FZF" })
 -- knows dependencies, but only answers for servers attached to the current
 -- buffer, so in a mixed Go/TS repo it sees one language at a time.
 --
--- <C-e> therefore prefers the accurate source and degrades to tags; <Leader>e
--- forces the repo-wide polyglot index.
+-- They are bound to separate keys rather than one key choosing between them.
+-- Capability is the wrong signal to choose on: graphql-lsp advertises
+-- workspaceSymbolProvider, so "some attached client answers workspace/symbol"
+-- is true in any repo with a graphql-config long before tsserver has loaded a
+-- project graph, and the picker then reports the GraphQL server's empty answer
+-- while never consulting the tag file. The two also differ in kind -- the tag
+-- index is complete the moment it exists, a server answers only once warm --
+-- so a single key makes an empty result impossible to interpret.
+vim.keymap.set("n", "<C-e>", function()
+    fzf.tags()
+end, { desc = "Project symbols (ctags, every language at once)" })
+vim.keymap.set("n", "<Leader>e", function()
+    fzf.lsp_live_workspace_symbols()
+end, { desc = "Project symbols (LSP, type-accurate)" })
 local function lsp_supports(method)
     for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
         if client:supports_method(method) then
@@ -80,15 +92,6 @@ local function lsp_supports(method)
     end
     return false
 end
-vim.keymap.set("n", "<C-e>", function()
-    if lsp_supports("workspace/symbol") then
-        return fzf.lsp_live_workspace_symbols()
-    end
-    fzf.tags()
-end, { desc = "Project symbols (LSP, ctags fallback)" })
-vim.keymap.set("n", "<Leader>e", function()
-    fzf.tags()
-end, { desc = "Project symbols (ctags, every language at once)" })
 vim.keymap.set("n", "<Leader>d", function()
     if lsp_supports("textDocument/documentSymbol") then
         return fzf.lsp_document_symbols()
