@@ -80,7 +80,7 @@ files build on it.
 End 001 with a section that previews the incremental sequence and the
 rationale for that ordering.
 
-### Phase 2: Incremental Extraction → 002, 003, ...
+### Phase 2: Incremental Extraction → 002, 003, … (one-file mode: a checklist in 001)
 
 From the full scope in 001, extract independently deployable increments.
 
@@ -121,7 +121,8 @@ not failures — they are expected. Plans change when they meet code.
 
 ## Quality Criteria for Each Increment
 
-Every extracted increment MUST satisfy ALL of these:
+Every extracted increment MUST satisfy Logical, Independent, Enabling and
+Boring. Reviewable is a target coherence may override:
 
 ### Logical
 
@@ -161,15 +162,11 @@ isolation.
 
 ## Anti-Patterns
 
-- **Mechanical splits:** Don't extract random renames or moves just to hit
-  a line count. Every increment must make sense on its own.
 - **Capability slicing:** Don't cut one increment per feature when they're
   all small derivations over the same surface. Slice by surface — what must
   build and merge together. Fewer coherent increments beat a long queue
   that serializes feedback.
 - **Monolith plans:** In multi-file mode, don't dump the whole effort in 001 — split.
-- **Retroactive editing:** Don't modify old plan files to match new reality.
-  Add new files that document what changed and why.
 - **Skipping research:** Don't jump to increments without understanding the
   full scope first. The 001 file prevents tunnel vision.
 - **Over-planning:** Don't plan 20 increments upfront. Plan the first 3-5
