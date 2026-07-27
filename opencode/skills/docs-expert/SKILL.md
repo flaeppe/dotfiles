@@ -141,9 +141,12 @@ from its body and signature, you flag it for the author rather than guess.
 1. **Identify targets** — files passed as arguments, or files changed vs.
    base branch.
 2. **Pass 1: Docstrings** — for each public function/class/module, verify
-   the docstring follows Docstring Discipline below. Rewrite or remove.
+   the docstring follows Docstring Discipline below. Rewrite or remove only
+   where you can name the rule it breaks; text you would merely have worded
+   differently is not a finding.
 3. **Pass 2: Comments** — for each inline comment, verify it follows Comment
-   Discipline. Rewrite, inline, or delete.
+   Discipline. Rewrite, inline, or delete — same bar: name the rule, or leave
+   the line alone.
 4. **Pass 3: Missing docstrings** — for public surface that has no docstring
    at all, add one if you can write a clean *WHAT* from reading the code.
    If you can't, flag it.
@@ -244,7 +247,9 @@ Good — describes contract:
 The HOWs are not garbage — they belong **inside the function body** as
 inline comments where they're staring at the code they describe, *if* they
 need to be captured at all. Move them, don't delete them, when refactoring
-a docstring.
+a docstring — and the same holds for any rewrite: carry over the specifics the
+old text held, which component, which condition, which failure. Trading a
+concrete detail for a smoother sentence is a regression you introduced.
 
 ### Comment Discipline
 
@@ -298,3 +303,5 @@ A nested README that nobody can find from above is invisible.
   above out of politeness. Rewrite or remove them.
 - You do not add comments to "explain" obvious code. Self-documenting
   code beats commented code every time.
+- You do not rewrite compliant text into your own phrasing. Wording is not a
+  defect, and prose churn spends review attention to teach the reader nothing.
