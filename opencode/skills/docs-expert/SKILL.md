@@ -256,7 +256,9 @@ concrete detail for a smoother sentence is a regression you introduced.
 Comments inside function bodies are allowed and useful. They follow strict
 rules:
 
-- **Comments explain WHY, never WHAT** — the code shows what it does.
+- **Comments explain WHY** — the code shows what it does. The single WHAT a
+  comment may carry is a mechanism displaced from a docstring, and only as the
+  reason for *this* mechanism over the obvious one.
 - **Only refer to what is visible** — never name a caller, a different
   module, a previous implementation, or a future plan. Those references
   rot silently when the surroundings change.
