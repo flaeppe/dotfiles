@@ -80,6 +80,13 @@
             ${builtins.readFile ./functions/new-session.fish}
           '';
         };
+        review = {
+          description =
+            "Sets up a two-worktree review session for a GitHub PR and opens it in Kitty";
+          body = ''
+            ${builtins.readFile ./functions/review.fish}
+          '';
+        };
       };
     };
   };

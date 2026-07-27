@@ -59,6 +59,11 @@ end, { desc = "View fzf-lua commands" })
 vim.keymap.set("n", "<C-p>", function()
     fzf.files()
 end, { silent = true, desc = "Search files with FZF" })
+-- What is already open, which is also how you find your way back after a stray :q
+-- closed the window you were reading.
+vim.keymap.set("n", "<Leader>b", function()
+    fzf.buffers()
+end, { desc = "Open buffers" })
 -- Symbol navigation.
 --
 -- ctags and the LSP have complementary blind spots, so both stay bound rather

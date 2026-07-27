@@ -41,6 +41,11 @@ export VIRTUAL_ENV=.venv
 layout python
 ```
 
+## Documentation
+
+- [Local PR review](docs/pr-review.md) — reviewing a pull request in the editor, with
+  findings delivered as a stack of commits rather than comments.
+
 ## Secrets
 
 Secrets are managed by [pass](https://www.passwordstore.org/) (GPG-encrypted, git-synced).

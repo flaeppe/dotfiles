@@ -2,7 +2,7 @@
 -- innermost language at the cursor, so they work inside injected gql`...` and
 -- sql`...` blocks in TypeScript too, not only in the host language.
 --
--- ]c/[c are left alone -- vim-gitgutter owns them for hunk motion.
+-- ]c/[c are left alone -- gitsigns owns them for hunk motion.
 require("nvim-treesitter-textobjects").setup({
     select = {
         -- Act on the next textobject when the cursor sits between two.

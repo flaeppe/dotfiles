@@ -139,8 +139,25 @@
               vim.cmd.colorscheme('kanagawa-wave')
             '';
           }
-          # Mark which lines have changed
-          vim-gitgutter
+          # Browse a whole change: file panel + per-file side-by-side diff, over
+          # any revision range.
+          {
+            plugin = diffview-nvim;
+            type = "lua";
+            config = ''
+              ${builtins.readFile ./lua/plugins/diffview.lua}
+            '';
+          }
+          # Mark which lines have changed, against a base that can be moved --
+          # which is what lets the same signs mean "what this PR changed" in one
+          # worktree and "what I have not accepted yet" in another.
+          {
+            plugin = gitsigns-nvim;
+            type = "lua";
+            config = ''
+              ${builtins.readFile ./lua/plugins/gitsigns.lua}
+            '';
+          }
           # Quick and easy file searching
           {
             plugin = fzf-lua;
@@ -150,6 +167,7 @@
               -- Rendered through an fzf-lua picker, so it loads with fzf-lua
               -- rather than as its own plugin entry.
               ${builtins.readFile ./lua/plugins/dojo.lua}
+              ${builtins.readFile ./lua/plugins/review.lua}
             '';
           }
           # Incremental tag generation

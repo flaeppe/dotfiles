@@ -74,6 +74,10 @@
         # ignore convention); user-specific, never committed
         ".ignore"
         ".worktrees"
+        # Local review session cache: review order, harvested findings, ship
+        # artifacts. Every file in it is either regenerable from the PR or
+        # already promoted into the suggestions PR, so it is never worth keeping.
+        ".review/"
         # codebase-memory-mcp per-repo exclude (cbm ignores the global gitignore,
         # so .direnv must be re-excluded per repo); user-specific, never committed
         ".cbmignore"

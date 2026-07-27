@@ -17,6 +17,8 @@ Load the `nix` skill before making any changes. This is mandatory, no exceptions
 Home Manager symlinks these files into `~/.config/` and `~/.local/` — this repo is the source of truth, not the symlink targets.
 
 - `flake.nix` — Flake definition with Home Manager configuration
+- `docs/` — Feature documentation for workflows spanning several programs
+  - `pr-review.md` — the local PR review tooling (nvim + fish + the `pr-session` skill)
 - `fish/` — Fish shell configuration (module imported via `fish/fish.nix`)
 - `git/` — Git configuration (module imported via `git/git.nix`)
 - `nvim/` — Neovim configuration (module imported via `nvim/nvim.nix`)

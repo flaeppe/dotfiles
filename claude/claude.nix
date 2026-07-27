@@ -85,6 +85,7 @@ in {
     ".claude/skills/explore".source = ./skills/explore;
     ".claude/skills/pr".source = ./skills/pr;
     ".claude/skills/pr-playbook".source = ./skills/pr-playbook;
+    ".claude/skills/pr-session".source = ./skills/pr-session;
     ".claude/skills/fix-pr".source = ./skills/fix-pr;
     ".claude/skills/research".source = ./skills/research;
     ".claude/skills/pr-review".source = ./skills/pr-review;

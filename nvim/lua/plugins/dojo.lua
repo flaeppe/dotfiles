@@ -25,6 +25,12 @@ local ENTRIES = {
     { group = "find", keys = "<C-p>", desc = "Files by name", added = "2019-08-02" },
     { group = "find", keys = "<Leader>f", desc = "Grep text across the project (ripgrep)", added = "2025-08-09" },
     { group = "find", keys = "F", desc = "Every fzf-lua picker, when you forget which exists", added = "2025-08-09" },
+    {
+        group = "find",
+        keys = "<Leader>b",
+        desc = "What is already open (and the way back after a stray :q)",
+        added = "2026-07-27",
+    },
 
     -- Symbols: the two indexes answer different questions
     {
@@ -133,6 +139,94 @@ local ENTRIES = {
         keys = "<Leader>ti",
         desc = "Inlay hints: resolve inferred types in place",
         added = "2026-07-25",
+    },
+
+    -- Review: annotating a PR in place, in the code, rather than in a web diff
+    {
+        group = "review",
+        keys = "<Leader>ro",
+        desc = "Start a review: walk it in the order given",
+        added = "2026-07-25",
+    },
+    {
+        group = "review",
+        keys = "<Leader>rc",
+        desc = "Something is wrong here, decide later how to raise it",
+        added = "2026-07-25",
+    },
+    {
+        group = "review",
+        keys = "<Leader>rf",
+        desc = "Wrong and you know the fix -- ship it as code",
+        added = "2026-07-25",
+    },
+    { group = "review", keys = "<Leader>ra", desc = "Not wrong, but ask the author about it", added = "2026-07-25" },
+    {
+        group = "review",
+        keys = "<Leader>rn",
+        desc = "A thought for yourself; never leaves the worktree",
+        added = "2026-07-25",
+    },
+    {
+        group = "review",
+        keys = "<Leader>rr",
+        desc = "Same problem as one you already wrote -- link, don't repeat",
+        added = "2026-07-25",
+    },
+    { group = "review", keys = "<Leader>rl", desc = "What have I found so far?", added = "2026-07-25" },
+    {
+        group = "review",
+        keys = "<Leader>rq",
+        desc = "Walk the actual changed code, hunk by hunk, in files you can edit",
+        added = "2026-07-25",
+    },
+    { group = "review", keys = "<Leader>rd", desc = "Retract the marker here", added = "2026-07-25" },
+    { group = "review", keys = "<Leader>rw", desc = "Done reviewing -- harvest the findings", added = "2026-07-25" },
+    { group = "review", keys = "<Leader>rt", desc = "Where does the review stand?", added = "2026-07-26" },
+    {
+        group = "review",
+        keys = "<Leader>rj",
+        desc = "Open this same file and line in the other worktree's editor",
+        added = "2026-07-26",
+    },
+    {
+        group = "review",
+        keys = "<Leader>rb",
+        desc = "Showing this round or the whole suggestion? Switch (stack only)",
+        added = "2026-07-26",
+    },
+    {
+        group = "review",
+        keys = ":ReviewAccept",
+        desc = "Take this change into the review (! takes all of it; no id = pick)",
+        added = "2026-07-26",
+    },
+
+    {
+        group = "review",
+        keys = "<Leader>rD",
+        desc = "How big is this change? Every changed file, side by side (<Leader>rb sets scope)",
+        added = "2026-07-26",
+    },
+    {
+        group = "review",
+        keys = "<Leader>rp",
+        desc = "Lost? Where the session stands and what is next",
+        added = "2026-07-26",
+    },
+
+    -- Hunks: the accept/discard pair a review runs on
+    { group = "hunk", keys = "<Leader>hs", desc = "Accept this hunk (again to un-accept)", added = "2026-07-26" },
+    { group = "hunk", keys = "<Leader>hu", desc = "Throw this hunk away", added = "2026-07-26" },
+    { group = "hunk", keys = "<Leader>hp", desc = "What exactly changed here?", added = "2026-07-26" },
+    { group = "hunk", keys = "<Leader>hd", desc = "This whole file against the base", added = "2026-07-26" },
+    { group = "hunk", keys = "¨h  åh", desc = "Next / previous changed hunk", added = "2026-07-26", run = false },
+    {
+        group = "review",
+        keys = "¨r  år",
+        desc = "Next / previous marker in this file",
+        added = "2026-07-25",
+        run = false,
     },
 
     -- Tree
