@@ -31,7 +31,7 @@ refactor.
 - History lives in git (commit messages + `git log`) — no changelog file here.
 
 **Size budget:** 14000 chars, worst-path load. Single-file skill (no leaves),
-so worst-path = SKILL.md. Currently 13688; check with `wc -c SKILL.md`.
+so worst-path = SKILL.md. Currently 13756; check with `wc -c SKILL.md`.
 (Raised 13500→14000 to fit the persona spine — report-with-integrity + grade
 by the finding itself, not its reach or the cost/ownership of the fix.)
 

@@ -91,8 +91,8 @@ error, even sideways between peers).
 - **Analysis only.** It produces findings and corrected-graph shapes. It never
   rewrites code — refactoring is a separate step.
 - **Concrete or nothing.** Every finding is a named edge in a named module, not
-  an abstract plea to "reduce coupling." If everything looks wrong, the bar is
-  too low.
+  an abstract plea to "reduce coupling." A pervasive violation is one systemic
+  finding, not a signal to raise the bar until it disappears.
 - **No speculative abstractions.** It proposes an interface only when the
   abstraction resolves a *named* violation. Adding indirection "for flexibility"
   with no current violation is over-engineering, and the skill calls that out

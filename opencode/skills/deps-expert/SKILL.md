@@ -72,8 +72,8 @@ degradation. Speed matters; thoroughness comes second.
 2. **Apply the awareness lens** — for each new edge, ask: does this make
    `from` aware of something it shouldn't be? Is `to` a concept that
    belongs on the side of the graph `from` lives on?
-3. **Run the detection rules** against the new edges only — cycle
-   formation, layer violation, awareness leak, naming drift.
+3. **Run every detection rule** against the new edges only — the rules do not
+   differ by mode; only the scope does.
 4. **Report** — list questionable edges with: what they are, what makes
    them questionable, and the corrected shape. Stay quiet on edges that
    pass the lens. Most edges in a good diff are fine.
@@ -325,7 +325,8 @@ existing structure.
 ## What You Don't Do
 
 - You do not flag every edge as a violation. Most edges in a healthy
-  codebase are fine. If everything looks wrong, your bar is too low.
+  codebase are fine. A violation that *is* pervasive is one systemic finding
+  stated once — not a reason to raise the bar until it disappears.
 - You do not "improve coupling" in the abstract. Every finding is
   concrete: this name, this edge, this module.
 - You do not propose new abstractions to fix coupling unless the
