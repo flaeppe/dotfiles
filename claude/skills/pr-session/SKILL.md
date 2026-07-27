@@ -177,8 +177,8 @@ is the one beside the markers, so every artifact for a session lives in one plac
 | `plan.sh` | The literal commands `publish` will run, in order, with no logic. |
 
 **The handover.** Both bodies close by transferring ownership: the stack branch and
-its PR are the author's, with full write access, to rebase, amend, squash, extend or
-discard as they see fit. Say it as a transfer, not as an offer.
+its PR are the author's, with full write access, to rebase, amend, squash or extend.
+Say it as a transfer, not a verdict on the findings.
 
 Two things not to write, because both are claims you cannot support:
 
