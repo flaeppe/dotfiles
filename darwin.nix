@@ -196,8 +196,10 @@ in {
         "cmd+enter" = "new_window_with_cwd";
         "cmd+s>x" = "close_session";
         "cmd+s>/" = "goto_session --sort-by=alphabetical";
-        # Browse scrollback buffer in nvim
-        "ctrl+f" = "kitty_scrollback_nvim --nvim-args -n";
+        # Browse scrollback buffer in nvim. Not ctrl+f: Kitty grabs a binding
+        # before the running program sees it, and ctrl+f is page-forward in
+        # nvim -- the terminal must not shadow a core motion.
+        "kitty_mod+f" = "kitty_scrollback_nvim --nvim-args -n";
         "ctrl+j" = "neighboring_window bottom";
         "ctrl+k" = "neighboring_window top";
         "ctrl+h" = "neighboring_window left";

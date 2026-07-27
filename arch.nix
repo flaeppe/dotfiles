@@ -142,8 +142,10 @@
           "kitty_scrollback_nvim kitten ${pkgs.vimPlugins.kitty-scrollback-nvim}/python/kitty_scrollback_nvim.py";
       };
       keybindings = {
-        # Browse scrollback buffer in nvim
-        "ctrl+f" = "kitty_scrollback_nvim --nvim-args -n";
+        # Browse scrollback buffer in nvim. Not ctrl+f: Kitty grabs a binding
+        # before the running program sees it, and ctrl+f is page-forward in
+        # nvim -- the terminal must not shadow a core motion.
+        "kitty_mod+f" = "kitty_scrollback_nvim --nvim-args -n";
         # Browse output of the last shell command in nvim
         "kitty_mod+g" =
           "kitty_scrollback_nvim --config ksb_builtin_last_cmd_output";
