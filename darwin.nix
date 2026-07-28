@@ -149,12 +149,13 @@ in {
 
     fzf = {
       enable = true;
+      # The fzf-fish plugin owns the interactive key bindings. fzf's own shell
+      # integration binds ctrl-t/ctrl-r/alt-c on top of the plugin's, so the two
+      # must not both be active. Widget options (FZF_CTRL_T_OPTS and friends)
+      # belong to that disabled integration and are configured on the plugin
+      # instead; defaultCommand still applies to bare `fzf` invocations.
       enableFishIntegration = false;
       defaultCommand = "rg --files --hidden --glob '!.git/*'";
-      fileWidget.options = [
-        "--walker-skip .git,node_modules,.direnv,.venv,venv,.pytest_cache,.ruff_cache,__pycache__"
-        "--preview 'bat -n --color=always {}'"
-      ];
     };
 
     gh = {

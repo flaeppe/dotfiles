@@ -22,6 +22,13 @@
             sha256 = "RG/0rfhgq6aEKNZ0XwIqOaZ6K5S4+/Y5EEMnIdtfPhk=";
           };
         }
+        # Fuzzy pickers for paths, history and git. Its Search Directory reads
+        # the token under the cursor: with the cursor after `some/dir/` it
+        # searches recursively inside that directory instead of from $PWD.
+        {
+          name = "fzf-fish";
+          src = pkgs.fishPlugins.fzf-fish.src;
+        }
       ];
       shellAliases = { ls = "ls -h --color=auto"; };
       shellInit = ''
@@ -42,6 +49,16 @@
       interactiveShellInit = ''
         # TODO remove when https://github.com/NixOS/nixpkgs/issues/462025 gets resolved
         set -p fish_complete_path ${pkgs.fish}/share/fish/completions
+
+        # Keep hidden files (.envrc, .github) in the picker but drop .git's contents.
+        set -g fzf_fd_opts --hidden --exclude .git
+
+        # Ctrl-only bindings, overriding the plugin's ctrl-alt-* defaults: on a
+        # Swedish Mac layout Alt is a character modifier (Alt+7 |, Alt+8 [,
+        # Alt+9 ], Alt+2 @), so it cannot be used for key bindings. ctrl-h/j/k/l
+        # are excluded because Kitty consumes them for window navigation before
+        # fish sees them; ctrl-s is fish's pager search and ctrl-p is up-line.
+        fzf_configure_bindings --directory=ctrl-t --history=ctrl-r --git_status=ctrl-g --git_log=ctrl-o --processes= --variables=
       '';
       functions = {
         fish_prompt = {
