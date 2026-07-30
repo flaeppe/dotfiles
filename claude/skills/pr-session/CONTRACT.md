@@ -8,142 +8,144 @@ This file is self-contained: a provider can be pointed at it alone.
 
 ## What a provider is
 
-Anything that reads a pull request and produces findings — the built-in analysis
-in `SKILL.md`, or a domain-specific skill named via `--analysis <skill>`. A
-provider never knows it is being consumed by a session.
+A **function**: a pull request goes in, a finding set comes out. Nothing else.
 
-## Where it runs
+It writes no files, touches no git state, and calls nothing that posts. Not because
+it is forbidden to — because producing the finding set *is* the whole job, and the
+session performs every effect. A provider therefore needs to know nothing about
+worktrees, editors, suggestion stacks or how a review gets posted, and cannot break
+any of them.
 
-Inside a **review worktree**: a directory containing `.review/session.json`, with
-the PR head checked out detached.
+That also keeps conformance cheap, which is the point: returning one JSON document
+is a far lower bar than placing markers at the right indentation in each language's
+comment syntax with ids allocated across a whole worktree. Those are mechanics, and
+mechanics belong in one place instead of in every provider.
 
-```json
-{
-  "pr": 4821, "title": "...", "url": "...", "repo": "api", "role": "review",
-  "head_branch": "feat/x", "base_branch": "master",
-  "pr_head": "<sha>", "merge_base": "<sha>",
-  "stack_branch": "review-suggestions/4821",
-  "review_worktree": "/…/.worktrees/review/4821/head",
-  "stack_worktree":  "/…/.worktrees/review/4821/stack",
-  "review_socket": "/tmp/nvim-review-api-4821.sock",
-  "stack_socket":  "/tmp/nvim-stack-api-4821.sock"
-}
-```
+## Input
 
-## Obligations
+| | |
+|---|---|
+| `repo` | the repository under review |
+| `base`, `head` | the commits to diff: `git diff <base>...<head>` |
+| `covered` | optional — findings the reviewer already holds, on a re-run |
 
-A provider MUST:
+Read the diff **from those commits, never from the working tree**. The tree may be
+dirty with markers and the reviewer's scratch edits at any time, so reading it makes
+analysis unrepeatable mid-session.
 
-1. **Read the diff from commits, never the working tree** —
-   `git diff <merge_base>...<pr_head>`. The reviewer's worktree may be dirty with
-   markers and scratch edits at any time; pinning the input to immutable commits
-   is what makes analysis idempotent and re-runnable mid-session.
-2. **Write `.review/order.json`** (below).
-3. **Insert draft `REVIEW[n]` markers** at the sites its findings concern.
-4. **Write `.review/summary.md`** — the reasoning behind the markers as standalone
-   prose: answer first, then 2–4 themes grouped by cause, then where to start. At most
-   500 words, and no code, paths or identifiers; the markers carry those. It is
-   embedded at the top of `findings.md`, so it introduces the findings rather than
-   restating them.
-5. **Refresh the editor** afterwards, if a socket is live:
-   `nvim --server <review_socket> --remote-send '<Cmd>checktime<CR>'`
-   Buffers do not auto-reload, so markers written to disk are invisible until
-   this runs.
+`covered` is how a re-run avoids fighting a curated set. A finding already in it is
+not returned again — and one the reviewer *deleted* is absent from it, so proposing
+it again means proposing something they rejected.
 
-A provider MUST NOT:
+## Output
 
-- Modify any source file except to insert marker lines.
-- Touch the stack worktree, commit, push, or call `gh` to write anything.
-- Analyse, report, revert or otherwise act on **unstaged non-marker changes** in
-  the review worktree. Those are the reviewer's scratch work and are invisible to
-  the review by design.
-- Delete or renumber markers it did not write. Ids are identity: gaps are normal
-  and renumbering breaks references already made elsewhere.
-
-A provider MAY write `.review/policy.json` (below).
-
-## `order.json`
-
-The order to read the change in, and why. `why` becomes the quickfix entry text,
-so the reasoning is visible while walking it.
-
-**Every changed file gets an entry** — one per file in
-`git diff --name-only <merge_base>...<pr_head>`, including files you found nothing
-in. This is the reviewer's route through the whole change, not an index of your
-findings: a file you had no comment on still has to be read, and its absence
-would silently shrink the PR. Say so in `why` when that is the case ("no findings;
-read to confirm the rename is mechanical").
+One JSON document, as the provider's return value.
 
 ```json
 {
-  "pr": 4821,
-  "entries": [
-    { "file": "src/handler.go", "lnum": 42,
+  "order": [
+    { "file": "src/handler.go", "line": 42,
       "why": "entry point — decides which path the rest of the diff takes" },
-    { "file": "src/domain/loan.go",
-      "why": "the invariant the handler leans on; read second or the handler looks fine" },
     { "file": "src/domain/fixtures.go", "context": true,
       "why": "not in this PR — where the capability the diff works around would live" }
-  ]
+  ],
+  "findings": [
+    { "kind": "fix",
+      "text": "the post-insert UPDATE works around a missing seed capability; the field already exists, so create the record in the target state instead",
+      "sites": [ { "file": "src/scripts/dev/link.ts", "line": 131 },
+                 { "file": "src/domain/fixtures.go", "line": 338 } ] }
+  ],
+  "summary": "# … markdown …",
+  "policy": { "review_event": ["APPROVE", "COMMENT"],
+              "forbid": ["REQUEST_CHANGES"] }
 }
 ```
 
-Paths are relative to the review worktree. `lnum` defaults to 1.
+### `order` — required
 
-A file **outside** the diff may be included when reading it is genuinely needed,
-but it MUST carry `"context": true`. Unmarked entries are read as the PR's own
-files, and an unchanged file smuggled in among them misrepresents how large the
-change is.
+The route through the change, **one entry per changed file**, including files the
+provider found nothing in. This is the reviewer's reading order, not an index of
+findings: a file with no comment still has to be read, and its absence silently
+shrinks the PR. Say so in `why` when there is nothing there — "no findings; read to
+confirm the rename is mechanical".
 
-## Markers
+`why` becomes the reviewer's list text, so write what reading that file *first*
+prevents. `line` defaults to 1. A file outside the diff may appear only with
+`"context": true`; unmarked, it misrepresents how large the change is.
 
-```
-REVIEW[<id>]: <text>       a finding; how to raise it is decided later
-REVIEW[<id>]fix: <text>    should become code in the suggestion stack
-REVIEW[<id>]ask: <text>    a question for the author; never a code change
-REVIEW[<id>]note: <text>   private to the reviewer; never reported
-REVIEW[<id>]               a back-reference: another site for finding <id>
-```
+### `findings` — required, may be empty
 
-Rules:
+An empty list is a valid result. A finding the reviewer deletes cost them more than
+one that was never written.
 
-- One line, in the file's own comment syntax, directly above the code it
-  concerns, at that line's indentation.
-- Ids are unique across the whole worktree and allocated from
-  `max(existing) + 1`.
-- One finding at several sites: give the body once, use bare back-references for
-  the rest. That is what turns "wrong in six places" into one finding.
-- Choose the kind honestly. `fix` claims the fix is known and mechanical;
-  a plain finding says it needs judgment; `ask` says there is no change to make
-  until the author answers.
+| Field | |
+|---|---|
+| `kind` | `fix` · `finding` · `ask` · `note` |
+| `text` | what is wrong and why it matters — never a restatement of the code |
+| `sites` | one or more `{ file, line }`; the first is where the text belongs |
 
-Markers are never committed. The review worktree is deleted when the review
-ships.
+**No ids.** The session allocates them, because uniqueness is a property of the whole
+worktree and of markers already in it, not of one analysis pass.
 
-## `policy.json` (optional)
+Kinds, chosen honestly:
 
-Ship constraints, as data. A provider with house rules declares them here rather
-than embedding them in the session.
+- `fix` — the change is known and mechanical. A redesign is never `fix`: claiming it
+  hands the session a half-fix to build.
+- `finding` — real, but what to do about it needs judgment.
+- `ask` — nothing to change until the author answers.
+- `note` — private to the reviewer; never reported.
 
-```json
-{
-  "review_event": ["APPROVE", "COMMENT"],
-  "forbid": ["REQUEST_CHANGES"],
-  "stack": { "base": "<head_branch>", "push_to_reviewed_branch": false }
-}
-```
+One finding at several places is **one entry with several sites**, never several
+entries. That is what turns "wrong in six places" into one finding.
+
+### `summary` — required
+
+The review as standalone prose, to be read away from the code by someone who has not
+opened the diff. Answer first: the opening block is the whole review and everything
+after it is support. At most 500 words, 2–4 themes grouped by cause rather than by
+file, and no code, paths, line numbers or identifiers — a sentence that needs a
+symbol name belongs in a finding. Never narrate the diff; write what the change
+assumes, what it breaks, and what it makes harder next time.
+
+### `policy` — optional
+
+House rules constraining how the review may be posted. Declared as data because
+executing them is the session's job, not the provider's.
 
 ## What the session does with it
 
-- `order.json` → the quickfix walk (`<Leader>ro`).
-- Markers → curated by hand, then harvested to `.review/findings.md`
-  (`<Leader>rw`), which is the input to implementation.
-- `fix` and plain findings → implemented in the stack worktree, one commit per
-  finding, message `REVIEW[<id>]: <text>`. The commit is the acceptance and the
-  grouping.
-- `ask` findings → the review comment body.
-- `note` → dropped.
+Every effect happens here:
 
-The authority for what the review *contains* is always
-`git diff <pr_head>..HEAD` in the stack worktree. The commit log is an
-incremental history, not a manifest: changes can be taken back out.
+1. Allocate ids from `max(existing) + 1`.
+2. Render each finding as markers — the first site carries the body, the rest are
+   bare back-references — one line each, in the file's own comment syntax, directly
+   above the code concerned and at its indentation:
+
+   ```
+   REVIEW[3]: this belongs in the domain layer     a finding
+   REVIEW[3]fix: extract to the domain layer       becomes code on the stack
+   REVIEW[3]ask: why is the retry unbounded?       a question for the author
+   REVIEW[3]note: check the sibling flow           private; never reported
+   REVIEW[3]                                       another site for finding 3
+   ```
+
+3. Write `order.json`, `summary.md` and, if given, `policy.json` into the review
+   worktree's `.review/`, then refresh the editor so the markers appear.
+4. Then: the reviewer curates; `findings.md` is harvested from the surviving markers;
+   `fix` and plain findings become one commit each on the suggestion stack; `ask`
+   findings become the review body; `note` is dropped.
+
+Markers are never committed. The authority for what the review *contains* is always
+`git diff <pr_head>..HEAD` in the stack worktree — the commit log is an incremental
+history, not a manifest.
+
+## `.review/`
+
+| File | Written by | Contents |
+|---|---|---|
+| `session.json` | `review <pr>` | PR, role, pinned commits, stack branch, socket paths |
+| `order.json` | the session, from `order` | the route through the PR |
+| `summary.md` | the session, from `summary` | the review as prose |
+| `policy.json` | the session, from `policy` | constraints the assembled review honours |
+| `findings.md` | the editor | the harvested marker set, `note` excluded |
+| `out/` | `assemble` | the review artifacts, local until `publish` |

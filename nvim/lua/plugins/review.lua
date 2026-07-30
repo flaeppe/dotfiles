@@ -629,6 +629,47 @@ end
 
 -- Orientation -------------------------------------------------------------
 
+--- The summary's opening prose, or nil.
+---
+--- Only the opening: the summary is written answer-first, so its first prose block is the
+--- whole review in a few sentences and everything after it is support. That block is the
+--- altitude this page holds; the rest is a document, and a document here would cost the
+--- page the one property that makes it worth opening -- that it can be read at a glance.
+---
+--- The block ends where the prose does -- at the next blank line or heading -- so its length
+--- is the summary's to decide. The cap is a backstop for prose that outgrew its own format,
+--- and it announces itself rather than stopping mid-sentence, since a page that silently
+--- truncates a paragraph reads as broken rather than as abridged.
+local function summary_opening(dir)
+    local path = dir .. "/summary.md"
+    if vim.fn.filereadable(path) ~= 1 then
+        return nil
+    end
+    local out, truncated = {}, false
+    for _, line in ipairs(vim.fn.readfile(path)) do
+        if line:match("^#") then
+            if #out > 0 then
+                break
+            end
+        elseif line ~= "" then
+            if #out == 10 then
+                truncated = true
+                break
+            end
+            table.insert(out, line)
+        elseif #out > 0 then
+            break
+        end
+    end
+    if #out == 0 then
+        return nil
+    end
+    if truncated then
+        table.insert(out, "…")
+    end
+    return out
+end
+
 --- Where the session stands, and the single next action.
 ---
 --- The orientation surface, and the one opened at session start: a review worktree is
@@ -647,6 +688,8 @@ function M.panel()
     -- Always the review worktree's: one `.review/` per session, beside the markers,
     -- whichever worktree produced the artifact.
     local has_assembled = vim.uv.fs_stat(session.review_worktree .. "/.review/out/plan.sh") ~= nil
+    local summary_path = session.review_worktree .. "/.review/summary.md"
+    local opening = summary_opening(session.review_worktree .. "/.review")
     local done = landed(session)
     local staged_count, unstaged_count = uncommitted(session)
     local in_flight = staged_count + unstaged_count
@@ -701,6 +744,7 @@ function M.panel()
         string.format("stack %s", session.stack_branch or "?"),
         "",
         string.format("  order      %s", has_order and "ready" or "not yet"),
+        string.format("  summary    %s", opening and "written" or "not yet"),
         string.format("  findings   %s", has_findings and "harvested" or "not harvested"),
         string.format("  open       %d", open_count),
         string.format("  accepted   %d", landed_count),
@@ -719,6 +763,21 @@ function M.panel()
         -- diagnosis is for -- so the escape hatch is named here rather than remembered.
         "      stuck?  /pr-session help <what you are unsure about>",
     }
+
+    -- Ahead of the state table, because it is what those counts are counts of. Coming back
+    -- after hours away, what has gone is why any of this mattered, not the numbers -- and
+    -- reading it here costs no key and no phase transition, where reaching the document
+    -- through a harvest would rewrite findings.md from a set still being curated.
+    if opening then
+        local prose = { "", "summary" }
+        for _, line in ipairs(opening) do
+            table.insert(prose, "  " .. line)
+        end
+        table.insert(prose, "  full: " .. summary_path .. "  (gf)")
+        for i = #prose, 1, -1 do
+            table.insert(lines, 6, prose[i])
+        end
+    end
 
     if not reviewing then
         local _, scope = change_range(session)

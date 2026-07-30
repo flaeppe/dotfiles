@@ -34,7 +34,7 @@ prose and code can never contaminate each other.
 | Checked out at | the PR head, **detached** | branch `review-suggestions/<pr>-<n>` |
 | Holds | markers only | code only |
 | Commits | never | one per accepted finding |
-| Lifetime | discarded when the review ships | handed to the author |
+| Lifetime | archived, then discarded on retire | handed to the author |
 
 Both worktrees contain the same paths, which is why the editor shows its role
 permanently in the statusline — a filename alone cannot tell you which tree you are
@@ -73,6 +73,18 @@ branch still descends from the commit under review; once its suggestions have la
 in the PR, or the base moved out from under it, the next session opens a new round
 rather than reviving a finished one.
 
+**Retiring.** Ending a session is not the same as removing its worktrees. A session's
+reasoning — the summary, the harvested findings, the assembled bodies — lives inside the
+review worktree, while its code lives on the stack branch, so removing the worktrees keeps
+the code and destroys the reasoning. Retiring copies both out first: every `.review/`
+artifact, the markers as a diff, the stack as a patch. The stack branch is kept, because
+whether its suggestions still matter is not a judgement a teardown can make — and once the
+patch is archived, deleting the branch later is recoverable rather than final.
+
+Archives live **outside** the repository, one directory per round under
+`${XDG_STATE_HOME:-~/.local/state}/review/<repo>/<pr>-<round>/`. Outside, because an
+archive that `git clean -xdff` can destroy is not an archive.
+
 **Scope.** What "the change" currently means, on the stack: `round` is the uncommitted
 work — what the last implement step produced and what there is to accept — and `whole`
 is the accumulated suggestion against the PR head. It is a property of the **session**,
@@ -91,17 +103,30 @@ worktree's copy, so one session means one `.review/`.
 | File | Written by | Contents |
 |---|---|---|
 | `session.json` | `review <pr>` | PR, role, pinned commits, stack branch, socket paths |
-| `order.json` | analysis | the route through the PR: one entry per changed file |
-| `summary.md` | analysis | the review as prose: answer first, then themes |
-| `policy.json` | analysis (optional) | constraints the assembled review must honour |
+| `order.json` | the session | the route through the PR: one entry per changed file |
+| `summary.md` | the session | the review as prose: answer first, then themes |
+| `policy.json` | the session (optional) | constraints the assembled review must honour |
 | `findings.md` | the editor | the harvested marker set, `note` excluded |
 | `out/` | `assemble` | the review artifacts, local until `publish` |
 
-**Analysis provider.** Analysis is pluggable. The session skill is provider-agnostic
-and never names one; a provider never learns it is being consumed by a session. A
-provider's entire obligation is to write `order.json` and `summary.md`, insert draft
-markers, and optionally write `policy.json`. With no provider configured, a
-built-in light analysis runs, so the whole loop is exercisable standalone.
+`summary.md` is written answer-first, so its opening block is the whole review in a few
+sentences. That block is inlined into the orientation panel and the file is reachable from
+there, which is what makes the reasoning available without harvesting — harvesting rewrites
+`findings.md` from whatever the marker set currently is, so reaching prose through it would
+mean advancing the workflow to read.
+
+**Analysis provider.** Analysis is pluggable, and a provider is a **function**: a PR
+goes in, a finding set comes out — an order, the findings with their sites, the review
+as prose, optionally a policy. It writes nothing, touches no git state and posts
+nothing, so it needs to know nothing about worktrees, editors or suggestion stacks,
+and there is no effect it could be told not to perform.
+
+Every effect belongs to the session: allocating ids, rendering findings as markers in
+each file's comment syntax, writing `.review/`, refreshing the editor. That keeps
+placement mechanics in one place instead of in every provider, and it is why the
+built-in analysis and a delegated one converge — they differ only in where the
+findings came from. With no provider configured, a built-in light analysis runs, so
+the whole loop is exercisable standalone.
 
 ## The loop
 
@@ -147,11 +172,56 @@ against the same PR reuses the worktrees, so a session survives closing the edit
 Re-entry after a crash or a stray `:q` is `nvim -c Review` in either worktree — the
 session is read from the working directory.
 
+```
+review list
+review retire <pr> [--force]
+```
+
+`list` is how sessions are found once they stop being visible: retiring removes the
+worktrees, so nothing in `git worktree list` shows that a review ever happened, and what
+survives is a branch and an archive directory in two places nobody would look. Per round it
+reports the commit count, whether the worktrees are still up, where the archive is, and
+whether deleting the branch would be recoverable.
+
+`retire` refuses rather than forces when something would be lost — uncommitted work in the
+stack worktree, an editor still serving on the session's socket, or a shell standing inside
+a worktree about to be removed. `--force` overrides the first two.
+
+### Worktree preparation
+
+A fresh worktree has none of the gitignored state a checkout accumulates. Small config files
+are copied and dependency directories are symlinked, which covers most of it — but not the
+two cases that matter most for reviewing:
+
+- **The language server is often installed into the dependency tree**, not onto `PATH`. A
+  worktree without that tree then has no type checking, no definitions and no references at
+  all — a far larger failure than unresolved imports, and one that looks like a broken editor
+  rather than a missing dependency.
+- **Dependency trees routinely pin the first-party import root to an absolute path.** Shared
+  or symlinked, that path still names the main checkout, so every first-party import in the
+  worktree resolves to whatever the default branch holds. Definitions then open the wrong
+  copy of the code under review, silently, and tests run against it.
+
+Materialising a dependency tree correctly is ecosystem-specific, so the repository supplies
+it. An executable `.review/setup` in the main checkout is run once per fresh worktree, with
+the worktree as its working directory and:
+
+| Variable | |
+|---|---|
+| `REVIEW_MAIN` | the main checkout, to copy or clone from |
+| `REVIEW_PR` | the PR number |
+| `REVIEW_ROLE` | `review` or `stack` |
+
+It is retried until it exits `0` — the `.review/setup-done` sentinel is written only on
+success, so a hook that failed halfway runs again on the next `review` instead of leaving a
+worktree that is silently half-prepared. `.review/` is already ignored, so the hook needs no
+ignore entry of its own, and nothing about it reaches this configuration.
+
 ### Editor
 
 | Key | Action |
 |---|---|
-| `<Leader>rp` / `:Review` | where the session stands, and the single next action |
+| `<Leader>rp` / `:Review` | where the session stands, the review's opening, and the single next action |
 | `<Leader>rc` `rf` `ra` `rn` | new marker: finding · fix · ask · private note |
 | `<Leader>rr` | add this location to an existing finding |
 | `<Leader>rd` | delete the marker here |
@@ -179,7 +249,7 @@ committed.
 
 | Phase | Does |
 |---|---|
-| `analyse` | writes `order.json`, `summary.md` and draft markers; delegates to a provider if configured |
+| `analyse` | gets a finding set — built-in or from a provider — then renders it as markers, `order.json` and `summary.md` |
 | `implement` | implements accepted findings as uncommitted edits on the stack |
 | `assemble` | writes `out/{pr-body.md,review-body.md,plan.sh}` — **sends nothing** |
 | `publish` | runs `plan.sh` and nothing else |
@@ -215,6 +285,8 @@ flowchart TB
     skill["<b>session skill</b><br/>analyse · implement<br/>assemble · publish"]
     provider["analysis provider<br/><i>optional</i>"]
     remote["forge<br/><i>publish only</i>"]
+    retire["<b>review retire</b><br/>fish function"]
+    archive[("<b>archive</b><br/>XDG state<br/><i>outlives the session</i>")]
 
     launcher --> review_editor
     launcher --> stack_editor
@@ -222,9 +294,12 @@ flowchart TB
     review_editor --> contract
     stack_editor --> contract
     contract <--> skill
-    provider --> contract
     skill -.->|"--analysis"| provider
+    provider -.->|"finding set"| skill
     skill ==>|explicit step| remote
+    contract --> retire
+    stack_editor --> retire
+    retire --> archive
 ```
 
 Each editor serves on a socket at a deterministic path derived from the repository
@@ -252,8 +327,11 @@ discover afterwards.
   of the PR.
 - Analysis never builds, typechecks or runs tests. Verification belongs to the human
   in Loop B.
-- Re-running analysis adds only uncovered findings, and never touches or duplicates
-  markers it did not write.
+- A provider performs no effects. It returns a finding set; the session allocates ids,
+  renders the markers and writes `.review/`. Placement depends on what is already in
+  the worktree, so it cannot be a provider's to get right.
+- Re-running analysis adds only uncovered findings, and never touches, renumbers or
+  duplicates markers it did not write.
 - `order.json` is always regenerated whole. A partial rewrite silently hides the rest
   of the PR from the route.
 - Every changed file gets an entry; an entry for a file outside the diff must be
@@ -276,6 +354,22 @@ discover afterwards.
 - The sign comparison base in the stack worktree stays at its default, the index.
   Naming an explicit revision collapses the staged/unstaged distinction that
   separates *accepted* from *still in flight*.
+
+**Environment**
+
+- A worktree's dependency tree resolves first-party imports to *that worktree*. One still
+  pointing at the main checkout makes every definition jump and every test run silently
+  address the default branch's copy of the code under review.
+- Worktree preparation is idempotent and retried until it succeeds. A half-prepared worktree
+  is indistinguishable from a healthy one until a language server fails to start.
+
+**Teardown**
+
+- Artifacts are archived before any worktree is removed. The review worktree holds the
+  only copy of the session's prose, so removing it first is not recoverable.
+- The stack branch outlives the session; teardown never deletes it.
+- The local PR ref is dropped, not kept. `pull/<pr>/head` remains fetchable from the
+  forge after the PR merges and after the author deletes their branch.
 
 **Shipping**
 
@@ -311,6 +405,18 @@ why they are here.
   for real; a blocked accept would strand the change with nowhere to go.
 - **Dependencies are symlinked into the worktrees, not installed.** Stale if the PR
   itself changes dependencies — install into the worktree by hand in that case.
+- **Whether a stack branch's suggestions landed is never computed.** A squash merge leaves
+  its commits unreachable from the base branch, so an ancestry test reads false forever and
+  a branch that shipped looks identical to one that was abandoned. Only the reviewed PR's
+  own state and the commit count are reported; the judgement stays with the reader.
+- **Retiring leaves the session's terminal tabs open**, pointing at directories that no
+  longer exist. Closing the window the command was typed in is worse than leaving it.
+- **The panel shows the summary's opening, never the whole document.** It is capped, and the
+  cap announces itself rather than trimming a sentence. The page is worth opening because it
+  can be read at a glance, and a document on it would end that.
+- **The panel's summary is as old as the last analysis.** It sits above live marker counts,
+  so the prose can describe a theme whose markers were all deleted since. Same staleness as
+  the copy embedded in `findings.md`, now visible next to the numbers that contradict it.
 
 ## Pointers
 
@@ -318,4 +424,6 @@ why they are here.
   so an analysis provider can be pointed at it alone.
 - `claude/skills/pr-session/SKILL.md` — the phase router.
 - `nvim/lua/plugins/review.lua` — markers, scope, and every editor surface.
-- `fish/functions/review.fish` — session bootstrap.
+- `fish/functions/review.fish` — session bootstrap and verb dispatch.
+- `fish/functions/_review_retire.fish` — archive, then teardown.
+- `fish/functions/_review_list.fish` — what sessions exist, live or retired.

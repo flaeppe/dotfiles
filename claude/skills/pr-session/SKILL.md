@@ -25,6 +25,8 @@ $ARGUMENTS
 - **Never commit on the stack branch.** A commit is the reviewer's acceptance,
   made from the editor with `:ReviewAccept`. Yours to prepare, theirs to take.
 - **Never push, never call `gh` to write, never touch the reviewed branch.**
+- **Never tear a session down** — no `git worktree remove`, no branch deletion. Ending a
+  session is `review retire <pr>`, and it is the reviewer's to run.
 - The reviewer's uncommitted non-marker edits are theirs. In the review worktree
   ignore them entirely; in the stack worktree read them as instructions (Phase B).
 
@@ -34,44 +36,59 @@ $ARGUMENTS
 
 Read `CONTRACT.md` before writing anything; it binds you.
 
-**Delegated form.** If `--analysis <skill>` is given, invoke that skill against
-this session and then verify it satisfied the contract: `order.json` exists and
-parses, markers carry unique ids, no source file changed except by marker lines
-(`git diff --stat` in the review worktree should show only comment additions).
-Report any breach rather than repairing it silently. Do not also run the built-in
-analysis.
+Analysis comes in two forms and they converge: **something produces a finding set,
+then this skill renders it.** Rendering is always yours — a provider returns findings
+and performs no effects, so the marker writing, the id allocation and the `.review/`
+files happen here on both paths, once.
 
-**If markers already exist, this is a re-run.** The reviewer has curated them
-since — some deleted on purpose, some reworded, some retagged. Re-deriving the
-whole set would duplicate their work alongside their edits. So read the existing
-markers first and add only findings that none of them already covers; say what was
-already there and what you added, and never restate a finding the reviewer
-deleted.
+**Where the findings come from.**
 
-`order.json` is derived, so rewrite it — but rewrite it **whole**. It is the route
-through the entire PR on every run, never a list of what this run happened to add:
-an order that shrinks to the newest findings hides the rest of the change.
+- *Delegated* — `--analysis <skill>` given: invoke that skill for this PR and point
+  it at `CONTRACT.md` beside this file for the output shape. It returns the finding
+  set; do not also run the built-in analysis. Verify what came back before rendering
+  it: `order` has an entry per changed file, every finding has a `kind`, a `text` and
+  at least one site whose file is real, and `summary` is present. Report a breach
+  rather than quietly repairing it.
+- *Built-in* — nothing given: derive them yourself, per **Built-in form** below.
+
+**Then render, identically either way:**
+
+1. **Allocate ids** from `max(existing) + 1`, scanning the whole worktree — ids are
+   unique across it, and gaps are normal.
+2. **Write the markers.** One line per site, in that file's own comment syntax,
+   directly above the code concerned and at its indentation. The finding's first site
+   carries the body; the rest are bare `REVIEW[<id>]` back-references.
+3. **Write `.review/order.json`, `summary.md`, and `policy.json`** if a policy came
+   back. `order.json` and `summary.md` are derived, so rewrite them **whole** — an
+   order that shrinks to this run's findings hides the rest of the change.
+4. `nvim --server <review_socket> --remote-send '<Cmd>checktime<CR>'`, or the markers
+   stay invisible in an open buffer.
+5. **Report** the count by kind, and that `<Leader>ro` walks the order.
+
+**If markers already exist, this is a re-run.** The reviewer has curated them since —
+some deleted on purpose, some reworded, some retagged. So collect what is already
+there and pass it to the analysis as covered ground; render only findings none of
+them covers, never restate one the reviewer deleted, and never renumber. Say what was
+already there and what you added.
 
 **Built-in form.** Deliberately small — a starting point for the reviewer, not a
-verdict.
+verdict. It produces the same finding set a provider would; rendering it is the
+shared step above.
 
 1. `git diff <merge_base>...<pr_head>` — commits, never the working tree.
 2. Read the changed files at the PR head for context the diff omits. Where a
    change leans on a caller or an invariant elsewhere, read that too.
 3. Decide the **review order**: which file makes the rest legible, and why. State
    the reason in terms of what reading it first prevents — "the handler decides
-   which path the rest takes", not "it is the main file". Write `order.json`,
-   **with an entry for every changed file** — it is the route through the whole
-   PR, not a list of the places you commented.
-4. Insert markers at the sites your findings concern, per `CONTRACT.md`. Look
-   for: behaviour that does not match what the PR claims; unhandled empty,
-   duplicate or boundary inputs; errors swallowed or left in a partial state;
-   work that grows with data; and new behaviour with no test covering its failure
-   mode. Say what is wrong and why it matters — never restate the code.
-5. Write `.review/summary.md` — the reasoning behind the markers, as prose (below).
-6. `nvim --server <review_socket> --remote-send '<Cmd>checktime<CR>'` so the
-   markers appear in the open editor.
-7. Report: the count by kind, and that `<Leader>ro` walks the order.
+   which path the rest takes", not "it is the main file". Every changed file gets an
+   entry — it is the route through the whole PR, not a list of the places you
+   commented.
+4. Find the findings, each with the sites it occurs at. Look for: behaviour that does
+   not match what the PR claims; unhandled empty, duplicate or boundary inputs;
+   errors swallowed or left in a partial state; work that grows with data; and new
+   behaviour with no test covering its failure mode. Say what is wrong and why it
+   matters — never restate the code.
+5. Write the summary prose (below).
 
 ### `summary.md`
 
@@ -236,3 +253,7 @@ Report **where the session stands**, then the **single next action**, then any
 
 If nothing is wrong, say so plainly and give the next action anyway. A reviewer asking
 this is usually asking "what now", and answering only "all clear" wastes the question.
+
+A session can also be **finished**: the reviewed PR has merged or closed and nothing is
+left in flight. Then the next action is `review retire <pr>`, which archives the findings
+and the stack before removing the worktrees. Say so — and do not run it.

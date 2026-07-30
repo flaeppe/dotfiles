@@ -104,6 +104,21 @@
             ${builtins.readFile ./functions/review.fish}
           '';
         };
+        # Reached through `review list` and `review retire`, which is the one entry point
+        # worth remembering; these carry the bodies so that dispatcher stays readable.
+        _review_list = {
+          description = "Lists every review session in this repository, live or retired";
+          body = ''
+            ${builtins.readFile ./functions/_review_list.fish}
+          '';
+        };
+        _review_retire = {
+          description =
+            "Archives a review session's findings and suggestions, then removes its worktrees";
+          body = ''
+            ${builtins.readFile ./functions/_review_retire.fish}
+          '';
+        };
       };
     };
   };
