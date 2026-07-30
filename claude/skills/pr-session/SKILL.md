@@ -43,13 +43,19 @@ files happen here on both paths, once.
 
 **Where the findings come from.**
 
-- *Delegated* — `--analysis <skill>` given: invoke that skill for this PR and point
-  it at `CONTRACT.md` beside this file for the output shape. It returns the finding
-  set; do not also run the built-in analysis. Verify what came back before rendering
-  it: `order` has an entry per changed file, every finding has a `kind`, a `text` and
-  at least one site whose file is real, and `summary` is present. Report a breach
-  rather than quietly repairing it.
+- *Delegated* — `--analysis <skill>` given: **read that skill and follow its
+  procedure** in place of the built-in analysis, treating `CONTRACT.md` beside this
+  file as the output shape. Providers are routinely user-invocable only, so the
+  `Skill` tool may refuse to invoke one — that is expected and not a blocker: the file
+  *is* the procedure. Follow it as written, including any gate it declares. Do not
+  also run the built-in analysis.
 - *Built-in* — nothing given: derive them yourself, per **Built-in form** below.
+
+Either way **you** produced the finding set, so check it mechanically before rendering:
+`order` has an entry per changed file, every finding has a `kind`, a `text` and at
+least one site whose file exists, and there is a `summary`. Those catch omissions, not
+misjudgements — a set you wrote cannot be independently verified by you. Say what you
+checked, and never call it verified.
 
 **Then render, identically either way:**
 

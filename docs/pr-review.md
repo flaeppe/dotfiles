@@ -128,6 +128,12 @@ built-in analysis and a delegated one converge — they differ only in where the
 findings came from. With no provider configured, a built-in light analysis runs, so
 the whole loop is exercisable standalone.
 
+Delegation is **adoption, not handoff**: a provider's procedure is read and followed in
+place of the built-in one, in the same context. There is no second party, so the
+conformance check on a finding set is mechanical only — it catches an omission, never a
+misjudgement. Nothing here can independently verify an analysis, and a design that
+claimed otherwise would be describing a reviewer that does not exist.
+
 ## The loop
 
 Three loops, cheap to expensive. The point of the ordering is that the expensive one
