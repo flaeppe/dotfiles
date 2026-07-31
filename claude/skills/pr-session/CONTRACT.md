@@ -148,4 +148,9 @@ history, not a manifest.
 | `summary.md` | the session, from `summary` | the review as prose |
 | `policy.json` | the session, from `policy` | constraints the assembled review honours |
 | `findings.md` | the editor | the harvested marker set, `note` excluded |
+| `notes/<id>.md` | the session, while implementing | approach, what was verified, what was not |
 | `out/` | `assemble` | the review artifacts, local until `publish` |
+
+`notes/` is internal: it is what the session folds into each suggestion commit's
+message once the reviewer has accepted it, so the reasoning travels with the code. A
+provider neither reads nor writes it.

@@ -67,6 +67,21 @@ spans several files.
 **Demonstration.** A code edit the reviewer writes directly in the stack worktree. No
 marker, no ceremony — the diff is the message: *like this; now apply it consistently.*
 
+**Implementation record.** A marker says what is wrong; the diff shows what changed.
+Neither says which approach was taken and what was ruled out, which version was
+actually checked, or what could not be run locally — and that is what lets an author
+trust a suggestion instead of re-deriving it. So implementing writes it down, and the
+record ends up in the suggestion commit's own message body, which is what makes it
+survive the author cherry-picking one commit and dropping the rest.
+
+It is written **one finding behind**, deliberately. The reviewer stages only the hunks
+they agree with, hand-edits, and demonstrates, so what lands is often not what was
+written — a note folded in before acceptance would describe a change that does not
+exist. Each implement step therefore settles the *previous* commit against what
+actually landed, and `assemble` closes the tail. The cost is that a session abandoned
+mid-flight leaves its last finding unrecorded, which `assemble` reports rather than
+papering over.
+
 **Round.** One pass of review-and-suggest over a PR, numbered, with its own stack
 branch: `review-suggestions/<pr>-1`, then `-2`. A round is continued only while its
 branch still descends from the commit under review; once its suggestions have landed
@@ -107,6 +122,7 @@ worktree's copy, so one session means one `.review/`.
 | `summary.md` | the session | the review as prose: answer first, then themes |
 | `policy.json` | the session (optional) | constraints the assembled review must honour |
 | `findings.md` | the editor | the harvested marker set, `note` excluded |
+| `notes/<id>.md` | `implement` | approach, what was verified, what was not |
 | `out/` | `assemble` | the review artifacts, local until `publish` |
 
 `summary.md` is written answer-first, so its opening block is the whole review in a few
@@ -368,6 +384,19 @@ discover afterwards.
   address the default branch's copy of the code under review.
 - Worktree preparation is idempotent and retried until it succeeds. A half-prepared worktree
   is indistinguishable from a healthy one until a language server fails to start.
+
+**The record**
+
+- A suggestion commit's message may be amended, but only its **message**. The tree must
+  survive byte-identical: the reviewer accepted code, and rewriting that under the same
+  hash would make acceptance meaningless.
+- Amending requires an empty index. `--amend` folds the index in, so amending with
+  staged changes swallows the reviewer's next demonstration into the previous finding's
+  commit.
+- Only `REVIEW[<id>]:` commits at HEAD, and never once the branch has an upstream —
+  after publishing, those hashes are shared history.
+- A missing record is reported, never reconstructed. A rationale inferred from a diff
+  reads exactly like one that was reasoned, and the author cannot tell them apart.
 
 **Teardown**
 

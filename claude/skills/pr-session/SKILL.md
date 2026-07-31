@@ -162,20 +162,69 @@ absence means they have not finished curating — stop and say so.
    `REVIEW[<id>]`. Skip those. **Then confirm against
    `git diff <pr_head>..HEAD`** — a finding whose commit was later dropped is not
    landed, and the diff is the authority.
-3. Pick the next unlanded `fix` or plain finding, or the ids named in
+3. **Settle the previous finding's record** (below) before starting a new one.
+4. Pick the next unlanded `fix` or plain finding, or the ids named in
    `$ARGUMENTS`. **One at a time unless told otherwise** — the reviewer reads
    each before accepting, and a pile of simultaneous changes cannot be read.
-4. **Check for a demonstration first.** Uncommitted changes in the stack worktree
+5. **Check for a demonstration first.** Uncommitted changes in the stack worktree
    are the reviewer showing you what they mean. Read `git diff` there and treat
    it as the instruction: finish it, apply it consistently, keep their shape.
    Never revert or rewrite it wholesale.
-5. Implement in the **stack worktree**, leaving the change **uncommitted**.
+6. Implement in the **stack worktree**, leaving the change **uncommitted**.
    Run the repo's tests if a change is more than cosmetic.
-6. Report: what changed, in which files, and that `<Leader>hs` accepts hunks and
+7. Write `.review/notes/<id>.md` — what you did and why (below).
+8. Report: what changed, in which files, and that `<Leader>hs` accepts hunks and
    `:ReviewAccept <id>` takes it into the review.
 
 `ask` findings are never implemented. If implementing a finding shows it was
 wrong, say so and leave the tree clean rather than shipping a half-fix.
+
+### The implementation record
+
+A marker says what is wrong. The diff shows what changed. Neither says which approach
+was taken and what was ruled out, which library version was actually checked, or what
+could not be run here — and that is what an author needs in order to trust a
+suggestion rather than re-derive it. Your report to the reviewer is conversation and
+does not survive the session, so write it down.
+
+**Write `.review/notes/<id>.md` when you finish implementing** — always the review
+worktree's `.review/`, beside the markers. Keep it to what the diff cannot say:
+
+```markdown
+Approach: <what you did, and what you ruled out and why>
+Verified: <what you ran and what it proved — name versions and APIs you checked>
+Not verified: <what could not be run here, and what it would take>
+```
+
+**Then settle it against reality on the next run** (step 3). The reviewer stages only
+the hunks they agree with, hand-edits, and demonstrates — so what landed is often not
+what you wrote. Read `git show HEAD`, reconcile it with the note, and fold the result
+into that commit's message body so the reasoning travels with the code:
+
+```sh
+git commit --amend -m "REVIEW[<id>]: <the original subject, unchanged>" -m "<the note>"
+```
+
+Five guards, because this rewrites history:
+
+- **Nothing staged.** `--amend` folds the index in, so amending with staged changes
+  silently swallows the reviewer's next demonstration into the previous finding's
+  commit. Check `git diff --cached --quiet` first; if it fails, skip the amend and say
+  so.
+- **The message only.** Capture `git rev-parse HEAD^{tree}` before and after — if it
+  changed, the amend touched content. Their acceptance was of code and must survive
+  byte-identical; restore and report rather than continuing.
+- **HEAD only**, and only when its subject matches `REVIEW[<id>]:`. Never a commit
+  the reviewer wrote, never one further back.
+- **Never once published.** If the stack branch has an upstream, those hashes are
+  public and amending rewrites shared history. Leave it alone.
+- **Never invent.** If the note is missing because that finding was implemented in a
+  session you cannot see, say the record is absent rather than reconstructing a
+  rationale from the diff. A guessed justification is worse than none.
+
+Nothing published ever points at `.review/notes/` — it is gitignored and dies with the
+worktree. The commit body is how a note reaches the author, which is also why it
+survives them cherry-picking one commit and dropping the rest.
 
 ---
 
@@ -190,14 +239,40 @@ separately.
   means something is still in flight.
 - Every non-`note` finding is either landed or `ask`.
 
-**Assemble** into the **review worktree's** `.review/out/` — the session's `.review/`
-is the one beside the markers, so every artifact for a session lives in one place:
+**First, close the record.** The amend in Phase B always lags by one, so the newest
+commit has no successor to settle it — and a finding implemented in a session that is
+gone may have none at all. Under the same five guards, settle every `REVIEW[<id>]:`
+commit still missing a body. Where a note is absent, say the record is missing; never
+reconstruct a rationale from the diff.
+
+**Then assemble** into the **review worktree's** `.review/out/` — the session's
+`.review/` is the one beside the markers, so every artifact for a session lives in one
+place:
 
 | File | Contents |
 |---|---|
-| `pr-body.md` | Title and body for the stacked PR. Ends with the handover (below). |
+| `pr-body.md` | Title, then one section per landed finding (below), then the handover. |
 | `review-body.md` | The review comment: 2–4 lines of what you found, the `ask` questions, and a link to the stack. Ends with the handover (below). |
 | `plan.sh` | The literal commands `publish` will run, in order, with no logic. |
+
+**`pr-body.md`, per landed finding**, in the order the commits are stacked — this is
+the author's reading surface, and the only one they are guaranteed to open:
+
+```markdown
+### `REVIEW[<id>]` — <what this change achieves, not what was wrong>
+
+<What the finding was and why it mattered. Then what this commit does about it, what
+it removes, and any approach that was ruled out. Then what was verified and what was
+not, naming versions and APIs where they were checked. Commit `<short sha>`.>
+```
+
+Draw it from the commit bodies, which the amend has already reconciled with what
+actually landed — so it describes the code as committed, not as first written. Name the
+commit so the author can see the same reasoning travels with it if they cherry-pick.
+Never point at `.review/notes/`: it is gitignored and dies with the worktree.
+
+A finding whose record is missing gets a section that says so. An honest gap is
+information; an invented rationale is a liability.
 
 **The handover.** Both bodies close by transferring ownership: the stack branch and
 its PR are the author's, with full write access, to rebase, amend, squash or extend.
@@ -256,6 +331,8 @@ Report **where the session stands**, then the **single next action**, then any
 - `findings.md` predates the markers — Phase B would act on a stale set.
 - A commit names a finding the diff no longer contains, or vice versa.
 - Markers exist in the stack worktree — they must not; that tree is code only.
+- A landed finding has no `notes/<id>.md` and its commit has no body — its reasoning
+  was never recorded and cannot be recovered, so `assemble` will have to say so.
 
 If nothing is wrong, say so plainly and give the next action anyway. A reviewer asking
 this is usually asking "what now", and answering only "all clear" wastes the question.
