@@ -2,6 +2,11 @@
 -- innermost language at the cursor, so they work inside injected gql`...` and
 -- sql`...` blocks in TypeScript too, not only in the host language.
 --
+-- Motion pairs are ¨/å rather than ]/[: on a Nordic Mac layout `[` is Option+8
+-- and `]` is Option+9, which puts a modifier in front of a motion meant to be
+-- pressed repeatedly. ¨ and å are unmodified keys sitting in those same physical
+-- positions, so the ]->¨ (next) and [->å (previous) reading stays intact.
+--
 -- ]c/[c are left alone -- gitsigns owns them for hunk motion.
 require("nvim-treesitter-textobjects").setup({
     select = {
@@ -29,12 +34,12 @@ for lhs, query in pairs(textobjects) do
 end
 
 local motions = {
-    ["]f"] = { move.goto_next_start, "@function.outer" },
-    ["[f"] = { move.goto_previous_start, "@function.outer" },
-    ["]F"] = { move.goto_next_end, "@function.outer" },
-    ["[F"] = { move.goto_previous_end, "@function.outer" },
-    ["]t"] = { move.goto_next_start, "@class.outer" },
-    ["[t"] = { move.goto_previous_start, "@class.outer" },
+    ["¨f"] = { move.goto_next_start, "@function.outer" },
+    ["åf"] = { move.goto_previous_start, "@function.outer" },
+    ["¨F"] = { move.goto_next_end, "@function.outer" },
+    ["åF"] = { move.goto_previous_end, "@function.outer" },
+    ["¨t"] = { move.goto_next_start, "@class.outer" },
+    ["åt"] = { move.goto_previous_start, "@class.outer" },
 }
 for lhs, spec in pairs(motions) do
     local goto_fn, query = spec[1], spec[2]

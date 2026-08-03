@@ -109,8 +109,8 @@ local ENTRIES = {
     },
 
     -- Structural motion, treesitter-driven, works inside embedded gql/sql too
-    { group = "motion", keys = "]f  [f", desc = "Next / previous function", added = "2026-07-25", run = false },
-    { group = "motion", keys = "]t  [t", desc = "Next / previous class or type", added = "2026-07-25", run = false },
+    { group = "motion", keys = "¨f  åf", desc = "Next / previous function", added = "2026-07-25", run = false },
+    { group = "motion", keys = "¨t  åt", desc = "Next / previous class or type", added = "2026-07-25", run = false },
     { group = "motion", keys = "af  if", desc = "Select function, outer / inner", added = "2026-07-25", run = false },
     {
         group = "motion",
