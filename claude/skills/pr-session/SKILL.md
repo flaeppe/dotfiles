@@ -294,7 +294,7 @@ place:
 
 | File | Contents |
 |---|---|
-| `pr-body.md` | Title, then one section per landed finding (below), then the handover. |
+| `pr-body.md` | Title, the handover, the reviewed PR's URL, then one section per landed finding (below). |
 | `review-body.md` | The review comment: 2–4 lines of what you found, the `ask` questions, and a link to the stack. Ends with the handover (below). |
 | `plan.sh` | The literal commands `publish` will run, in order, with no logic. |
 
@@ -302,11 +302,11 @@ place:
 the author's reading surface, and the only one they are guaranteed to open:
 
 ```markdown
-### `REVIEW[<id>]` — <what this change achieves, not what was wrong>
+### `REVIEW[<id>]` — <what this change achieves, not what was wrong> · [`<sha>`](<url>)
 
 <What the finding was and why it mattered. Then what this commit does about it, what
 it removes, and any approach that was ruled out. Then what was verified and what was
-not, naming versions and APIs where they were checked. Commit `<short sha>`.>
+not, naming versions and APIs where they were checked.>
 ```
 
 Draw it from the commit bodies, which the amend has already reconciled with what
@@ -317,7 +317,7 @@ Never point at `.review/notes/`: it is gitignored and dies with the worktree.
 A finding whose record is missing gets a section that says so. An honest gap is
 information; an invented rationale is a liability.
 
-**The handover.** Both bodies close by transferring ownership: the stack branch and
+**The handover.** `pr-body.md` opens with it, `review-body.md` closes with it: the stack branch and
 its PR are the author's, with full write access, to rebase, amend, squash or extend.
 Say it as a transfer, not a verdict on the findings.
 
@@ -329,6 +329,9 @@ Two things not to write, because both are claims you cannot support:
   turns real findings into noise.
 - **Never invite the author to open their own PR** for this work. It already exists;
   the point of the handover is that they take this one over rather than redo it.
+
+Never write a bare `#<number>`: GitHub renders it as a cross-reference to that issue.
+"trap 2", not "trap #2" — keep `#` for a PR you actually mean to link.
 
 State severity per finding where you have grounds, and otherwise not at all.
 
