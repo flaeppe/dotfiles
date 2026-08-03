@@ -261,9 +261,14 @@ reviewer's to accept like any other suggestion:
    docstrings and comments on code *this stack* added or modified, and nothing else.
 2. It leaves every edit **uncommitted**. Never commit on the stack branch; a commit is
    the reviewer's acceptance and that rule has no exception for documentation.
-3. Report what it changed and stop, telling the reviewer to accept it
-   (`:ReviewAccept!` takes the whole pass) and run `assemble` again. Write
-   `.review/documented` only once it has run, so a re-run does not repeat it.
+3. Report what it changed and stop, telling the reviewer to accept it with
+   **`:ReviewAccept! docs`** — plain `:ReviewAccept!` will refuse, because it asks which
+   *finding* a change belongs to and this belongs to none. Then they re-run `assemble`.
+   Write `.review/documented` only once the pass has run, so a re-run does not repeat it.
+
+The resulting commit carries no `REVIEW[<id>]`, which is what keeps it out of the landed
+set. It gets a line of its own in `pr-body.md`, never a per-finding section — the author
+should know their comments were touched, and by what.
 
 **Scope is the whole risk.** Turned loose on every changed file it would rewrite the
 author's own comments, and the stack would arrive carrying churn nobody asked for —

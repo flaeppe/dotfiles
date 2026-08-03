@@ -322,8 +322,16 @@ function M.accept(id, take_all)
         vim.notify("Accept from the stack worktree -- the review worktree never commits", vim.log.levels.ERROR)
         return
     end
-    id = tonumber(id)
-    if not id then
+    -- The documentation pass edits code the *stack* introduced, so no marker describes it
+    -- and there is no id for it to carry -- but it is still the reviewer's to accept, and
+    -- accepting it by hand would miss the hook skip below that a fresh worktree needs.
+    local documenting = id == "docs"
+    if documenting then
+        id = nil
+    else
+        id = tonumber(id)
+    end
+    if not id and not documenting then
         -- No id given: nobody should have to remember one. One candidate is
         -- unambiguous, several get a picker.
         local done = landed(session)
@@ -370,22 +378,27 @@ function M.accept(id, take_all)
         )
         return
     end
-    local text
-    for _, group in ipairs(grouped(session.review_worktree)) do
-        if group.id == id then
-            text = group.text
+    -- A subject with no `REVIEW[n]` in it is what keeps a documentation commit out of the
+    -- landed set, so it is never mistaken for a finding by anything reading the log.
+    local subject = "docs: comments and docstrings for the suggestion stack"
+    if not documenting then
+        local text
+        for _, group in ipairs(grouped(session.review_worktree)) do
+            if group.id == id then
+                text = group.text
+            end
         end
-    end
-    if not text then
-        vim.notify(string.format("No finding [%d] in %s", id, session.review_worktree), vim.log.levels.ERROR)
-        return
+        if not text then
+            vim.notify(string.format("No finding [%d] in %s", id, session.review_worktree), vim.log.levels.ERROR)
+            return
+        end
+        subject = string.format("REVIEW[%d]: %s", id, text)
     end
     -- --no-verify because commit hooks routinely depend on tooling generated at
     -- install time and excluded from version control, which a fresh worktree
     -- therefore lacks -- and because this is a local suggestion that the author's own
     -- CI will check for real. A blocked accept would strand the change.
-    local _, code, err =
-        git({ "commit", "--no-verify", "-m", string.format("REVIEW[%d]: %s", id, text) }, session.stack_worktree)
+    local _, code, err = git({ "commit", "--no-verify", "-m", subject }, session.stack_worktree)
     if code ~= 0 then
         vim.notify("Commit failed: " .. err, vim.log.levels.ERROR)
         return
@@ -393,7 +406,11 @@ function M.accept(id, take_all)
     -- An accept changes what every progress surface reports, so it is announced
     -- rather than pushed: surfaces subscribe instead of being called from here.
     vim.api.nvim_exec_autocmds("User", { pattern = "ReviewAccepted" })
-    vim.notify(string.format("[%d] accepted — %d file(s)", id, #vim.split(staged, "\n", { trimempty = true })))
+    local files = #vim.split(staged, "\n", { trimempty = true })
+    vim.notify(
+        documenting and string.format("documentation accepted — %d file(s)", files)
+            or string.format("[%d] accepted — %d file(s)", id, files)
+    )
 end
 
 --- Findings and their state, with the counts in the window title. Per-finding
@@ -1294,7 +1311,7 @@ vim.api.nvim_create_user_command("ReviewAccept", function(opts)
 end, {
     nargs = "?",
     bang = true,
-    desc = "Commit the staged changes as accepted finding <id> (! takes the whole change)",
+    desc = "Commit the staged changes as accepted finding <id>, or `docs` (! takes the whole change)",
     complete = function()
         local session = M.session()
         if not session then
@@ -1305,6 +1322,12 @@ end, {
             if group.kind ~= "note" and group.kind ~= "ask" and not done[group.id] then
                 table.insert(ids, tostring(group.id))
             end
+        end
+        -- Offered only when there is something to accept, so it never suggests committing
+        -- an empty documentation pass.
+        local staged_count, unstaged_count = uncommitted(session)
+        if staged_count + unstaged_count > 0 then
+            table.insert(ids, "docs")
         end
         return ids
     end,
