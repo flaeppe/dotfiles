@@ -82,6 +82,21 @@ actually landed, and `assemble` closes the tail. The cost is that a session aban
 mid-flight leaves its last finding unrecorded, which `assemble` reports rather than
 papering over.
 
+**Two durable surfaces.** A suggestion stack is usually squashed into the author's
+branch, and squashing keeps one message and discards the rest — so a commit body is a
+carrier, not a home. What has to outlive it splits by kind:
+
+| | Lives in | Because |
+|---|---|---|
+| Why the code has this shape | a comment, at the code | the file is read long after the commit is gone |
+| What was ruled out, whose call it was, what was verified | the PR description | session context and diff-relative notes may never become comments |
+
+That split is why `assemble` runs a documentation pass over the stack's own change
+before building anything — and why that pass is scoped to what the stack introduced.
+Turned loose on every changed file it would rewrite the author's comments, and the
+stack would arrive carrying prose edits with no finding behind them, in a branch whose
+whole claim is that every commit traces to one.
+
 **Round.** One pass of review-and-suggest over a PR, numbered, with its own stack
 branch: `review-suggestions/<pr>-1`, then `-2`. A round is continued only while its
 branch still descends from the commit under review; once its suggestions have landed
@@ -273,7 +288,7 @@ committed.
 |---|---|
 | `analyse` | gets a finding set — built-in or from a provider — then renders it as markers, `order.json` and `summary.md` |
 | `implement` | implements accepted findings as uncommitted edits on the stack |
-| `assemble` | writes `out/{pr-body.md,review-body.md,plan.sh}` — **sends nothing** |
+| `assemble` | runs the documentation pass, then writes `out/{pr-body.md,review-body.md,plan.sh}` — **sends nothing** |
 | `publish` | runs `plan.sh` and nothing else |
 | `help [question]` | read-only diagnosis: where the session stands, and what to do next |
 

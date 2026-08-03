@@ -191,10 +191,16 @@ does not survive the session, so write it down.
 worktree's `.review/`, beside the markers. Keep it to what the diff cannot say:
 
 ```markdown
-Approach: <what you did, and what you ruled out and why>
+Approach: <one sentence on what changed, then what you ruled out and why>
 Verified: <what you ran and what it proved — name versions and APIs you checked>
 Not verified: <what could not be run here, and what it would take>
 ```
+
+`Approach` opens with **one sentence** of what changed and spends the rest on what the
+diff cannot show: the option you rejected and why, whose call a judgement was, a
+premise in the finding that turned out to be wrong, a limitation the fix knowingly
+carries. Any line that could be read off `git show` is cut — the diff is attached to
+the same commit, so restating it costs the reader twice.
 
 **Then settle it against reality on the next run** (step 3). The reviewer stages only
 the hunks they agree with, hand-edits, and demonstrates — so what landed is often not
@@ -239,7 +245,39 @@ separately.
   means something is still in flight.
 - Every non-`note` finding is either landed or `ask`.
 
-**First, close the record.** The amend in Phase B always lags by one, so the newest
+### The documentation pass — once, before anything else
+
+**Why it belongs here and not in the commits.** A suggestion stack is usually squashed
+into the author's branch, and squashing keeps one message and discards the rest. So a
+commit body is a *transient* carrier: fine for reaching the author, useless for
+reaching whoever reads the file in a year. Anything that explains a **code shape** has
+to be in the code, or it does not survive being taken.
+
+If `.review/documented` is absent, this has not run. Dispatch a documentation agent
+over the stack's own change and then **stop** — its edits are code, so they are the
+reviewer's to accept like any other suggestion:
+
+1. Give it `git diff <pr_head>..HEAD` — the stack's change, **not** the PR's. It audits
+   docstrings and comments on code *this stack* added or modified, and nothing else.
+2. It leaves every edit **uncommitted**. Never commit on the stack branch; a commit is
+   the reviewer's acceptance and that rule has no exception for documentation.
+3. Report what it changed and stop, telling the reviewer to accept it
+   (`:ReviewAccept!` takes the whole pass) and run `assemble` again. Write
+   `.review/documented` only once it has run, so a re-run does not repeat it.
+
+**Scope is the whole risk.** Turned loose on every changed file it would rewrite the
+author's own comments, and the stack would arrive carrying churn nobody asked for —
+prose edits with no finding behind them, in a branch whose entire claim is that every
+commit traces to one. Constrain it to what the stack introduced.
+
+**What this does and does not rescue.** Code-shape reasons become comments and survive
+a squash. Decision records — what was ruled out, whose call it was, what was verified —
+must *not* become comments: they are session context and diff-relative, which is
+exactly what a durable comment may never contain. Those survive in the PR description
+instead, which outlives the commits it describes. Two durable surfaces, and the commit
+bodies are the carrier between them.
+
+**Then close the record.** The amend in Phase B always lags by one, so the newest
 commit has no successor to settle it — and a finding implemented in a session that is
 gone may have none at all. Under the same five guards, settle every `REVIEW[<id>]:`
 commit still missing a body. Where a note is absent, say the record is missing; never
