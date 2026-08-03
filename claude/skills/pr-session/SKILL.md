@@ -220,8 +220,8 @@ Five guards, because this rewrites history:
 - **The message only.** Capture `git rev-parse HEAD^{tree}` before and after — if it
   changed, the amend touched content. Their acceptance was of code and must survive
   byte-identical; restore and report rather than continuing.
-- **HEAD only**, and only when its subject matches `REVIEW[<id>]:`. Never a commit
-  the reviewer wrote, never one further back.
+- **HEAD only** while implementing, and only when its subject matches
+  `REVIEW[<id>]:`. Never a commit the reviewer wrote.
 - **Never once published.** If the stack branch has an upstream, those hashes are
   public and amending rewrites shared history. Leave it alone.
 - **Never invent.** If the note is missing because that finding was implemented in a
@@ -284,7 +284,7 @@ bodies are the carrier between them.
 
 **Then close the record.** The amend in Phase B always lags by one, so the newest
 commit has no successor to settle it — and a finding implemented in a session that is
-gone may have none at all. Under the same five guards, settle every `REVIEW[<id>]:`
+gone may have none at all. Under the same guards, settle every `REVIEW[<id>]:`
 commit still missing a body. Where a note is absent, say the record is missing; never
 reconstruct a rationale from the diff.
 
