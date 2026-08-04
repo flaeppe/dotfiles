@@ -162,19 +162,21 @@ absence means they have not finished curating — stop and say so.
    `REVIEW[<id>]`. Skip those. **Then confirm against
    `git diff <pr_head>..HEAD`** — a finding whose commit was later dropped is not
    landed, and the diff is the authority.
-3. **Settle the previous finding's record** (below) before starting a new one.
+3. **Settle the previous run's records** (below) before starting new work.
 4. Pick the next unlanded `fix` or plain finding, or the ids named in
-   `$ARGUMENTS`. **One at a time unless told otherwise** — the reviewer reads
-   each before accepting, and a pile of simultaneous changes cannot be read.
+   `$ARGUMENTS`. **Bundle findings whose hunks stay separable** — `:ReviewAccept`
+   commits the staged index, so ones touching disjoint files land together fine,
+   while two edits to the same function cannot be told apart and go one at a time.
+   The editor does not attribute uncommitted work, so say which hunks are whose.
 5. **Check for a demonstration first.** Uncommitted changes in the stack worktree
    are the reviewer showing you what they mean. Read `git diff` there and treat
    it as the instruction: finish it, apply it consistently, keep their shape.
    Never revert or rewrite it wholesale.
 6. Implement in the **stack worktree**, leaving the change **uncommitted**.
    Run the repo's tests if a change is more than cosmetic.
-7. Write `.review/notes/<id>.md` — what you did and why (below).
+7. Write `.review/notes/<id>.md` where the diff leaves something unexplained (below).
 8. Report: what changed, in which files, and that `<Leader>hs` accepts hunks and
-   `:ReviewAccept <id>` takes it into the review.
+   `:ReviewAccept <id>` takes each finding into the review.
 
 `ask` findings are never implemented. If implementing a finding shows it was
 wrong, say so and leave the tree clean rather than shipping a half-fix.
@@ -185,22 +187,28 @@ A marker says what is wrong. The diff shows what changed. Neither says which app
 was taken and what was ruled out, which library version was actually checked, or what
 could not be run here — and that is what an author needs in order to trust a
 suggestion rather than re-derive it. Your report to the reviewer is conversation and
-does not survive the session, so write it down.
+dies with the session — so extract the decision and write *that* down, never the
+conversation. No first attempts, no what-this-run-caught, no answers to questions the
+reader never saw asked: a rejected option is one clause about the option, not the story
+of rejecting it. If a sentence would puzzle someone who was not here, it is chronology.
 
-**Write `.review/notes/<id>.md` when you finish implementing** — always the review
+**Write `.review/notes/<id>.md` when the diff needs explaining** — always the review
 worktree's `.review/`, beside the markers. Keep it to what the diff cannot say:
 
 ```markdown
 Approach: <one sentence on what changed, then what you ruled out and why>
-Verified: <what you ran and what it proved — name versions and APIs you checked>
+Verified: <the version or API you actually opened, the mutation that proved a test
+  bites — never the standard build-and-test>
 Not verified: <what could not be run here, and what it would take>
 ```
 
 `Approach` opens with **one sentence** of what changed and spends the rest on what the
 diff cannot show: the option you rejected and why, whose call a judgement was, a
 premise in the finding that turned out to be wrong, a limitation the fix knowingly
-carries. Any line that could be read off `git show` is cut — the diff is attached to
-the same commit, so restating it costs the reader twice.
+carries. Any line that could be read off `git show` is cut — and when cutting leaves
+nothing, write no note at all. A mechanical fix with no alternative weighed and nothing
+left unverified explains itself; a record padded to fill the template reads as reasoning
+and is not. Say in one line that it needed none.
 
 **Then settle it against reality on the next run** (step 3). The reviewer stages only
 the hunks they agree with, hand-edits, and demonstrates — so what landed is often not
@@ -277,16 +285,17 @@ commit traces to one. Constrain it to what the stack introduced.
 
 **What this does and does not rescue.** Code-shape reasons become comments and survive
 a squash. Decision records — what was ruled out, whose call it was, what was verified —
-must *not* become comments: they are session context and diff-relative, which is
+must *not* become comments: they are diff-relative and tied to one review, which is
 exactly what a durable comment may never contain. Those survive in the PR description
 instead, which outlives the commits it describes. Two durable surfaces, and the commit
 bodies are the carrier between them.
 
-**Then close the record.** The amend in Phase B always lags by one, so the newest
-commit has no successor to settle it — and a finding implemented in a session that is
+**Then close the record.** The amend in Phase B always lags a run, so the last batch's
+commits have no successor to settle them — and a finding implemented in a session that is
 gone may have none at all. Under the same guards, settle every `REVIEW[<id>]:`
-commit still missing a body. Where a note is absent, say the record is missing; never
-reconstruct a rationale from the diff.
+commit still missing a body. Where a note is absent because none was needed, leave the
+body alone; where it is absent because the session that wrote it is gone, say the record
+is missing and never reconstruct a rationale from the diff.
 
 **Then assemble** into the **review worktree's** `.review/out/` — the session's
 `.review/` is the one beside the markers, so every artifact for a session lives in one
@@ -296,7 +305,7 @@ place:
 |---|---|
 | `pr-body.md` | Title, the handover, the reviewed PR's URL, then one section per landed finding (below). |
 | `review-body.md` | The review comment: 2–4 lines of what you found, the `ask` questions, and a link to the stack. Ends with the handover (below). |
-| `plan.sh` | The literal commands `publish` will run, in order, with no logic. |
+| `plan.sh` | The literal commands `publish` will run, in order, with no logic — so settle here whether the stack branch already has a PR, and emit `gh pr edit` or `gh pr create` accordingly. Put the PR step before the review step. |
 
 **`pr-body.md`, per landed finding**, in the order the commits are stacked — this is
 the author's reading surface, and the only one they are guaranteed to open:
@@ -314,8 +323,9 @@ actually landed — so it describes the code as committed, not as first written.
 commit so the author can see the same reasoning travels with it if they cherry-pick.
 Never point at `.review/notes/`: it is gitignored and dies with the worktree.
 
-A finding whose record is missing gets a section that says so. An honest gap is
-information; an invented rationale is a liability.
+A finding whose record is missing gets a section that says so, and one that needed no
+record gets a sentence. An honest gap is information; an invented rationale is a
+liability.
 
 **The handover.** `pr-body.md` opens with it, `review-body.md` closes with it: the stack branch and
 its PR are the author's, with full write access, to rebase, amend, squash or extend.
@@ -345,9 +355,10 @@ Then tell the reviewer to read `out/` and
 
 ## Phase D — publish
 
-Runs `plan.sh` and nothing else — no regeneration, so what was read is what is sent.
-Report each command's result. If a PR for this stack branch already exists, update it
-rather than opening a second.
+Runs `plan.sh` and nothing else — no regeneration, so what was read is what is sent,
+with one exception. `review-body.md` links the stack PR, which does not exist until
+`plan.sh` opens it, so substitute that URL into the body before the review step and
+leave the file matching what was sent. Report each command's result.
 
 ---
 
