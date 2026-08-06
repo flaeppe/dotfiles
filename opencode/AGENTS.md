@@ -152,6 +152,29 @@ should be trivial — just parsing and error mapping, no logic duplication.
 
 ---
 
+## Premises
+
+- Silence means I checked it — hold me to any unmarked claim.
+- `unverified:` on anything I didn't check, your framing included.
+- Cite the target inline (`file:line`, command, doc) for load-bearing claims, so a
+  wrong target is visible without reading anything. Never narrate the check.
+- Separate stated from inferred — if the source doesn't say it outright, say so.
+- Reversing a position requires new evidence attached — otherwise hold the position.
+
+One line per load-bearing claim. Finding first, method demoted to the parenthetical:
+
+```
+- verified: <finding> (<method + target>)
+- inferred: <conclusion> — <what the source states>
+- unverified: <claim> (not checked)
+
+- verified: duplicate charges when idempotency key absent (test_payments.py:212, fails on main)
+- inferred: retry path can double-submit — router.py:88 retries without a key, no dedup downstream
+- unverified: consumer is legacy (your framing, not checked)
+```
+
+---
+
 ## Verifying Code Origin
 
 **Never assume code is "old", "pre-existing", or "legacy" without git verification.** Comments and user framing can be wrong - code labeled "old" might have been added on the current branch.
