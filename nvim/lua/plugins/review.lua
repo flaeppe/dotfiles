@@ -307,6 +307,24 @@ local function landed(session)
     return ids
 end
 
+--- The commit message prepared for a finding while it was implemented, as lines, or nil.
+---
+--- The first line is the subject's *remainder*: the caller owns the `REVIEW[n]:` prefix,
+--- so a malformed file can cost a commit its body but never its place in the landed set.
+--- The rest is the reasoning -- what was ruled out, what was actually checked -- which
+--- has to travel in the message because a squash keeps one message and discards the rest.
+local function prepared_message(root, id)
+    local path = string.format("%s/.review/messages/%d.md", root, id)
+    if vim.fn.filereadable(path) ~= 1 then
+        return nil
+    end
+    local lines = vim.fn.readfile(path)
+    while lines[1] and lines[1]:match("^%s*$") do
+        table.remove(lines, 1)
+    end
+    return lines[1] and lines or nil
+end
+
 --- Commit the staged changes as one accepted suggestion. The commit is the
 --- grouping: one finding, one commit, however many files it touches.
 --- `take_all` (the command's bang) stages every change first, for the common case
@@ -380,7 +398,7 @@ function M.accept(id, take_all)
     end
     -- A subject with no `REVIEW[n]` in it is what keeps a documentation commit out of the
     -- landed set, so it is never mistaken for a finding by anything reading the log.
-    local subject = "docs: comments and docstrings for the suggestion stack"
+    local message = { "docs: comments and docstrings for the suggestion stack" }
     if not documenting then
         local text
         for _, group in ipairs(grouped(session.review_worktree)) do
@@ -392,13 +410,26 @@ function M.accept(id, take_all)
             vim.notify(string.format("No finding [%d] in %s", id, session.review_worktree), vim.log.levels.ERROR)
             return
         end
-        subject = string.format("REVIEW[%d]: %s", id, text)
+        -- The marker states the problem; a prepared message states the change and the
+        -- reasoning behind it, which is what an author needs in order to trust a
+        -- suggestion. Falling back to the marker keeps accepting a finding nothing
+        -- prepared -- one written by hand, or taken before its implementation ran.
+        message = prepared_message(session.review_worktree, id) or { text }
+        message[1] = string.format("REVIEW[%d]: %s", id, message[1])
     end
     -- --no-verify because commit hooks routinely depend on tooling generated at
     -- install time and excluded from version control, which a fresh worktree
     -- therefore lacks -- and because this is a local suggestion that the author's own
     -- CI will check for real. A blocked accept would strand the change.
-    local _, code, err = git({ "commit", "--no-verify", "-m", subject }, session.stack_worktree)
+    --
+    -- --cleanup=whitespace pins what a body may contain, rather than inheriting it: a
+    -- checkout configuring `commit.cleanup=strip` silently eats every line opening with
+    -- `#`, and a body written as markdown loses its headings to that without a word.
+    local message_file = vim.fn.tempname()
+    vim.fn.writefile(message, message_file)
+    local _, code, err =
+        git({ "commit", "--no-verify", "--cleanup=whitespace", "-F", message_file }, session.stack_worktree)
+    vim.fn.delete(message_file)
     if code ~= 0 then
         vim.notify("Commit failed: " .. err, vim.log.levels.ERROR)
         return

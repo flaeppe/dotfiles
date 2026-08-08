@@ -162,19 +162,34 @@ absence means they have not finished curating — stop and say so.
    `REVIEW[<id>]`. Skip those. **Then confirm against
    `git diff <pr_head>..HEAD`** — a finding whose commit was later dropped is not
    landed, and the diff is the authority.
-3. **Settle the previous run's records** (below) before starting new work.
-4. Pick the next unlanded `fix` or plain finding, or the ids named in
-   `$ARGUMENTS`. **Bundle findings whose hunks stay separable** — `:ReviewAccept`
-   commits the staged index, so ones touching disjoint files land together fine,
-   while two edits to the same function cannot be told apart and go one at a time.
-   The editor does not attribute uncommitted work, so say which hunks are whose.
+3. **Reconcile the messages you left behind** (below) before starting new work.
+4. **Take a batch, not a finding.** The ids in `$ARGUMENTS` if given; otherwise
+   group the unlanded `fix` and plain findings and implement the first batch.
+   Two reasons to put findings together:
+   - **The mechanical ones, all of them, in one pass** — a rename, a guard, a
+     missing `await`. Nothing to weigh, so splitting them costs the reviewer a
+     round each and buys nothing.
+   - **Findings that have to be judged together** — where judging one alone
+     means holding the others in your head, or where the same decision recurs in
+     each. The gate is the review, not the code: what does the reviewer need in
+     front of them at once.
+
+   Everything else is its own batch. Put a batch that changes the shape the
+   others sit on first, and say why you ordered them as you did.
+
+   **Separability is the ceiling.** `:ReviewAccept` commits the staged index, so
+   findings touching disjoint files land together fine, while two edits to the
+   same function cannot be told apart and go one at a time however well they
+   cohere. A batch is one implementation round, never one acceptance — each
+   finding is still its own commit. The editor does not attribute uncommitted
+   work, so say which hunks are whose.
 5. **Check for a demonstration first.** Uncommitted changes in the stack worktree
    are the reviewer showing you what they mean. Read `git diff` there and treat
    it as the instruction: finish it, apply it consistently, keep their shape.
    Never revert or rewrite it wholesale.
 6. Implement in the **stack worktree**, leaving the change **uncommitted**.
    Run the repo's tests if a change is more than cosmetic.
-7. Write `.review/notes/<id>.md` where the diff leaves something unexplained (below).
+7. Write each finding's commit message as part of implementing it (below).
 8. Report: what changed, in which files, and that `<Leader>hs` accepts hunks and
    `:ReviewAccept <id>` takes each finding into the review.
 
@@ -185,17 +200,21 @@ wrong, say so and leave the tree clean rather than shipping a half-fix.
 
 A marker says what is wrong. The diff shows what changed. Neither says which approach
 was taken and what was ruled out, which library version was actually checked, or what
-could not be run here — and that is what an author needs in order to trust a
-suggestion rather than re-derive it. Your report to the reviewer is conversation and
-dies with the session — so extract the decision and write *that* down, never the
-conversation. No first attempts, no what-this-run-caught, no answers to questions the
-reader never saw asked: a rejected option is one clause about the option, not the story
-of rejecting it. If a sentence would puzzle someone who was not here, it is chronology.
+could not be run here — and that is what an author needs in order to trust a suggestion
+rather than re-derive it. So extract the decision and write *that* down, never the
+conversation that reached it: no first attempts, no what-this-run-caught, no answers to
+questions the reader never saw asked. A rejected option is one clause about the option,
+not the story of rejecting it; a sentence that would puzzle someone who was not here is
+chronology.
 
-**Write `.review/notes/<id>.md` when the diff needs explaining** — always the review
-worktree's `.review/`, beside the markers. Keep it to what the diff cannot say:
+**Write it as the commit message, while you implement.** One `.review/messages/<id>.md`
+per finding, in the review worktree beside the markers. The editor commits that file and
+owns the `REVIEW[<id>]: ` prefix, so the first line is the rest of the subject and
+everything below it is the body:
 
 ```markdown
+<what this change achieves — not what was wrong>
+
 Approach: <one sentence on what changed, then what you ruled out and why>
 Verified: <the version or API you actually opened, the mutation that proved a test
   bites — never the standard build-and-test>
@@ -206,17 +225,25 @@ Not verified: <what could not be run here, and what it would take>
 diff cannot show: the option you rejected and why, whose call a judgement was, a
 premise in the finding that turned out to be wrong, a limitation the fix knowingly
 carries. Any line that could be read off `git show` is cut — and when cutting leaves
-nothing, write no note at all. A mechanical fix with no alternative weighed and nothing
-left unverified explains itself; a record padded to fill the template reads as reasoning
-and is not. Say in one line that it needed none.
+nothing, the file is its subject line alone. A mechanical fix with no alternative weighed
+and nothing left unverified explains itself; a body padded to fill the template reads as
+reasoning and is not.
 
-**Then settle it against reality on the next run** (step 3). The reviewer stages only
-the hunks they agree with, hand-edits, and demonstrates — so what landed is often not
-what you wrote. Read `git show HEAD`, reconcile it with the note, and fold the result
-into that commit's message body so the reasoning travels with the code:
+### Reconciling what actually landed
+
+The reviewer stages only the hunks they agree with, hand-edits, and demonstrates — so
+what lands is often not what you wrote. A message file is not history, which is what
+makes this cheap: **correct the file while there is still no commit.** At the start of
+every run, for each finding you left a message for (step 3):
+
+- **Still uncommitted** — reread the stack worktree's diff, rewrite `messages/<id>.md`
+  to match, and stop. Nothing was committed, so nothing is amended.
+- **Landed, and the body no longer matches the code** — read `git show`, correct the
+  file, and fold it in under the guards below.
+- **Landed and accurate** — leave it alone.
 
 ```sh
-git commit --amend -m "REVIEW[<id>]: <the original subject, unchanged>" -m "<the note>"
+git commit --amend -m "REVIEW[<id>]: <subject>" -m "<the body>"
 ```
 
 Five guards, because this rewrites history:
@@ -228,16 +255,17 @@ Five guards, because this rewrites history:
 - **The message only.** Capture `git rev-parse HEAD^{tree}` before and after — if it
   changed, the amend touched content. Their acceptance was of code and must survive
   byte-identical; restore and report rather than continuing.
-- **HEAD only** while implementing, and only when its subject matches
-  `REVIEW[<id>]:`. Never a commit the reviewer wrote.
+- **HEAD only** while implementing, and only when its subject matches `REVIEW[<id>]:` —
+  which the subject you write keeps. The landed set is derived from that prefix, so an
+  amend dropping it silently unlands the finding. Never a commit the reviewer wrote.
 - **Never once published.** If the stack branch has an upstream, those hashes are
   public and amending rewrites shared history. Leave it alone.
-- **Never invent.** If the note is missing because that finding was implemented in a
+- **Never invent.** If the message is missing because that finding was implemented in a
   session you cannot see, say the record is absent rather than reconstructing a
   rationale from the diff. A guessed justification is worse than none.
 
-Nothing published ever points at `.review/notes/` — it is gitignored and dies with the
-worktree. The commit body is how a note reaches the author, which is also why it
+Nothing published ever points at `.review/messages/` — it is gitignored and dies with the
+worktree. The commit body is how the record reaches the author, which is also why it
 survives them cherry-picking one commit and dropping the rest.
 
 ---
@@ -290,12 +318,10 @@ exactly what a durable comment may never contain. Those survive in the PR descri
 instead, which outlives the commits it describes. Two durable surfaces, and the commit
 bodies are the carrier between them.
 
-**Then close the record.** The amend in Phase B always lags a run, so the last batch's
-commits have no successor to settle them — and a finding implemented in a session that is
-gone may have none at all. Under the same guards, settle every `REVIEW[<id>]:`
-commit still missing a body. Where a note is absent because none was needed, leave the
-body alone; where it is absent because the session that wrote it is gone, say the record
-is missing and never reconstruct a rationale from the diff.
+**Then check the record.** Reconcile any `REVIEW[<id>]:` commit whose body no longer
+matches the code, under the Phase B guards. A commit with no body at all was accepted
+before anything prepared a message — say the record is missing and never reconstruct a
+rationale from the diff.
 
 **Then assemble** into the **review worktree's** `.review/out/` — the session's
 `.review/` is the one beside the markers, so every artifact for a session lives in one
@@ -321,7 +347,7 @@ not, naming versions and APIs where they were checked.>
 Draw it from the commit bodies, which the amend has already reconciled with what
 actually landed — so it describes the code as committed, not as first written. Name the
 commit so the author can see the same reasoning travels with it if they cherry-pick.
-Never point at `.review/notes/`: it is gitignored and dies with the worktree.
+Never point at `.review/messages/`: it is gitignored and dies with the worktree.
 
 A finding whose record is missing gets a section that says so, and one that needed no
 record gets a sentence. An honest gap is information; an invented rationale is a
@@ -364,36 +390,5 @@ leave the file matching what was sent. Report each command's result.
 
 ## help
 
-Read-only. Diagnose the session and say what to do next; change nothing, and never
-"repair" what you find. If `$ARGUMENTS` carries a question, answer that specifically
-rather than reciting the whole state.
-
-Gather, then compare:
-
-1. `session.json` — role, `pr_head`, `pr_tip`, both worktree paths.
-2. `git rev-parse HEAD` in **each** worktree, and `git status --porcelain` in each.
-3. Markers in the review worktree, and whether `findings.md` is older than the newest
-   marker edit.
-4. `git log --format=%s <pr_head>..HEAD` in the stack worktree, checked against
-   `git diff <pr_head>..HEAD` — the diff is the authority.
-5. Which of `order.json`, `findings.md`, `out/` exist.
-
-Report **where the session stands**, then the **single next action**, then any
-**desync** you found, naming the specific one:
-
-- The session's `pr_head` differs from `pr_tip` — the PR moved upstream and this
-  session still reviews the older commit, deliberately.
-- A worktree's `HEAD` differs from the session's `pr_head` — the session file and the
-  checkout disagree; every computed range is suspect.
-- `findings.md` predates the markers — Phase B would act on a stale set.
-- A commit names a finding the diff no longer contains, or vice versa.
-- Markers exist in the stack worktree — they must not; that tree is code only.
-- A landed finding has no `notes/<id>.md` and its commit has no body — its reasoning
-  was never recorded and cannot be recovered, so `assemble` will have to say so.
-
-If nothing is wrong, say so plainly and give the next action anyway. A reviewer asking
-this is usually asking "what now", and answering only "all clear" wastes the question.
-
-A session can also be **finished**: the reviewed PR has merged or closed and nothing is
-left in flight. Then the next action is `review retire <pr>`, which archives the findings
-and the stack before removing the worktrees. Say so — and do not run it.
+Read `references/help.md` and follow it. Read-only throughout: diagnose, say what to do
+next, change nothing.

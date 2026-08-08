@@ -108,7 +108,7 @@ echo "review $pr: archiving to $archive"
 
 # Copy rather than move, and only what exists: a retire re-run after a partial teardown then
 # leaves already-archived artifacts alone instead of replacing them with nothing.
-for name in session.json summary.md findings.md order.json notes out
+for name in session.json summary.md findings.md order.json messages out
     if test -e "$review_tree/.review/$name"
         cp -R "$review_tree/.review/$name" "$archive/$name"
     end
@@ -140,7 +140,7 @@ printf '# review %s\n\n' $pr >$manifest
 printf 'Retired from `%s`. Branch `%s`, %s commit(s) over `%s`.\n\n' \
     $repo "$stack_branch" $commits (string sub -l 9 -- "$base") >>$manifest
 printf '| File | Contents |\n|---|---|\n' >>$manifest
-for name in session.json summary.md findings.md order.json notes out markers.diff stack.patch
+for name in session.json summary.md findings.md order.json messages out markers.diff stack.patch
     test -e "$archive/$name"; or continue
     switch $name
         case session.json
@@ -151,8 +151,8 @@ for name in session.json summary.md findings.md order.json notes out markers.dif
             printf '| `findings.md` | the harvested findings, with their sites |\n' >>$manifest
         case order.json
             printf '| `order.json` | the reading order through the PR |\n' >>$manifest
-        case notes
-            printf '| `notes/` | per-finding implementation records; folded into the commits |\n' >>$manifest
+        case messages
+            printf '| `messages/` | each suggestion commit\'s message, as prepared |\n' >>$manifest
         case out
             printf '| `out/` | the assembled bodies and the publish plan |\n' >>$manifest
         case markers.diff

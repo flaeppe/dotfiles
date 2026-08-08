@@ -22,8 +22,20 @@ and nothing leaves the machine until an explicit publish.
   changed their mind. Chronology is the main way this skill's outputs bloat.
 - Provider/session split: a provider returns findings and performs no effects; every
   effect happens in this skill, once. Keeps conformance cheap for providers.
+- Phase B's unit is a **batch**, not a finding. The reviewer's cost is a round, so
+  mechanical fixes sweep together in one and findings that must be judged together land
+  together; the gate is what has to be in front of the reviewer at once, and hunk
+  separability only caps it. Commits stay one per finding.
+- The record is **written as the commit message, at implementation time**, and the editor
+  commits that file on accept. What the reviewer takes diverges from what was proposed, so
+  the message is reconciled against the stack: a file edit while the finding is still
+  uncommitted, an amend only once it has landed. Writing it while implementing is what
+  leaves nothing unrecorded when a session is abandoned mid-flight.
 - Phase C decides, Phase D executes. Anything requiring a judgement belongs in
   `assemble`; `publish` runs `plan.sh` and reports.
+- A phase no other phase reads belongs in `references/`, reached by a router line — one
+  invocation loads one phase. `help` is the case that holds it: a diagnostic nothing else
+  consults, and dead weight in every analyse.
 - When changing this skill, repair the line that causes a behaviour before adding a
   rule that argues with it. Two of this file's rules exist because a mandate elsewhere
   said the opposite; a counter-rule twelve lines down loses to the mandate that reads
@@ -43,9 +55,10 @@ and nothing leaves the machine until an explicit publish.
 ## Size budget
 
 - Phase A's worst path loads SKILL.md **and** CONTRACT.md together: **≤ 29000 chars**
-  for the pair (currently 28118, so the next growth has to be small or fund itself).
-- Note `skill-improver/scripts/measure.sh` counts only `references/` and `leaves/`,
-  so it reports SKILL.md alone and under-reports this skill by CONTRACT.md's size.
+  for the pair (currently 27538).
+- `skill-improver/scripts/measure.sh` reports SKILL.md plus the largest leaf, which is
+  no path this skill takes: Phase A pairs SKILL.md with CONTRACT.md, `help` pairs it
+  with `references/help.md`. Add the pair by hand.
 
 ## Rehaul threshold (refuse and defer to a human rewrite)
 

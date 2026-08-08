@@ -70,17 +70,21 @@ marker, no ceremony — the diff is the message: *like this; now apply it consis
 **Implementation record.** A marker says what is wrong; the diff shows what changed.
 Neither says which approach was taken and what was ruled out, which version was
 actually checked, or what could not be run locally — and that is what lets an author
-trust a suggestion instead of re-deriving it. So implementing writes it down, and the
-record ends up in the suggestion commit's own message body, which is what makes it
-survive the author cherry-picking one commit and dropping the rest.
+trust a suggestion instead of re-deriving it. So implementing writes it down, as the
+suggestion commit's own message, which is what makes it survive the author
+cherry-picking one commit and dropping the rest.
 
-It is written **one finding behind**, deliberately. The reviewer stages only the hunks
-they agree with, hand-edits, and demonstrates, so what lands is often not what was
-written — a note folded in before acceptance would describe a change that does not
-exist. Each implement step therefore settles the *previous* commit against what
-actually landed, and `assemble` closes the tail. The cost is that a session abandoned
-mid-flight leaves its last finding unrecorded, which `assemble` reports rather than
-papering over.
+It is written **while implementing**, into `.review/messages/<id>.md`, and the accept
+commits that file — subject first, body below, with the editor owning the `REVIEW[n]:`
+prefix so a malformed message can never cost a commit its place in the landed set. The
+subject says what the change achieves: the marker already carries the problem, and a log
+that restates it gives the author nothing to act on.
+
+The reviewer stages only the hunks they agree with, hand-edits, and demonstrates, so what
+lands is often not what was written. The message is a file until the accept, which is what
+makes that cheap to absorb — each implement step rewrites the messages of findings still
+uncommitted, and only a record that has already landed wrong needs an amend. The residue
+is an accept taken before the next step could reconcile it, which `assemble` catches.
 
 **Two durable surfaces.** A suggestion stack is usually squashed into the author's
 branch, and squashing keeps one message and discards the rest — so a commit body is a
@@ -137,7 +141,7 @@ worktree's copy, so one session means one `.review/`.
 | `summary.md` | the session | the review as prose: answer first, then themes |
 | `policy.json` | the session (optional) | constraints the assembled review must honour |
 | `findings.md` | the editor | the harvested marker set, `note` excluded |
-| `notes/<id>.md` | `implement` | approach, what was verified, what was not |
+| `messages/<id>.md` | `implement` | that suggestion commit's message: what it achieves, what was ruled out, what was verified |
 | `out/` | `assemble` | the review artifacts, local until `publish` |
 
 `summary.md` is written answer-first, so its opening block is the whole review in a few
