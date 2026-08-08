@@ -97,7 +97,6 @@ in {
     ".claude/skills/prompt".source = ./skills/prompt;
     ".claude/skills/defer".source = ./skills/defer;
     ".claude/skills/upgrade-risk".source = ./skills/upgrade-risk;
-    ".claude/skills/keystroke-review".source = ./skills/keystroke-review;
   };
 
   # Deploy as writable copy (not symlink) so `claude plugin install` can write to it

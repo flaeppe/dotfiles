@@ -31,7 +31,7 @@ thousand keys cannot support a subtle claim — say so rather than reaching.
 ## 1. Run the report
 
 ```
-python3 ~/.claude/skills/keystroke-review/report.py --review
+python3 .claude/skills/keystroke-review/report.py --review
 ```
 
 It reads the log, the previous `review.json`, and the Dojo's entry table, then

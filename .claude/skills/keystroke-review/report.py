@@ -11,11 +11,15 @@ import datetime
 import glob
 import json
 import os
+import pathlib
 import re
 import sys
 
 KEYLOG = os.path.expanduser("~/.local/state/nvim/keylog")
-DOJO = os.path.expanduser("~/.dotfiles/nvim/lua/plugins/dojo.lua")
+# <repo>/.claude/skills/keystroke-review/report.py, so the dotfiles root is four
+# levels up. Derived rather than hardcoded: the repo is not checked out at the
+# same path on every machine.
+DOJO = pathlib.Path(__file__).resolve().parents[3] / "nvim/lua/plugins/dojo.lua"
 
 # `keytrans` spells control keys with an upper-case letter; the Dojo writes them
 # the way vim documents them. Same key, two spellings, so one has to be folded.
