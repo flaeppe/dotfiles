@@ -53,7 +53,9 @@ fzf.setup({
     },
 })
 fzf.register_ui_select()
-vim.keymap.set("n", "F", function()
+-- Under the leader rather than bare `F`, which is the builtin backwards
+-- character search on the current line -- a motion, and one that pairs with `f`.
+vim.keymap.set("n", "<Leader>F", function()
     fzf.builtin()
 end, { desc = "View fzf-lua commands" })
 vim.keymap.set("n", "<C-p>", function()

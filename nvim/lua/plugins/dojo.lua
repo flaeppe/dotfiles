@@ -11,6 +11,11 @@
 -- *when* to reach for it, since that is what you would search on. Prune as
 -- freely as you add -- an entry nobody searches for costs space.
 --
+-- A key already in the fingers is not searched for either. It earns a row only
+-- when there is a sibling to choose between, or when it is rare enough that you
+-- would have to look it up. Reflexes belong in the log, not here: the review
+-- counts every key pressed, listed or not, so dropping a row loses no evidence.
+--
 -- `added` is the date an entry appeared here, rendered as an age. A binding four
 -- months old that you still never press is a different problem from one added
 -- last week. Set it when you add a row; never backdate it to flatter yourself.
@@ -22,9 +27,13 @@ local fzf = require("fzf-lua")
 
 local ENTRIES = {
     -- Find
-    { group = "find", keys = "<C-p>", desc = "Files by name", added = "2019-08-02" },
     { group = "find", keys = "<Leader>f", desc = "Grep text across the project (ripgrep)", added = "2025-08-09" },
-    { group = "find", keys = "F", desc = "Every fzf-lua picker, when you forget which exists", added = "2025-08-09" },
+    {
+        group = "find",
+        keys = "<Leader>F",
+        desc = "Every fzf-lua picker, when you forget which exists",
+        added = "2025-08-09",
+    },
     {
         group = "find",
         keys = "<Leader>b",
@@ -47,12 +56,6 @@ local ENTRIES = {
     },
     { group = "symbol", keys = "<Leader>d", desc = "Symbols in this file", added = "2026-07-25" },
     { group = "symbol", keys = "<Leader>o", desc = "Outline sidebar, stays open while you read", added = "2026-07-25" },
-    {
-        group = "symbol",
-        keys = "<Leader>gr",
-        desc = "Regenerate the tag file (after a branch switch or pull)",
-        added = "2025-08-09",
-    },
 
     -- Jump
     {
@@ -67,30 +70,14 @@ local ENTRIES = {
         desc = "Definition in source, past a generated .d.ts (TypeScript)",
         added = "2026-07-25",
     },
-    { group = "jump", keys = "grd", desc = "Definition (LSP only)", added = "2025-08-06" },
     { group = "jump", keys = "grt", desc = "Type definition", added = "2025-08-06" },
     { group = "jump", keys = "gri", desc = "Implementation", added = "2025-08-06" },
-    { group = "jump", keys = "K", desc = "Hover documentation", added = "2025-08-06" },
-    {
-        group = "jump",
-        keys = "<C-o>",
-        desc = "Back to where you jumped from (jumplist)",
-        added = "2019-08-02",
-        run = false,
-    },
-    { group = "jump", keys = "<C-i>", desc = "Forward again (jumplist)", added = "2019-08-02", run = false },
 
     -- References and call hierarchy
     {
         group = "reference",
-        keys = "grr",
-        desc = "References into the quickfix list -- to walk all of them",
-        added = "2025-08-06",
-    },
-    {
-        group = "reference",
         keys = "<Leader>cr",
-        desc = "References in a picker -- to filter first, when there are many",
+        desc = "References in a picker, to narrow before committing to walking them",
         added = "2026-07-25",
     },
     { group = "reference", keys = "<Leader>ci", desc = "Incoming calls: who reaches this", added = "2026-07-25" },
@@ -122,14 +109,17 @@ local ENTRIES = {
     { group = "motion", keys = "aa  ia", desc = "Select parameter, outer / inner", added = "2026-07-25", run = false },
 
     -- Change
-    { group = "edit", keys = "grn", desc = "Rename symbol across the project", added = "2025-08-06" },
+    {
+        group = "edit",
+        keys = "grn",
+        desc = "Rename symbol across the project, writing every file it touched",
+        added = "2025-08-06",
+    },
     { group = "edit", keys = "gra", desc = "Code action", added = "2025-08-06" },
-    { group = "edit", keys = "<Leader>ll", desc = "Format buffer", added = "2025-02-23" },
 
     -- Diagnostics
     { group = "diagnostic", keys = "¨d", desc = "Next diagnostic", added = "2025-02-23" },
     { group = "diagnostic", keys = "åd", desc = "Previous diagnostic", added = "2025-02-23" },
-    { group = "diagnostic", keys = "<Leader>le", desc = "Show the diagnostic under the cursor", added = "2025-02-23" },
     { group = "diagnostic", keys = "<Leader>ts", desc = "Show diagnostics", added = "2022-12-29" },
     { group = "diagnostic", keys = "<Leader>th", desc = "Hide diagnostics", added = "2022-12-29" },
 
@@ -230,14 +220,12 @@ local ENTRIES = {
     },
 
     -- Tree
-    { group = "tree", keys = "<Leader>nn", desc = "Toggle the file tree", added = "2019-08-02" },
     { group = "tree", keys = "<Leader>nf", desc = "Reveal the current file in the tree", added = "2019-08-02" },
 
     -- Markdown
     { group = "markdown", keys = "<Leader>mp", desc = "Toggle live markdown preview", added = "2026-07-20" },
 
     -- The training loop itself
-    { group = "dojo", keys = "<Leader>?", desc = "This page (ctrl-u: only what I never press)", added = "2026-07-25" },
     { group = "dojo", keys = ":KeylogStatus", desc = "Where the keystroke log is, and how big", added = "2026-07-25" },
     {
         group = "dojo",

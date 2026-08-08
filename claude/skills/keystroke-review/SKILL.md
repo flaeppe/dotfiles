@@ -129,6 +129,10 @@ reply unless asked — the numbers that matter are the ones in the drills.
 follow them rather than this file:
 
 - Entries are described by *when to reach for it*, not what it does.
+- A key already in the fingers does not earn a row. Reflexes are not searched
+  for, and the review counts every key pressed whether it is listed or not, so
+  pruning one loses no evidence. A row earns its place when there is a sibling
+  to choose between, or when it is rare enough to need looking up.
 - `added` is the date the row appeared. Set it when you add a row. **Never
   backdate it** — the age column is what makes "still unused after four months"
   readable.

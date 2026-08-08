@@ -91,6 +91,33 @@ vim.api.nvim_create_autocmd("LspAttach", {
         end, { buffer = args.buf, desc = "Go to source definition (past .d.ts)" })
     end,
 })
+-- A rename edits every file that referenced the symbol and leaves all of them
+-- unwritten, which turns one decision into a pile of buffers to remember. The
+-- edits only exist once the request reports complete, so the write hangs off
+-- that rather than off the call returning.
+vim.keymap.set("n", "grn", function()
+    vim.api.nvim_create_autocmd("LspRequest", {
+        group = vim.api.nvim_create_augroup("RenameWriteAll", { clear = true }),
+        callback = function(args)
+            local request = args.data.request
+            if request.method ~= "textDocument/rename" or request.type ~= "complete" then
+                return
+            end
+            -- Scheduled, not immediate: the event is emitted from the reply
+            -- callback, which runs before the handler that applies the edit.
+            vim.schedule(function()
+                -- Fails on an unnamed buffer, which no rename can have touched.
+                local ok, err = pcall(vim.cmd, "wall")
+                if not ok then
+                    vim.notify(tostring(err), vim.log.levels.WARN)
+                end
+            end)
+            return true
+        end,
+    })
+    vim.lsp.buf.rename()
+end, { desc = "Rename symbol, then write every file it touched" })
+
 -- lspconfig's default filetypes are { graphql, typescriptreact,
 -- javascriptreact }, so operations written in plain .ts/.js modules -- hooks,
 -- server-side resolvers, generated clients -- get no GraphQL LSP at all.
