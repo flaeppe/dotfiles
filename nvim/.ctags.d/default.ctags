@@ -9,6 +9,8 @@
 
 --exclude=.bash_env
 --exclude=.git
+## Checkouts of the same repo -- tagging them doubles every symbol.
+--exclude=.worktrees
 --exclude=.mypy_cache
 --exclude=.next
 --exclude=.venv
