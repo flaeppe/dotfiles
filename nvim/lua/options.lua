@@ -12,6 +12,12 @@ vim.opt.expandtab = true
 vim.opt.smarttab = true
 -- Show line numbers
 vim.opt.number = true
+-- Room for two signs, because a diagnostic and a changed hunk routinely land on the same
+-- line and one column silently shows only the winner. Diagnostics outrank hunk signs, so
+-- the default hides exactly the thing a review is reading for: the gutter says nothing
+-- changed on every line that also has a warning. `auto` still means no gutter until
+-- something needs one, and it only widens to two when a line carries both.
+vim.opt.signcolumn = "auto:2"
 -- Disable error bells
 vim.opt.errorbells = false
 -- Use the system clipboard
