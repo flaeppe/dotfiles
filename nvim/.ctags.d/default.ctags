@@ -11,6 +11,8 @@
 --exclude=.git
 ## Checkouts of the same repo -- tagging them doubles every symbol.
 --exclude=.worktrees
+## Claude Code's own worktree checkouts, same reason.
+--exclude=.claude/worktrees
 --exclude=.mypy_cache
 --exclude=.next
 --exclude=.venv

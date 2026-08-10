@@ -2,9 +2,10 @@ local fzf = require("fzf-lua")
 -- Directories that stay excluded even when gitignore-respecting is toggled
 -- off with alt-i (unlike .gitignore entries, these are never useful to browse).
 local FILE_PICKER_DENYLIST = {
-    -- .worktrees holds checkouts of the same repo: every hit in it is a
-    -- duplicate of one in the root project, on a different branch.
-    ".git", ".jj", ".worktrees", "node_modules", ".direnv", ".venv", "venv", ".pytest_cache", ".ruff_cache", "__pycache__",
+    -- .worktrees and .claude/worktrees hold checkouts of the same repo: every
+    -- hit in them is a duplicate of one in the root project, on a different
+    -- branch.
+    ".git", ".jj", ".worktrees", ".claude/worktrees", "node_modules", ".direnv", ".venv", "venv", ".pytest_cache", ".ruff_cache", "__pycache__",
     "dist", "build", "out", "target", ".next",
 }
 fzf.setup({
