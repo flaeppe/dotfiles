@@ -104,8 +104,9 @@
             ${builtins.readFile ./functions/review.fish}
           '';
         };
-        # Reached through `review list` and `review retire`, which is the one entry point
-        # worth remembering; these carry the bodies so that dispatcher stays readable.
+        # Reached through `review list`, `review retire` and `review skim`, which is the one
+        # entry point worth remembering; these carry the bodies so that dispatcher stays
+        # readable.
         _review_list = {
           description = "Lists every review session in this repository, live or retired";
           body = ''
@@ -117,6 +118,21 @@
             "Archives a review session's findings and suggestions, then removes its worktrees";
           body = ''
             ${builtins.readFile ./functions/_review_retire.fish}
+          '';
+        };
+        _review_skim = {
+          description =
+            "Opens the read-only skim worktree for browsing pull requests across the org";
+          body = ''
+            ${builtins.readFile ./functions/_review_skim.fish}
+          '';
+        };
+        # Shared by `review <pr>` and `review skim`: both must prepare a worktree
+        # identically, or a language server works in one surface and not the next.
+        _review_prepare_tree = {
+          description = "Copies local config, links dependency trees and runs .review/setup in a worktree";
+          body = ''
+            ${builtins.readFile ./functions/_review_prepare_tree.fish}
           '';
         };
       };

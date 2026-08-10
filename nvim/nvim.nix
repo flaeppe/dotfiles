@@ -168,6 +168,9 @@
               -- rather than as its own plugin entry.
               ${builtins.readFile ./lua/plugins/dojo.lua}
               ${builtins.readFile ./lua/plugins/review.lua}
+              -- Reads a PR without a session: the org-wide PR list is a picker, and the
+              -- changed-file surface is fzf-lua's own git_diff.
+              ${builtins.readFile ./lua/plugins/pr.lua}
             '';
           }
           # Incremental tag generation

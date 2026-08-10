@@ -1260,6 +1260,66 @@ function M.report()
     )
 end
 
+--- The marker set as markdown on the clipboard, grouped by file, for pasting into a PR
+--- by hand.
+---
+--- The exit for a review that never becomes a suggestion stack: on the skim surface (see
+--- pr.lua) findings have nowhere else to go, since nothing there is committed and the next
+--- PR overwrites the worktree. Grouped by file and ordered by line, because that is the
+--- order a GitHub diff is walked in -- a set grouped by finding would mean scrolling back
+--- and forth for every entry.
+---
+--- `note` markers are dropped, as in `M.report`: they navigate and highlight, they just
+--- never leave the worktree. `ask` markers are kept and marked, since a question is
+--- exactly the thing worth pasting.
+function M.clipboard()
+    local root = marker_root()
+    local by_file, order = {}, {}
+    for _, group in ipairs(grouped(root)) do
+        if group.kind ~= "note" and group.file then
+            for _, site in ipairs(vim.list_extend({ { file = group.file, lnum = group.lnum } }, group.sites)) do
+                local path = relative(site.file, root)
+                if not by_file[path] then
+                    by_file[path] = {}
+                    table.insert(order, path)
+                end
+                table.insert(by_file[path], {
+                    lnum = site.lnum,
+                    kind = group.kind,
+                    text = group.text or "(no body)",
+                })
+            end
+        end
+    end
+    if #order == 0 then
+        vim.notify("No findings to copy — write one with <Leader>rc first", vim.log.levels.WARN)
+        return
+    end
+    table.sort(order)
+    local lines, count = {}, 0
+    for _, path in ipairs(order) do
+        table.insert(lines, "## " .. path)
+        table.insert(lines, "")
+        table.sort(by_file[path], function(left, right)
+            return left.lnum < right.lnum
+        end)
+        for _, entry in ipairs(by_file[path]) do
+            count = count + 1
+            -- `ask` is called out because it changes what the author is expected to do with
+            -- the line; `fix` and a plain finding both read as "change this".
+            local prefix = entry.kind == "ask" and "**Question** " or ""
+            table.insert(lines, string.format("- **L%d** %s%s", entry.lnum, prefix, entry.text))
+        end
+        table.insert(lines, "")
+    end
+    local markdown = table.concat(lines, "\n")
+    -- Both registers: `+` is what a browser paste reads, `"` makes it available to a
+    -- put in this editor without a second key.
+    vim.fn.setreg("+", markdown)
+    vim.fn.setreg('"', markdown)
+    vim.notify(string.format("%d finding site(s) across %d file(s) → clipboard", count, #order))
+end
+
 -- Highlighting ------------------------------------------------------------
 
 -- Green ships, yellow needs a decision, blue is a question, dim is private.
@@ -1318,6 +1378,7 @@ map("<Leader>rq", M.hunks, "Review: the change as a work list")
 map("<Leader>ro", M.order, "Review: order to quickfix")
 map("<Leader>rd", M.delete, "Review: delete marker")
 map("<Leader>rw", M.report, "Review: write findings.md")
+map("<Leader>rY", M.clipboard, "Review: copy findings as markdown")
 map("¨r", function()
     M.jump(1)
 end, "Review: next marker")
@@ -1332,6 +1393,7 @@ map("<Leader>rD", M.diff, "Review: browse the change")
 
 vim.api.nvim_create_user_command("ReviewOrder", M.order, { desc = "Load the review order into the quickfix list" })
 vim.api.nvim_create_user_command("ReviewReport", M.report, { desc = "Harvest markers into .review/findings.md" })
+vim.api.nvim_create_user_command("ReviewCopy", M.clipboard, { desc = "Copy findings as markdown for a PR comment" })
 vim.api.nvim_create_user_command("Review", M.panel, { desc = "Where the session stands and what to do next" })
 vim.api.nvim_create_user_command("ReviewStatus", M.status, { desc = "Findings and their states" })
 vim.api.nvim_create_user_command("ReviewDiff", M.diff, { desc = "Browse the whole change in a file panel" })

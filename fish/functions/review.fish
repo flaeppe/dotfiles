@@ -8,6 +8,7 @@
 # after closing the editor.
 #
 #   review <pr>          start or resume a session
+#   review skim [<pr>]   the read-only surface: browse PRs across the org, one worktree
 #   review list          every session in this repo, live or retired
 #   review retire <pr>   archive a session and take its worktrees down
 
@@ -18,10 +19,13 @@ switch "$argv[1]"
     case retire
         _review_retire $argv[2..]
         return $status
+    case skim
+        _review_skim $argv[2..]
+        return $status
 end
 
 if test -z "$argv[1]"
-    echo "Usage: review <pr-number> | review list | review retire <pr-number>"
+    echo "Usage: review <pr-number> | review skim [<pr-number>] | review list | review retire <pr-number>"
     return 1
 end
 if not string match -qr '^\d+$' -- "$argv[1]"
@@ -39,24 +43,6 @@ end
 set -l repo (basename $root)
 set -l review_tree "$root/.worktrees/review/$pr/head"
 set -l stack_tree "$root/.worktrees/review/$pr/stack"
-
-# Per-checkout tool configuration that is gitignored, and therefore absent from a fresh
-# worktree. Extend this list with whatever a project keeps untracked; `.envrc` is the
-# load-bearing one, since without it direnv never activates and the worktree has no
-# toolchain at all, so no language server can start.
-set -l LOCAL_CONFIG .envrc .ignore .sqruff .cbmignore postgres-language-server.jsonc .ctags.d
-
-# Dependency trees, symlinked rather than installed: a fresh worktree has none,
-# and without them a language server reports every import as unresolved and any
-# typecheck fails. Symlinked because installing is project-specific and slow,
-# and reviewing rarely needs dependencies that differ from the main checkout's.
-# Stale if the PR itself changes dependencies -- install into the worktree by hand
-# in that case.
-#
-# Only safe for trees that hold no absolute path back to where they were installed. One
-# that does -- and one that carries the language server itself -- needs `.review/setup`
-# below, which can rewrite it per worktree.
-set -l LINK_DIRS node_modules
 
 echo "review $pr: reading PR metadata"
 set -l meta (gh pr view $pr --json headRefName,baseRefName,title,url \
@@ -137,53 +123,7 @@ for role in review stack
     else
         set -f tree $stack_tree
     end
-    for name in $LOCAL_CONFIG
-        if test -e "$root/$name"; and not test -e "$tree/$name"
-            cp -R "$root/$name" "$tree/$name"
-        end
-    end
-    for name in $LINK_DIRS
-        if test -d "$root/$name"; and not test -e "$tree/$name"
-            ln -s "$root/$name" "$tree/$name"
-        end
-    end
-    mkdir -p "$tree/.review"
-
-    # Per-repo worktree preparation, for what copying and symlinking cannot express.
-    #
-    # A language server is often installed into the project's dependency tree rather than
-    # onto PATH, so a worktree without that tree has no type checking, no definitions and no
-    # references at all -- not merely unresolved imports. Materialising one is
-    # ecosystem-specific, and it usually has to be rewritten afterwards: dependency trees
-    # routinely pin the first-party import root to an absolute path, and one that still
-    # points at the main checkout resolves the code under review to whatever the default
-    # branch happens to hold.
-    #
-    # That is knowledge the repository has and this function cannot, so the repository
-    # supplies it. `.review/` is already ignored, so the hook needs no ignore entry.
-    #
-    # Retried until it succeeds: the sentinel is written only on exit 0, so a hook that
-    # failed halfway runs again on the next `review` instead of leaving a worktree that is
-    # silently half-prepared.
-    if test -x "$root/.review/setup"; and not test -e "$tree/.review/setup-done"
-        echo "review $pr: preparing the $role worktree"
-        pushd $tree
-        REVIEW_MAIN=$root REVIEW_PR=$pr REVIEW_ROLE=$role "$root/.review/setup"
-        set -l prepared $status
-        popd
-        if test $prepared -eq 0
-            touch "$tree/.review/setup-done"
-        else
-            echo "review $pr: WARNING .review/setup failed for the $role worktree"
-            echo "             language servers will be missing until it succeeds"
-        end
-    end
-
-    # After the hook, which may well have written the `.envrc` that direnv is being asked
-    # to trust.
-    if test -e "$tree/.envrc"
-        direnv allow $tree 2>/dev/null
-    end
+    _review_prepare_tree $root $tree $role $pr
 end
 
 # Sockets live in /tmp, never in the worktree: macOS caps unix socket paths at

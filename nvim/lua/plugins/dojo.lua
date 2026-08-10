@@ -166,6 +166,12 @@ local ENTRIES = {
     { group = "review", keys = "<Leader>rl", desc = "What have I found so far?", added = "2026-07-25" },
     {
         group = "review",
+        keys = "<Leader>rY",
+        desc = "Findings to the clipboard as markdown, to paste into the PR yourself",
+        added = "2026-08-10",
+    },
+    {
+        group = "review",
         keys = "<Leader>rq",
         desc = "Walk the actual changed code, hunk by hunk, in files you can edit",
         added = "2026-07-25",
@@ -210,6 +216,30 @@ local ENTRIES = {
     { group = "hunk", keys = "<Leader>hu", desc = "Throw this hunk away", added = "2026-07-26" },
     { group = "hunk", keys = "<Leader>hp", desc = "What exactly changed here?", added = "2026-07-26" },
     { group = "hunk", keys = "<Leader>hd", desc = "This whole file against the base", added = "2026-07-26" },
+    {
+        group = "hunk",
+        keys = "<Leader>hl",
+        desc = "What is there to review? Every open PR in the org, description beside it (ctrl-r: session, ctrl-l: reload)",
+        added = "2026-08-10",
+    },
+    {
+        group = "hunk",
+        keys = ":PrDiff",
+        desc = "Read one named PR as hunks -- paste a number or URL ('off' to stop)",
+        added = "2026-08-10",
+    },
+    {
+        group = "hunk",
+        keys = "<Leader>hD",
+        desc = "How big is this? Every changed file against the base (the :PrDiff overview)",
+        added = "2026-08-10",
+    },
+    {
+        group = "hunk",
+        keys = "<Leader>hf",
+        desc = "Jump straight to a changed file, fuzzily -- no path to remember (ctrl-q: all of them)",
+        added = "2026-08-10",
+    },
     { group = "hunk", keys = "¨h  åh", desc = "Next / previous changed hunk", added = "2026-07-26", run = false },
     {
         group = "review",

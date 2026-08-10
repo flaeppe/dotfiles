@@ -21,6 +21,25 @@ a human before it becomes part of the review.
 
 ## Concepts
 
+**Two shapes, one set of habits.** A session is the long form: it pins two worktrees to
+one PR and ships findings as commits, which is right when a PR deserves hours and far too
+much ceremony when it deserves ten minutes. The **skim surface** is the short form — one
+worktree per repository that moves from PR to PR, where findings leave as a comment you
+paste into GitHub yourself. Both read the same markers with the same keys and sign hunks
+against the same kind of base, so moving between them costs no new vocabulary.
+
+| | Skim surface | Review session |
+|---|---|---|
+| Opened by | `review skim` | `review <pr>` |
+| Worktrees | one, per repository | two, per PR |
+| Pinned to | nothing — it moves | one PR, one commit |
+| Findings leave as | a pasted PR comment (`<Leader>rY`) | commits on a stack branch |
+| Survives | until the next PR overwrites it | until `review retire` archives it |
+
+Skimming is also where you find out a PR needs the long form, so `ctrl-r` on a row of the
+PR list starts a session for it. The traffic is one-way by design: a session is a
+commitment, and nothing about it wants to be demoted back to a glance.
+
 **Review session.** One PR under review. Created by `review <pr>`, which opens two
 git worktrees and one editor per worktree. `.review/session.json` in each worktree
 records the PR, the role, and the commits the session is pinned to; everything else
@@ -40,6 +59,22 @@ Both worktrees contain the same paths, which is why the editor shows its role
 permanently in the statusline — a filename alone cannot tell you which tree you are
 standing in, and the difference decides whether an edit is a throwaway annotation or
 a suggestion.
+
+**The skim worktree.** `.worktrees/skim`, one per repository, detached and never on a
+branch — the reviewer is frequently the PR's author, and a branch already checked out in
+the main worktree cannot be checked out again. Loading a PR fetches its head to
+`refs/skim/<pr>`, outside `refs/heads` so no branch listing ever fills up with it.
+
+It carries no `session.json`; `.review/skim.json` holds the current PR instead, which is
+what tells the editor it is standing here and restores the sign base after a restart. It
+sits outside `.worktrees/review/`, whose children are all PR numbers to `review list`.
+
+The PR list it opens on (`<Leader>hl`) spans the **whole organisation** rather than this
+repository, because that is the question being asked — not "what is open here" but "what
+is there to review". Picking a PR in another repository hands it to that repository's own
+skim surface, since a worktree belongs to one repository and its toolchain comes from that
+repository's direnv environment. An editor already open there is retargeted rather than
+duplicated.
 
 **Marker.** A finding, written as a comment in the code under review:
 
