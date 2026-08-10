@@ -24,11 +24,27 @@ context from here — don't ask me to re-explain what's already on screen.
 
 Planning docs are ingested into the kb, so search there first to avoid
 duplicating something I already captured. Planning docs are excluded from kb
-results by default — pass `include=["plans"]`:
+results by default — pass `include=["plans"]`.
 
-```
-kb_find(query="<the task in a few words>", include=["plans"])
-```
+**Two queries, then one filename check.** One query is not enough. A single long
+query mixing the service, the artefact format and the failure shape ranks on
+whichever axis carries the most lexical mass, and the domain lens files win that
+fight every time — so an existing plan about the *same failure on a different
+service* stays buried even when your query did contain the mechanism words.
+
+1. **Artefact/service** — what you'd naturally type.
+   `kb_find(query="<service> <artefact> <task in a few words>", include=["plans"])`
+2. **Failure shape, with the service and format words deleted.** Those words
+   don't merely fail to help here — they suppress the cross-service matches this
+   step exists to find.
+   `kb_find(query="<what goes wrong, mechanism only>", include=["plans"])`
+3. **Filename substring**, deterministic and unranked. Plan directories are named
+   after their mechanism, so this surfaces siblings that relevance ordering
+   buries. `kb_files(pattern="<mechanism keyword>")`
+
+**Stop when (2) returns nothing (1) didn't.** That is the bound: you are covering
+two orthogonal axes once each plus a free exact check — not enumerating
+mechanisms.
 
 If a similar or identical plan turns up, don't silently write a new file.
 Present the match briefly — title, path, status, and a one-line gist (enough to
@@ -74,9 +90,10 @@ look thorough.
 
 ## Process
 
-1. Search the kb (`include=["plans"]`) for an existing plan on this work. If one
-   matches, present it and let me choose extend/amend/separate (recommend one);
-   only continue to a new file if it's clean or I pick separate.
+1. Search the kb for an existing plan on this work — both queries plus the
+   filename check above, stopping on convergence. If one matches, present it and
+   let me choose extend/amend/separate (recommend one); only continue to a new
+   file if it's clean or I pick separate.
 2. Resolve current branch/repo to pick the location and next `NNN` (per planning).
 3. Write the one file with planning's header block, Status: Draft.
 4. Report the path. The file alone must be enough to resume in a clean session —
