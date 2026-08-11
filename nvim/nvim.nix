@@ -89,6 +89,10 @@
                 yaml
                 toml
                 dockerfile
+                # `terraform` is the .tf dialect and inherits hcl's queries, so both
+                # grammars are needed for either to highlight.
+                terraform
+                hcl
                 bash
                 ini
                 properties
