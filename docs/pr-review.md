@@ -33,7 +33,7 @@ against the same kind of base, so moving between them costs no new vocabulary.
 | Opened by | `review skim` | `review <pr>` |
 | Worktrees | one, per repository | two, per PR |
 | Pinned to | nothing — it moves | one PR, one commit |
-| Findings leave as | a pasted PR comment (`<Leader>rY`) | commits on a stack branch |
+| Findings leave as | one posted review, anchored on the lines (`:GithubApprove`) | commits on a stack branch |
 | Survives | until the next PR overwrites it | until `review retire` archives it |
 
 Skimming is also where you find out a PR needs the long form, so `ctrl-r` on a row of the
@@ -75,6 +75,30 @@ is there to review". Picking a PR in another repository hands it to that reposit
 skim surface, since a worktree belongs to one repository and its toolchain comes from that
 repository's direnv environment. An editor already open there is retargeted rather than
 duplicated.
+
+**Posting the review.** `:GithubApprove`, `:GithubComment` and `:GithubRequestChanges`
+turn the marker set into one GitHub review: each finding an inline comment on the line it
+was written against, the verdict on the whole. They open a compose buffer — summary above
+the cut, every comment listed below it at the line it will land on — and `:wq` posts,
+`:q!` abandons, an empty summary posts nothing. The set is recomputed on write, so a
+finding written after the block was drawn still goes up.
+
+Anchoring needs two translations, and both are the reason this is mechanical rather than
+hand-transcribed:
+
+* A marker is an uncommitted insertion sitting *above* the code it annotates, so the
+  anchor is the first line below it that exists in the commit under review, at the number
+  that commit gives it — the diff against `HEAD` supplies the shift.
+* GitHub only accepts a comment inside one of the PR's own diff hunks, context lines
+  included. A line outside them is a 422 that rejects the *entire* review, so those
+  findings are folded into the summary as `path:line` instead of being posted. Which lines
+  qualify is measured locally against the merge base — the same two revisions GitHub
+  diffs, at no request.
+
+Every comment carries its finding's id, and a back-reference carries `↑` and points at the
+primary. That is deliberately a tag rather than a link: a link would mean posting the
+review as pending, reading back the comment URLs, patching every body, and then submitting
+— two extra round trips per finding to replace `[3]` with a URL that says the same thing.
 
 **Marker.** A finding, written as a comment in the code under review:
 
@@ -311,6 +335,8 @@ ignore entry of its own, and nothing about it reaches this configuration.
 | `<Leader>rw` | harvest `findings.md` — summary plus findings — and open it |
 | `<Leader>rj` | the same file and line in the other worktree's editor |
 | `:ReviewAccept [id]` | commit the staged change as accepted finding `id`; `!` takes the whole change |
+| `<Leader>rY` / `:ReviewCopy` | the findings as markdown on the clipboard, to paste by hand |
+| `:GithubApprove` `:GithubComment` `:GithubRequestChanges` | post the findings as one review with that verdict; `:wq` posts, `:q!` abandons |
 
 Everything that produces a list produces a **quickfix** list, walked by the same
 motions as every other quickfix list in the configuration. Populate many ways;

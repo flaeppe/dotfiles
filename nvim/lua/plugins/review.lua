@@ -1263,9 +1263,9 @@ end
 --- The marker set as markdown on the clipboard, grouped by file, for pasting into a PR
 --- by hand.
 ---
---- The exit for a review that never becomes a suggestion stack: on the skim surface (see
---- pr.lua) findings have nowhere else to go, since nothing there is committed and the next
---- PR overwrites the worktree. Grouped by file and ordered by line, because that is the
+--- For a review that goes somewhere other than the pull request it came from -- a Slack
+--- thread, a message to the author, a note to yourself -- and for when the anchoring
+--- `M.github_review` does is not wanted. Grouped by file and ordered by line, because that is the
 --- order a GitHub diff is walked in -- a set grouped by finding would mean scrolling back
 --- and forth for every entry.
 ---
@@ -1318,6 +1318,417 @@ function M.clipboard()
     vim.fn.setreg("+", markdown)
     vim.fn.setreg('"', markdown)
     vim.notify(string.format("%d finding site(s) across %d file(s) → clipboard", count, #order))
+end
+
+-- Posting a review to GitHub ----------------------------------------------
+--
+-- The mechanical exit from a skim: every finding becomes an inline comment on the line it
+-- was written against, and the set goes up as one review carrying a verdict. `M.clipboard`
+-- hands the same findings over as text to paste by hand; this puts them on the diff, where
+-- the author reads code, and attaches the approval to them.
+--
+-- One review rather than a comment apiece, because a review is atomic -- one notification,
+-- one page, one verdict -- and because a loose comment cannot approve anything.
+--
+-- Anchoring is what the conversion is actually about, and it needs two translations:
+--
+--   * A marker is an uncommitted insertion, so every line beneath one sits lower on disk
+--     than in the commit GitHub anchors against. The diff against HEAD gives the shift.
+--   * GitHub only accepts a comment on a line inside one of the pull request's own diff
+--     hunks. A line outside them is a 422 that rejects the whole review, so a finding on
+--     untouched code is folded into the summary rather than posted.
+
+local REVIEW_VERBS = { APPROVE = "Approve", COMMENT = "Comment on", REQUEST_CHANGES = "Request changes on" }
+-- Kind, rendered for the author. `note` never gets here; a plain finding needs no label,
+-- since "change this" is what a review comment already means.
+local REVIEW_LABEL = { ask = "Question", fix = "Suggestion" }
+-- Everything from this line down is dropped on write. An HTML comment, so a body that
+-- somehow keeps it renders as nothing on GitHub rather than as instructions to the author.
+local CUT = "<!-- Everything from this line down is dropped when this buffer is written."
+-- How far below a marker to look for a line that exists in the commit under review.
+-- Markers stack when one line draws two findings; a stack deeper than this does not happen.
+local ANCHOR_SEARCH = 10
+
+--- The pull request the markers belong to, with what anchoring a comment in it needs, or
+--- nil and a reason.
+local function pr_context(root)
+    root = root or marker_root()
+    local state = read_json(root .. "/.review/skim.json") or read_json(root .. "/.review/session.json")
+    if not (state and state.pr) then
+        return nil, "no pull request is loaded here -- :PrDiff <pr> on the skim surface first"
+    end
+    local base = state.base or state.merge_base
+    if not base then
+        return nil, ("nothing records what #%s is being compared against"):format(state.pr)
+    end
+    -- The remote rather than `gh repo view`: the owner is in the URL already, and reading
+    -- it locally costs no request and cannot be redirected by GH_REPO being set elsewhere.
+    local origin = git({ "remote", "get-url", "origin" }, root)
+    local owner, name = origin:match("github%.com[:/]([^/]+)/([^/]+)$")
+    if not owner then
+        return nil, ("origin is not a GitHub remote: %s"):format(origin)
+    end
+    local head, code = git({ "rev-parse", "HEAD" }, root)
+    if code ~= 0 then
+        return nil, ("%s is not a git worktree"):format(root)
+    end
+    return {
+        root = root,
+        pr = state.pr,
+        title = state.title,
+        slug = ("%s/%s"):format(owner, (name:gsub("%.git$", ""))),
+        base = base,
+        head = head,
+        maps = {},
+        hunks = {},
+        lengths = {},
+    }
+end
+
+--- Disk line to line in HEAD, for one file. Nil for a line HEAD does not have -- a marker,
+--- or anything else edited in since.
+local function head_line_map(root, path)
+    local diff = git({ "diff", "--unified=0", "HEAD", "--", path }, root)
+    local hunks = {}
+    for old_count, new_start, new_count in diff:gmatch("@@ %-%d+,?(%d*) %+(%d+),?(%d*) @@") do
+        table.insert(hunks, {
+            old_count = tonumber(old_count) or 1,
+            new_start = tonumber(new_start),
+            new_count = tonumber(new_count) or 1,
+        })
+    end
+    return function(line)
+        local shift = 0
+        for _, hunk in ipairs(hunks) do
+            if line >= hunk.new_start and line < hunk.new_start + hunk.new_count then
+                return nil
+            end
+            -- A hunk that only deletes names the line *before* the deletion, so its shift
+            -- starts one line later than one that adds.
+            if line >= hunk.new_start + math.max(hunk.new_count, 1) then
+                shift = shift + hunk.old_count - hunk.new_count
+            end
+        end
+        return line + shift
+    end
+end
+
+local function to_head(context, path)
+    context.maps[path] = context.maps[path] or head_line_map(context.root, path)
+    return context.maps[path]
+end
+
+--- Whether GitHub will take a comment on this line: is it inside a hunk of the pull
+--- request's own diff, context lines included.
+---
+--- Measured locally against the merge base, which is the same two revisions GitHub
+--- diffs, rather than by fetching the pull request's files -- same hunks, no request.
+local function in_pr_diff(context, path, line)
+    if not context.hunks[path] then
+        local ranges = {}
+        local diff = git({ "diff", context.base, context.head, "--", path }, context.root)
+        for new_start, new_count in diff:gmatch("@@ %-%d+,?%d* %+(%d+),?(%d*) @@") do
+            local count = tonumber(new_count) or 1
+            if count > 0 then
+                table.insert(ranges, { first = tonumber(new_start), last = tonumber(new_start) + count - 1 })
+            end
+        end
+        context.hunks[path] = ranges
+    end
+    for _, range in ipairs(context.hunks[path]) do
+        if line >= range.first and line <= range.last then
+            return true
+        end
+    end
+    return false
+end
+
+local function disk_length(context, path)
+    context.lengths[path] = context.lengths[path] or #vim.fn.readfile(context.root .. "/" .. path)
+    return context.lengths[path]
+end
+
+--- The line a finding is about, in the commit under review. Markers sit above the code they
+--- annotate, so the anchor is the first line below the marker that exists in that commit --
+--- past the marker itself, and past any marker stacked on the same line.
+local function anchor_line(context, path, lnum)
+    local map = to_head(context, path)
+    for candidate = lnum, math.min(lnum + ANCHOR_SEARCH, disk_length(context, path)) do
+        local head = map(candidate)
+        if head then
+            return head
+        end
+    end
+    return nil
+end
+
+--- Every finding as a review comment, split into the ones GitHub will accept and the ones
+--- it will not.
+---
+--- One comment per site rather than per finding: a back-reference exists precisely because
+--- the finding shows up somewhere else too, and collapsing those into a list of paths in
+--- one comment puts the author back to scrolling. Each carries the finding's id, so a group
+--- reads as a group on a page that renders comments file by file -- the cheap form of a
+--- link between them, and the one that survives GitHub collapsing an outdated comment.
+local function review_comments(context)
+    local accepted, orphans = {}, {}
+    for _, group in ipairs(grouped(context.root)) do
+        if group.kind ~= "note" and group.file then
+            local sites = {}
+            for index, site in ipairs(vim.list_extend({ { file = group.file, lnum = group.lnum } }, group.sites)) do
+                local path = relative(site.file, context.root)
+                local line = anchor_line(context, path, site.lnum)
+                table.insert(sites, {
+                    path = path,
+                    line = line,
+                    lnum = site.lnum,
+                    primary = index == 1,
+                    postable = line ~= nil and in_pr_diff(context, path, line),
+                })
+            end
+            -- Where else the finding sits, so the primary comment says so without needing a
+            -- link. Only postable sites: an entry pointing at a line the author cannot open
+            -- from the diff page is worse than no entry.
+            local elsewhere, first = {}, nil
+            for _, site in ipairs(sites) do
+                if site.postable then
+                    first = first or ("`%s:%d`"):format(site.path, site.line)
+                    if not site.primary then
+                        table.insert(elsewhere, ("`%s:%d`"):format(site.path, site.line))
+                    end
+                end
+            end
+            local text = group.text or "(no body)"
+            for _, site in ipairs(sites) do
+                -- `[3] ↑ Question` -- the id first, since it is what ties the group together
+                -- on a page that renders comments file by file.
+                local label = ("[%d]%s%s"):format(
+                    group.id,
+                    site.primary and "" or " ↑",
+                    REVIEW_LABEL[group.kind] and " " .. REVIEW_LABEL[group.kind] or ""
+                )
+                local body = { ("**%s** %s"):format(label, text) }
+                if site.primary and #elsewhere > 0 then
+                    table.insert(body, "")
+                    table.insert(body, "Also at " .. table.concat(elsewhere, ", ") .. ".")
+                elseif not site.primary and first then
+                    table.insert(body, "")
+                    table.insert(body, "Same finding as " .. first .. ".")
+                end
+                local entry = {
+                    label = label,
+                    path = site.path,
+                    line = site.line or site.lnum,
+                    text = text,
+                    body = table.concat(body, "\n"),
+                }
+                table.insert(site.postable and accepted or orphans, entry)
+            end
+        end
+    end
+    local function by_position(left, right)
+        if left.path ~= right.path then
+            return left.path < right.path
+        end
+        return left.line < right.line
+    end
+    table.sort(accepted, by_position)
+    table.sort(orphans, by_position)
+    return accepted, orphans
+end
+
+--- What the buffer holds above the cut, as the review body.
+local function summary_of(bufnr)
+    local lines = {}
+    for _, line in ipairs(vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)) do
+        if line:find(CUT, 1, true) then
+            break
+        end
+        table.insert(lines, line)
+    end
+    return vim.trim(table.concat(lines, "\n"))
+end
+
+--- The block under the cut: the verdict, and every comment the write will post, at the line
+--- it will land on. The one chance to see the anchoring before the author does.
+local function preview_lines(context, event, accepted, orphans)
+    local lines = {
+        CUT,
+        ("%s %s#%s at %s."):format(REVIEW_VERBS[event], context.slug, context.pr, context.head:sub(1, 7)),
+        "",
+        ":wq posts. :q! abandons. An empty summary posts nothing.",
+        "The comment set below is recomputed on write, so a finding written after this",
+        "block was drawn still goes up.",
+        "",
+    }
+    local function render(entry)
+        table.insert(
+            lines,
+            ("  %s:%d  %s %s"):format(
+                entry.path,
+                entry.line,
+                entry.label,
+                #entry.text > 64 and entry.text:sub(1, 63) .. "…" or entry.text
+            )
+        )
+    end
+    table.insert(lines, ("%d inline comment(s):"):format(#accepted))
+    for _, entry in ipairs(accepted) do
+        render(entry)
+    end
+    if #orphans > 0 then
+        table.insert(lines, "")
+        table.insert(lines, ("%d finding(s) sit on lines this PR does not touch, which GitHub"):format(#orphans))
+        table.insert(lines, "will not anchor a comment to. They are appended to the summary instead:")
+        for _, entry in ipairs(orphans) do
+            render(entry)
+        end
+    end
+    table.insert(lines, "-->")
+    return lines
+end
+
+--- Findings GitHub refused to anchor, carried in the body so they are still said.
+local function orphan_section(orphans)
+    if #orphans == 0 then
+        return ""
+    end
+    -- Two blank lines ahead of the rule, or markdown reads `---` as an underline and turns
+    -- the summary's last line into a heading.
+    local lines = { "", "", "---", "", "On lines this pull request does not change:", "" }
+    for _, entry in ipairs(orphans) do
+        table.insert(lines, ("- `%s:%d` — **%s** %s"):format(entry.path, entry.line, entry.label, entry.text))
+    end
+    return table.concat(lines, "\n")
+end
+
+--- Post, and report what the author will see. Failure leaves the draft alone and the buffer
+--- modified, which is what stops `:wq` from closing a window over an unposted review.
+local function post_review(bufnr)
+    local context, reason = pr_context(vim.b[bufnr].review_root)
+    if not context then
+        return vim.notify("Review: " .. reason, vim.log.levels.ERROR)
+    end
+    local event = vim.b[bufnr].review_event
+    local summary = summary_of(bufnr)
+    if summary == "" then
+        return vim.notify("Review: empty summary, nothing posted", vim.log.levels.WARN)
+    end
+
+    local accepted, orphans = review_comments(context)
+    local comments = {}
+    for _, entry in ipairs(accepted) do
+        -- RIGHT is the head side of the diff, which is the only side a marker can sit on:
+        -- markers are written into the files as they are after the change.
+        table.insert(comments, { path = entry.path, line = entry.line, side = "RIGHT", body = entry.body })
+    end
+    local payload = {
+        commit_id = context.head,
+        event = event,
+        body = summary .. orphan_section(orphans),
+    }
+    if #comments > 0 then
+        payload.comments = comments
+    end
+
+    local result = vim.system({
+        "gh",
+        "api",
+        "--method",
+        "POST",
+        ("repos/%s/pulls/%s/reviews"):format(context.slug, context.pr),
+        "--input",
+        "-",
+        "--jq",
+        ".html_url",
+    }, { cwd = context.root, stdin = vim.json.encode(payload), text = true }):wait()
+
+    if result.code ~= 0 then
+        return vim.notify(
+            ("Review: GitHub rejected the review, nothing was posted -- %s"):format(
+                vim.trim(result.stderr or ""):gsub("\n", " ")
+            ),
+            vim.log.levels.ERROR
+        )
+    end
+
+    vim.notify(
+        ("Review: %s posted on #%s — %d inline comment(s), %d in the summary\n%s"):format(
+            event,
+            context.pr,
+            #comments,
+            #orphans,
+            vim.trim(result.stdout or "")
+        )
+    )
+    -- Written: the buffer stops being modified, so a `:wq` closes its window. Then wiped,
+    -- because a draft that has been posted is the one thing that must not be posted twice.
+    vim.bo[bufnr].modified = false
+    vim.schedule(function()
+        pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+    end)
+end
+
+--- Compose a review of the loaded pull request and post it on write.
+---
+--- A buffer rather than a prompt, because a summary is prose and because the list under the
+--- cut is where the anchoring gets checked. One draft per pull request, whatever the
+--- verdict: re-running any of the three commands sets the verdict and redraws the block,
+--- leaving what you have already written alone.
+function M.github_review(event)
+    local context, reason = pr_context()
+    if not context then
+        return vim.notify("Review: " .. reason, vim.log.levels.ERROR)
+    end
+    local accepted, orphans = review_comments(context)
+
+    local name = ("GithubReview://%s/%s"):format(context.slug, context.pr)
+    local bufnr
+    for _, candidate in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_get_name(candidate) == name then
+            bufnr = candidate
+        end
+    end
+    -- `:q!` on the draft discards it, which unloads the buffer and leaves the name taken by
+    -- something that reads back as empty. Start over rather than write into the corpse.
+    if bufnr and not vim.api.nvim_buf_is_loaded(bufnr) then
+        vim.api.nvim_buf_delete(bufnr, { force = true })
+        bufnr = nil
+    end
+    local summary = bufnr and summary_of(bufnr) or ""
+
+    if not bufnr then
+        bufnr = vim.api.nvim_create_buf(true, false)
+        vim.api.nvim_buf_set_name(bufnr, name)
+        vim.bo[bufnr].buftype = "acwrite"
+        vim.bo[bufnr].filetype = "markdown"
+        -- Kept loaded when its window closes, so `:q!` abandons the posting without
+        -- discarding what was written: run the command again and the draft is still there.
+        -- The default unloads it, and an unloaded buffer reads back as empty.
+        vim.bo[bufnr].bufhidden = "hide"
+        vim.api.nvim_create_autocmd("BufWriteCmd", {
+            buffer = bufnr,
+            callback = function()
+                post_review(bufnr)
+            end,
+        })
+    end
+    -- The worktree is captured now: at write time the current buffer is this one, whose
+    -- name is no path, so nothing can be walked upward from it.
+    vim.b[bufnr].review_root = context.root
+    vim.b[bufnr].review_event = event
+
+    local lines = vim.split(summary, "\n")
+    table.insert(lines, "")
+    vim.list_extend(lines, preview_lines(context, event, accepted, orphans))
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    vim.bo[bufnr].modified = true
+
+    if vim.api.nvim_get_current_buf() ~= bufnr then
+        vim.cmd("botright split")
+        vim.api.nvim_win_set_buf(0, bufnr)
+    end
+    vim.api.nvim_win_set_cursor(0, { #vim.split(summary, "\n"), 0 })
 end
 
 -- Highlighting ------------------------------------------------------------
@@ -1394,6 +1805,17 @@ map("<Leader>rD", M.diff, "Review: browse the change")
 vim.api.nvim_create_user_command("ReviewOrder", M.order, { desc = "Load the review order into the quickfix list" })
 vim.api.nvim_create_user_command("ReviewReport", M.report, { desc = "Harvest markers into .review/findings.md" })
 vim.api.nvim_create_user_command("ReviewCopy", M.clipboard, { desc = "Copy findings as markdown for a PR comment" })
+-- Three commands rather than one with an argument, because the verdict is the whole
+-- decision being made and typing it out is the moment to make it.
+vim.api.nvim_create_user_command("GithubApprove", function()
+    M.github_review("APPROVE")
+end, { desc = "Approve the loaded PR, posting the markers as inline comments" })
+vim.api.nvim_create_user_command("GithubComment", function()
+    M.github_review("COMMENT")
+end, { desc = "Comment on the loaded PR, posting the markers as inline comments" })
+vim.api.nvim_create_user_command("GithubRequestChanges", function()
+    M.github_review("REQUEST_CHANGES")
+end, { desc = "Request changes on the loaded PR, posting the markers as inline comments" })
 vim.api.nvim_create_user_command("Review", M.panel, { desc = "Where the session stands and what to do next" })
 vim.api.nvim_create_user_command("ReviewStatus", M.status, { desc = "Findings and their states" })
 vim.api.nvim_create_user_command("ReviewDiff", M.diff, { desc = "Browse the whole change in a file panel" })

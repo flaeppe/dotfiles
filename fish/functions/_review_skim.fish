@@ -9,7 +9,7 @@
 # See docs/pr-review.md for why this is a third surface rather than a mode of a session.
 #
 # One per repository, not one per PR, because it holds nothing worth keeping: findings
-# leave as a comment pasted into GitHub, so the next PR can overwrite it. That is the
+# leave as a review posted from the editor, so the next PR can overwrite it. That is the
 # whole difference from a session, and it is what makes switching cost nothing.
 #
 # Deliberately outside `.worktrees/review/`, whose children are all PR numbers to

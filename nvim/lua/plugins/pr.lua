@@ -5,7 +5,8 @@
 -- worktrees to one PR and ships its findings as commits; that is the right shape when a
 -- PR deserves hours, and far too much ceremony when it deserves ten minutes. This is the
 -- ten-minute shape: one worktree that moves from PR to PR, markers if you want them, and
--- findings that leave as a comment you paste into GitHub yourself.
+-- findings that leave as one posted review rather than as commits -- see review.lua's
+-- `:GithubApprove`, which anchors each marker on the line it was written against.
 --
 --   :PrList / <Leader>hl   every open PR in the organisation, review-requested first, with
 --                          the description rendered beside the list (! or ctrl-l re-fetches)

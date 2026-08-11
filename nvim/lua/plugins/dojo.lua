@@ -172,6 +172,18 @@ local ENTRIES = {
     },
     {
         group = "review",
+        keys = ":GithubApprove",
+        desc = "Approve, with every marker posted as an inline comment (:wq posts, :q! abandons)",
+        added = "2026-08-11",
+    },
+    {
+        group = "review",
+        keys = ":GithubComment",
+        desc = "Same, without a verdict -- and :GithubRequestChanges for the other one",
+        added = "2026-08-11",
+    },
+    {
+        group = "review",
         keys = "<Leader>rq",
         desc = "Walk the actual changed code, hunk by hunk, in files you can edit",
         added = "2026-07-25",
