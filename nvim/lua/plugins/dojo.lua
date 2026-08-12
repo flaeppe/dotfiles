@@ -163,6 +163,13 @@ local ENTRIES = {
         desc = "Same problem as one you already wrote -- link, don't repeat",
         added = "2026-07-25",
     },
+    {
+        group = "review",
+        keys = "V then <Leader>rc",
+        desc = "Finding about a whole block: select it first, and the comment covers the range",
+        added = "2026-08-12",
+        run = false,
+    },
     { group = "review", keys = "<Leader>rl", desc = "What have I found so far?", added = "2026-07-25" },
     {
         group = "review",

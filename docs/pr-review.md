@@ -95,6 +95,11 @@ hand-transcribed:
   qualify is measured locally against the merge base — the same two revisions GitHub
   diffs, at no request.
 
+A marker with a span posts as a **multi-line** comment, `start_line` through `line`, so the
+block is highlighted on the diff exactly as it was selected. A range that runs out of the
+hunk it starts in is clamped to what the diff carries and the comment says where the rest
+went — GitHub cannot anchor to a line its diff does not have, and cannot show one either.
+
 Every comment carries its finding's id, and a back-reference carries `↑` and points at the
 primary. That is deliberately a tag rather than a link: a link would mean posting the
 review as pending, reading back the comment URLs, patching every body, and then submitting
@@ -108,7 +113,16 @@ REVIEW[3]fix: extract to domain layer           implement as code; the prose nev
 REVIEW[3]ask: why is the retry unbounded?       a question for the author
 REVIEW[3]note: check the sibling flow           private; never leaves the worktree
 REVIEW[3]                                       another site for finding 3
+REVIEW[3]fix+8: the block belongs in domain     the finding covers 8 lines
 ```
+
+`+n` comes from writing the marker in **visual mode**: the selection becomes the finding's
+extent, and the marker lands above the block rather than inside it. It is a line *count*
+rather than a pair of line numbers, which is what keeps a marker free of re-anchoring
+machinery — a count stays true wherever the block moves to, while numbers written into a
+comment go stale the moment anything above them shifts, starting with the marker's own
+insertion. The count is in lines the reviewed commit has, so a second marker written
+inside the block does not shorten it.
 
 A marker *is* the line it annotates, so it moves when the code moves and needs no
 re-anchoring machinery. Markers are the entire medium the reviewer and the AI share.
@@ -322,8 +336,8 @@ ignore entry of its own, and nothing about it reaches this configuration.
 | Key | Action |
 |---|---|
 | `<Leader>rp` / `:Review` | where the session stands, the review's opening, and the single next action |
-| `<Leader>rc` `rf` `ra` `rn` | new marker: finding · fix · ask · private note |
-| `<Leader>rr` | add this location to an existing finding |
+| `<Leader>rc` `rf` `ra` `rn` | new marker: finding · fix · ask · private note — in visual mode, over the selection |
+| `<Leader>rr` | add this location to an existing finding (visual: over the selection) |
 | `<Leader>rd` | delete the marker here |
 | `¨r` / `år` | next / previous marker in this buffer |
 | `<Leader>rl` | the findings, with a preview |

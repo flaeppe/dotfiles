@@ -8,9 +8,15 @@
 --   REVIEW[3]ask: why is the retry unbounded?        a question for the author
 --   REVIEW[3]note: check the sibling flow            private; never reported
 --   REVIEW[3]                                        another site for finding 3
+--   REVIEW[3]fix+8: this whole block belongs there   the finding covers 8 lines
 --
 -- One id, many sites: the site carrying a body is the primary, bare ones add
 -- locations. Markers live in the code they annotate, so they move with it.
+--
+-- `+n` is a line *count*, not a pair of line numbers, and that is the whole reason a
+-- marker needs no re-anchoring machinery: a count stays true wherever the block moves to,
+-- while numbers written into a comment go stale as soon as anything above them shifts --
+-- starting with the marker's own insertion.
 
 local fzf = require("fzf-lua")
 
@@ -19,7 +25,7 @@ local M = {}
 local NAMESPACE = vim.api.nvim_create_namespace("review-markers")
 -- Two patterns over one syntax: `FIND` locates a marker anywhere in a line,
 -- `BODY` decides whether it carries text. Bare back-references have no colon.
-local FIND = "REVIEW%[(%d+)%](%a*)"
+local FIND = "REVIEW%[(%d+)%](%a*)%+?(%d*)"
 local BODY = "^:%s*(.*)"
 local KINDS = { fix = "ReviewMarkerFix", ask = "ReviewMarkerAsk", note = "ReviewMarkerNote" }
 
@@ -29,7 +35,7 @@ local function parse(line)
     local found = {}
     local offset = 1
     while true do
-        local start, stop, id, kind = line:find(FIND, offset)
+        local start, stop, id, kind, span = line:find(FIND, offset)
         if not start then
             return found
         end
@@ -37,6 +43,9 @@ local function parse(line)
         table.insert(found, {
             id = tonumber(id),
             kind = kind ~= "" and kind or nil,
+            -- How many lines the finding covers, counted from the line below the marker. The
+            -- common case carries no count and covers the one line it sits above.
+            span = tonumber(span) or 1,
             text = text,
             col = start,
             stop = stop,
@@ -101,6 +110,14 @@ local function relative(path, root)
     return (path:gsub("^" .. vim.pesc(root .. "/"), ""))
 end
 
+--- `path:12` or `path:12-19`, so a finding reads the same wherever it is pointed at.
+local function locator(path, first, last)
+    if last and last > first then
+        return ("%s:%d-%d"):format(path, first, last)
+    end
+    return ("%s:%d"):format(path, first)
+end
+
 --- Markers grouped into findings, one group per id, each with its primary site's body
 --- and kind plus the locations of its back-references.
 local function grouped(root)
@@ -119,8 +136,9 @@ local function grouped(root)
             group.kind = marker.kind
             group.file = marker.file
             group.lnum = marker.lnum
+            group.span = marker.span
         else
-            table.insert(group.sites, { file = marker.file, lnum = marker.lnum })
+            table.insert(group.sites, { file = marker.file, lnum = marker.lnum, span = marker.span })
         end
     end
     return order
@@ -920,14 +938,37 @@ local function insert_line(text)
     vim.api.nvim_win_set_cursor(0, { lnum, #line })
 end
 
---- A new marker above the cursor, cursor left in insert mode at the end of it.
+--- `+n` for a marker made from a selection, and the cursor moved to the top of it so the
+--- marker lands above the block rather than inside it. Empty in normal mode, where a marker
+--- covers the single line it sits above.
+---
+--- Read while the mapping still holds the selection, which is why the marker keys bind in
+--- visual mode rather than being reached from a normal-mode key.
+local function selected_span()
+    if not vim.fn.mode():match("[vV]") then
+        return ""
+    end
+    local first, last = vim.fn.line("v"), vim.fn.line(".")
+    if first > last then
+        first, last = last, first
+    end
+    vim.cmd("normal! \27")
+    vim.api.nvim_win_set_cursor(0, { first, 0 })
+    return last > first and ("+%d"):format(last - first + 1) or ""
+end
+
+--- A new marker above the cursor, or above the selection and covering it, cursor left in
+--- insert mode at the end of it.
 function M.insert(kind)
-    insert_line(string.format("REVIEW[%d]%s: ", next_id(), kind or ""))
+    local span = selected_span()
+    insert_line(string.format("REVIEW[%d]%s%s: ", next_id(), kind or "", span))
     vim.cmd.startinsert({ bang = true })
 end
 
 --- A bare back-reference to a finding that already exists elsewhere.
 function M.link()
+    -- Read before the picker opens, since opening it ends the selection.
+    local span = selected_span()
     local groups = grouped()
     if #groups == 0 then
         vim.notify("No finding to link to yet — write one with <Leader>rc first", vim.log.levels.WARN)
@@ -946,7 +987,7 @@ function M.link()
             ["default"] = function(selected)
                 local id = selected and by_label[selected[1]]
                 if id then
-                    insert_line(string.format("REVIEW[%d]", id))
+                    insert_line(string.format("REVIEW[%d]%s", id, span))
                 end
             end,
         },
@@ -1220,7 +1261,9 @@ function M.report()
         tally[group.kind or "finding"] = (tally[group.kind or "finding"] or 0) + 1
         if group.kind ~= "note" then
             kept = kept + 1
-            local location = group.file and string.format("%s:%d", relative(group.file, root), group.lnum) or "?"
+            local location = group.file
+                    and locator(relative(group.file, root), group.lnum, group.lnum + (group.span or 1) - 1)
+                or "?"
             table.insert(
                 index,
                 string.format("- **[%d]** %s — %s", group.id, group.kind or "finding", group.text or "(no body)")
@@ -1235,7 +1278,8 @@ function M.report()
                 table.insert(detail, "")
                 table.insert(detail, "Also at:")
                 for _, site in ipairs(group.sites) do
-                    table.insert(detail, string.format("- %s:%d", relative(site.file, root), site.lnum))
+                    local span = site.span or 1
+                    table.insert(detail, "- " .. locator(relative(site.file, root), site.lnum, site.lnum + span - 1))
                 end
             end
             table.insert(detail, "")
@@ -1277,7 +1321,8 @@ function M.clipboard()
     local by_file, order = {}, {}
     for _, group in ipairs(grouped(root)) do
         if group.kind ~= "note" and group.file then
-            for _, site in ipairs(vim.list_extend({ { file = group.file, lnum = group.lnum } }, group.sites)) do
+            local primary_site = { file = group.file, lnum = group.lnum, span = group.span }
+            for _, site in ipairs(vim.list_extend({ primary_site }, group.sites)) do
                 local path = relative(site.file, root)
                 if not by_file[path] then
                     by_file[path] = {}
@@ -1285,6 +1330,7 @@ function M.clipboard()
                 end
                 table.insert(by_file[path], {
                     lnum = site.lnum,
+                    span = site.span or 1,
                     kind = group.kind,
                     text = group.text or "(no body)",
                 })
@@ -1308,7 +1354,9 @@ function M.clipboard()
             -- `ask` is called out because it changes what the author is expected to do with
             -- the line; `fix` and a plain finding both read as "change this".
             local prefix = entry.kind == "ask" and "**Question** " or ""
-            table.insert(lines, string.format("- **L%d** %s%s", entry.lnum, prefix, entry.text))
+            local at = entry.span > 1 and ("L%d-%d"):format(entry.lnum, entry.lnum + entry.span - 1)
+                or ("L%d"):format(entry.lnum)
+            table.insert(lines, string.format("- **%s** %s%s", at, prefix, entry.text))
         end
         table.insert(lines, "")
     end
@@ -1418,12 +1466,12 @@ local function to_head(context, path)
     return context.maps[path]
 end
 
---- Whether GitHub will take a comment on this line: is it inside a hunk of the pull
---- request's own diff, context lines included.
+--- The hunk of the pull request's own diff holding this line, context lines included, or
+--- nil -- which is GitHub's rule for whether a comment can be anchored here at all.
 ---
 --- Measured locally against the merge base, which is the same two revisions GitHub
 --- diffs, rather than by fetching the pull request's files -- same hunks, no request.
-local function in_pr_diff(context, path, line)
+local function pr_hunk(context, path, line)
     if not context.hunks[path] then
         local ranges = {}
         local diff = git({ "diff", context.base, context.head, "--", path }, context.root)
@@ -1437,10 +1485,10 @@ local function in_pr_diff(context, path, line)
     end
     for _, range in ipairs(context.hunks[path]) do
         if line >= range.first and line <= range.last then
-            return true
+            return range
         end
     end
-    return false
+    return nil
 end
 
 local function disk_length(context, path)
@@ -1448,18 +1496,28 @@ local function disk_length(context, path)
     return context.lengths[path]
 end
 
---- The line a finding is about, in the commit under review. Markers sit above the code they
---- annotate, so the anchor is the first line below the marker that exists in that commit --
---- past the marker itself, and past any marker stacked on the same line.
-local function anchor_line(context, path, lnum)
+--- The lines a finding covers, in the commit under review. Markers sit above the code they
+--- annotate, so the first is the first line below the marker that exists in that commit --
+--- past the marker itself, and past any marker stacked on the same line -- and the last is
+--- the `span`th such line.
+---
+--- Counted in lines the commit has rather than in lines on disk, so a marker written inside
+--- the block does not shorten the range it reports.
+local function anchor_range(context, path, lnum, span)
     local map = to_head(context, path)
-    for candidate = lnum, math.min(lnum + ANCHOR_SEARCH, disk_length(context, path)) do
+    local first, last, counted = nil, nil, 0
+    for candidate = lnum, math.min(lnum + span + ANCHOR_SEARCH, disk_length(context, path)) do
         local head = map(candidate)
         if head then
-            return head
+            first = first or head
+            last = head
+            counted = counted + 1
+            if counted == span then
+                break
+            end
         end
     end
-    return nil
+    return first, last
 end
 
 --- Every finding as a review comment, split into the ones GitHub will accept and the ones
@@ -1475,15 +1533,23 @@ local function review_comments(context)
     for _, group in ipairs(grouped(context.root)) do
         if group.kind ~= "note" and group.file then
             local sites = {}
-            for index, site in ipairs(vim.list_extend({ { file = group.file, lnum = group.lnum } }, group.sites)) do
+            local primary_site = { file = group.file, lnum = group.lnum, span = group.span }
+            for index, site in ipairs(vim.list_extend({ primary_site }, group.sites)) do
                 local path = relative(site.file, context.root)
-                local line = anchor_line(context, path, site.lnum)
+                local first, last = anchor_range(context, path, site.lnum, site.span or 1)
+                local hunk = first and pr_hunk(context, path, first)
+                -- A range can run out of the hunk it starts in, and GitHub cannot show --
+                -- let alone anchor to -- a line its diff does not carry. The comment covers
+                -- as much of the block as the diff has, and says where the rest went.
+                local beyond = hunk and last > hunk.last and last or nil
                 table.insert(sites, {
                     path = path,
-                    line = line,
+                    first = first,
+                    last = beyond and hunk.last or last,
+                    beyond = beyond,
                     lnum = site.lnum,
                     primary = index == 1,
-                    postable = line ~= nil and in_pr_diff(context, path, line),
+                    postable = hunk ~= nil,
                 })
             end
             -- Where else the finding sits, so the primary comment says so without needing a
@@ -1492,9 +1558,10 @@ local function review_comments(context)
             local elsewhere, first = {}, nil
             for _, site in ipairs(sites) do
                 if site.postable then
-                    first = first or ("`%s:%d`"):format(site.path, site.line)
+                    local where = ("`%s`"):format(locator(site.path, site.first, site.last))
+                    first = first or where
                     if not site.primary then
-                        table.insert(elsewhere, ("`%s:%d`"):format(site.path, site.line))
+                        table.insert(elsewhere, where)
                     end
                 end
             end
@@ -1515,10 +1582,19 @@ local function review_comments(context)
                     table.insert(body, "")
                     table.insert(body, "Same finding as " .. first .. ".")
                 end
+                if site.beyond then
+                    table.insert(body, "")
+                    table.insert(body, ("It carries on past what the diff shows, through line %d."):format(site.beyond))
+                end
+                local line = site.last or site.lnum
                 local entry = {
                     label = label,
                     path = site.path,
-                    line = site.line or site.lnum,
+                    line = line,
+                    -- Only when it spans more than one line: GitHub rejects a range whose
+                    -- start is its end.
+                    start_line = site.first and site.first < line and site.first or nil,
+                    where = locator(site.path, site.first or site.lnum, site.last),
                     text = text,
                     body = table.concat(body, "\n"),
                 }
@@ -1526,11 +1602,13 @@ local function review_comments(context)
             end
         end
     end
+    -- Diff order, which for a range is where it starts: the block a comment opens on is
+    -- where the author's eye lands, not where it ends.
     local function by_position(left, right)
         if left.path ~= right.path then
             return left.path < right.path
         end
-        return left.line < right.line
+        return (left.start_line or left.line) < (right.start_line or right.line)
     end
     table.sort(accepted, by_position)
     table.sort(orphans, by_position)
@@ -1549,6 +1627,22 @@ local function summary_of(bufnr)
     return vim.trim(table.concat(lines, "\n"))
 end
 
+--- Buffers holding markers that are still only in the editor. The set is scanned off disk,
+--- so an unwritten marker is invisible to it -- silently, which is the kind of thing that
+--- has to be said out loud on the page where the count is read.
+local function unwritten_markers(root)
+    local files = {}
+    for _, bufnr in ipairs(vim.api.nvim_list_bufs()) do
+        local name = vim.api.nvim_buf_get_name(bufnr)
+        if vim.api.nvim_buf_is_loaded(bufnr) and vim.bo[bufnr].modified and name:find(root .. "/", 1, true) == 1 then
+            if #M.buffer_markers(bufnr) > 0 then
+                table.insert(files, relative(name, root))
+            end
+        end
+    end
+    return files
+end
+
 --- The block under the cut: the verdict, and every comment the write will post, at the line
 --- it will land on. The one chance to see the anchoring before the author does.
 local function preview_lines(context, event, accepted, orphans)
@@ -1564,9 +1658,8 @@ local function preview_lines(context, event, accepted, orphans)
     local function render(entry)
         table.insert(
             lines,
-            ("  %s:%d  %s %s"):format(
-                entry.path,
-                entry.line,
+            ("  %s  %s %s"):format(
+                entry.where,
                 entry.label,
                 #entry.text > 64 and entry.text:sub(1, 63) .. "…" or entry.text
             )
@@ -1584,6 +1677,14 @@ local function preview_lines(context, event, accepted, orphans)
             render(entry)
         end
     end
+    local unwritten = unwritten_markers(context.root)
+    if #unwritten > 0 then
+        table.insert(lines, "")
+        table.insert(lines, "Not counted, because the markers in them are unwritten -- :w and run again:")
+        for _, path in ipairs(unwritten) do
+            table.insert(lines, "  " .. path)
+        end
+    end
     table.insert(lines, "-->")
     return lines
 end
@@ -1597,7 +1698,7 @@ local function orphan_section(orphans)
     -- the summary's last line into a heading.
     local lines = { "", "", "---", "", "On lines this pull request does not change:", "" }
     for _, entry in ipairs(orphans) do
-        table.insert(lines, ("- `%s:%d` — **%s** %s"):format(entry.path, entry.line, entry.label, entry.text))
+        table.insert(lines, ("- `%s` — **%s** %s"):format(entry.where, entry.label, entry.text))
     end
     return table.concat(lines, "\n")
 end
@@ -1619,8 +1720,16 @@ local function post_review(bufnr)
     local comments = {}
     for _, entry in ipairs(accepted) do
         -- RIGHT is the head side of the diff, which is the only side a marker can sit on:
-        -- markers are written into the files as they are after the change.
-        table.insert(comments, { path = entry.path, line = entry.line, side = "RIGHT", body = entry.body })
+        -- markers are written into the files as they are after the change. `line` is the last
+        -- line of a range and `start_line` the first, which is GitHub's shape for one.
+        table.insert(comments, {
+            path = entry.path,
+            line = entry.line,
+            side = "RIGHT",
+            start_line = entry.start_line,
+            start_side = entry.start_line and "RIGHT" or nil,
+            body = entry.body,
+        })
     end
     local payload = {
         commit_id = context.head,
@@ -1767,19 +1876,25 @@ local function map(keys, fn, desc)
     vim.keymap.set("n", keys, fn, { desc = desc })
 end
 
-map("<Leader>rc", function()
+-- The keys that write a marker bind in visual mode too, where the selection becomes the
+-- finding's extent -- one comment over the whole block rather than one on its first line.
+local function map_marker(keys, fn, desc)
+    vim.keymap.set({ "n", "x" }, keys, fn, { desc = desc })
+end
+
+map_marker("<Leader>rc", function()
     M.insert()
-end, "Review: new finding")
-map("<Leader>rf", function()
+end, "Review: new finding (visual: over the selection)")
+map_marker("<Leader>rf", function()
     M.insert("fix")
-end, "Review: new fix")
-map("<Leader>ra", function()
+end, "Review: new fix (visual: over the selection)")
+map_marker("<Leader>ra", function()
     M.insert("ask")
-end, "Review: new question")
-map("<Leader>rn", function()
+end, "Review: new question (visual: over the selection)")
+map_marker("<Leader>rn", function()
     M.insert("note")
-end, "Review: new private note")
-map("<Leader>rr", M.link, "Review: link to an existing finding")
+end, "Review: new private note (visual: over the selection)")
+map_marker("<Leader>rr", M.link, "Review: link to an existing finding (visual: over the selection)")
 map("<Leader>rl", M.list, "Review: list findings")
 -- One work-list key, whose contents follow the worktree and the scope: the PR's hunks
 -- while reading, the suggestion's while accepting. Findings are a different question,
