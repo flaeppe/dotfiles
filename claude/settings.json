@@ -68,6 +68,30 @@
             "command": "~/.claude/hooks/git-local-path-guard"
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/protected-path-guard"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/edit-content-guard"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/format-after-edit"
+          }
+        ]
       }
     ],
     "SessionStart": [

@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Claude Code PostToolUse hook: format a just-edited file with the formatter
+that repo has available.
+
+Runs only when the formatter is actually installed, so a repo without it is
+untouched. Exits 2 only when the file was rewritten, so Claude learns its copy
+is stale; silent otherwise. Any internal failure exits 0 -- a broken hook must
+never wedge a session.
+"""
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+
+# Escape hatch: set to any value to disable formatting for a session.
+DISABLE = "CLAUDE_NO_AUTOFORMAT"
+
+# Extension -> (binary, argv suffixes run in order against the edited file).
+# Ceiling: python/ruff only. Add a row per language as the need shows up.
+FORMATTERS = {
+    ".py": ("ruff", (("check", "--fix", "--quiet"), ("format", "--quiet"))),
+}
+
+TIMEOUT_SECONDS = 20
+
+
+def find_binary(name, start):
+    """The binary a project-local virtualenv provides, else one on PATH.
+
+    Hooks inherit the session environment, which is not necessarily the one
+    direnv activated for this file's repo, so look there first.
+    """
+    directory = start
+    while True:
+        candidate = os.path.join(directory, ".venv", "bin", name)
+        if os.access(candidate, os.X_OK):
+            return candidate
+        parent = os.path.dirname(directory)
+        if parent == directory or directory == os.path.expanduser("~"):
+            break
+        directory = parent
+    return shutil.which(name)
+
+
+def run(argv, cwd):
+    """True if the command ran successfully."""
+    try:
+        return (
+            subprocess.run(
+                argv, cwd=cwd, capture_output=True, timeout=TIMEOUT_SECONDS
+            ).returncode
+            == 0
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def main():
+    if os.environ.get(DISABLE):
+        return 0
+
+    payload = json.load(sys.stdin)
+    path = payload.get("tool_input", {}).get("file_path", "")
+    if not path or not os.path.isfile(path):
+        return 0
+
+    entry = FORMATTERS.get(os.path.splitext(path)[1])
+    if not entry:
+        return 0
+    name, argv_suffixes = entry
+
+    absolute = os.path.abspath(path)
+    cwd = os.path.dirname(absolute)
+
+    binary = find_binary(name, cwd)
+    if not binary:
+        return 0
+
+    with open(absolute, "rb") as handle:
+        original = handle.read()
+
+    for suffix in argv_suffixes:
+        if not run((binary,) + suffix + (absolute,), cwd):
+            return 0
+
+    with open(absolute, "rb") as handle:
+        if handle.read() == original:
+            return 0
+
+    print(
+        "NOTE: edit applied, then reformatted by %s. Your copy of %s is stale --\n"
+        "re-read it before editing again." % (name, os.path.basename(absolute)),
+        file=sys.stderr,
+    )
+    return 2
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit(0)

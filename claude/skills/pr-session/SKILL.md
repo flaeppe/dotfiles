@@ -366,9 +366,6 @@ Two things not to write, because both are claims you cannot support:
 - **Never invite the author to open their own PR** for this work. It already exists;
   the point of the handover is that they take this one over rather than redo it.
 
-Never write a bare `#<number>`: GitHub renders it as a cross-reference to that issue.
-"trap 2", not "trap #2" — keep `#` for a PR you actually mean to link.
-
 State severity per finding where you have grounds, and otherwise not at all.
 
 Honour `.review/policy.json` if present — its `forbid` list is absolute.

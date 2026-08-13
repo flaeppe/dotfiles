@@ -117,6 +117,15 @@ in {
     install -m 755 ${
       ./hooks/git-local-path-guard
     } "$HOME/.claude/hooks/git-local-path-guard"
+    install -m 755 ${
+      ./hooks/protected-path-guard
+    } "$HOME/.claude/hooks/protected-path-guard"
+    install -m 755 ${
+      ./hooks/edit-content-guard
+    } "$HOME/.claude/hooks/edit-content-guard"
+    install -m 755 ${
+      ./hooks/format-after-edit
+    } "$HOME/.claude/hooks/format-after-edit"
   '';
 
   # Status line script (referenced by settings.json statusLine.command)
