@@ -3,8 +3,9 @@
 run unprompted, every other gcloud command needs approval.
 
 Answers with a permissionDecision so the verdict holds in every permission mode,
-including the ones where a classifier would otherwise decide. A command it
-cannot read is asked about, not waved through.
+including the ones where a classifier would otherwise decide. Only a command
+that invokes gcloud gets a verdict: text that merely carries the name, such as a
+commit message or a grep pattern, gets none.
 """
 
 import json
@@ -64,17 +65,23 @@ ASSIGNMENT = re.compile(r"^[A-Za-z_]\w*=")
 
 
 def words_of(command):
-    """Shell words of a command, or None when it cannot be lexed.
+    """Shell words of a command.
 
     Unquoted shell punctuation becomes its own word; quoted punctuation stays
-    inside the word it belongs to.
+    inside the word it belongs to. Text a shell lexer rejects -- a heredoc body
+    carrying an apostrophe, say -- is read again with quoting and escaping off,
+    which cannot fail and only ever splits into more words.
     """
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    try:
-        return list(lexer)
-    except ValueError:
-        return None
+    for quotes, escape in (("'\"", "\\"), ("", "")):
+        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+        lexer.whitespace_split = True
+        lexer.quotes = quotes
+        lexer.escape = escape
+        try:
+            return list(lexer)
+        except ValueError:
+            continue
+    return []
 
 
 def is_gcloud(word):
@@ -83,8 +90,12 @@ def is_gcloud(word):
 
 def invokes_gcloud(words):
     """Whether gcloud stands where a command starts: first, or after an
-    operator. Elsewhere the name is an argument or a path -- grepping for it or
-    installing this file is not a gcloud call and gets no verdict."""
+    operator. Elsewhere the name is an argument or a path -- a commit message
+    quoting a gcloud command line is not a gcloud call and gets no verdict.
+
+    Ceiling: a call nested inside another command's argument, as in
+    `bash -c "gcloud ..."`, reads as an argument too. Scan inside words if that
+    shows up."""
     starting = True
     for word in words:
         if word and set(word) <= OPERATORS:
@@ -146,8 +157,6 @@ def main():
         return
 
     words = words_of(command)
-    if words is None:
-        return decide("ask", "gcloud command could not be read")
     if not invokes_gcloud(words):
         return
     if not is_gcloud(words[0]):
