@@ -39,6 +39,16 @@ IGNORE_FILENAMES = (
     ".prettierignore",
 )
 
+# A lockfile resolves a relative path from the workspace member that declared it,
+# not from the lockfile, so there is no base this can resolve against. Only the
+# relative check is skipped -- an absolute path in one is still a leak.
+LOCKFILE_NAMES = (
+    "pnpm-lock.yaml",
+    "package-lock.json",
+    "npm-shrinkwrap.json",
+    "yarn.lock",
+)
+
 # Sources exempt from the content scan, one repo-relative path prefix per line.
 # For files that legitimately document these paths as text.
 ALLOWLIST_FILE = ".claude/local-path-allow"
@@ -139,6 +149,9 @@ class Repo:
             or os.path.basename(path) in IGNORE_FILENAMES
         )
 
+    def resolves_relatives_of(self, path):
+        return os.path.basename(path) not in LOCKFILE_NAMES
+
 
 def read_allowlist(repo_root):
     try:
@@ -151,7 +164,7 @@ def read_allowlist(repo_root):
     )
 
 
-def classify(token, file_dir, repo, fragments):
+def classify(token, file_dir, repo, fragments, resolve_relatives=True):
     """Why this path token is local-only, or None if it is publishable."""
     token = token.rstrip(".,;:")
 
@@ -170,7 +183,7 @@ def classify(token, file_dir, repo, fragments):
             return "sits beside the repo, not inside it"
         return None
 
-    if "../" in token:
+    if resolve_relatives and "../" in token:
         target = os.path.normpath(os.path.join(file_dir, token))
         if not is_inside(repo.root, target):
             return "escapes the repo root (-> %s)" % target
@@ -217,8 +230,11 @@ def scan_diff(repo, label, revisions):
     for path, file_dir, line in added_lines(repo.root, revisions):
         if not repo.scans_content_of(path):
             continue
+        resolve_relatives = repo.resolves_relatives_of(path)
         for token in path_tokens(line):
-            reason = classify(token, file_dir, repo, PLAN_FRAGMENTS)
+            reason = classify(
+                token, file_dir, repo, PLAN_FRAGMENTS, resolve_relatives
+            )
             if reason:
                 yield path, token, reason
 
