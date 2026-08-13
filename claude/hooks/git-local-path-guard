@@ -57,12 +57,6 @@ TOKEN_SEPARATORS = re.compile(r"[^\w.@~${}/+-]+")
 
 HOME_PREFIX = re.compile(re.escape(HOME) + r"/|~/|\$\{?HOME\}?/")
 
-# `git commit -a` / `--amend` / `--allow-empty` legitimately run with an empty
-# index, so the "nothing staged" check does not apply to them.
-COMMIT_WITHOUT_INDEX = re.compile(
-    r"--(amend|all|allow-empty)\b|(?<![\w-])-[a-zA-Z]*a[a-zA-Z]*(?![\w-])"
-)
-
 
 def git(directory, *args):
     """stdout of a git command, or None if it failed."""
@@ -75,16 +69,6 @@ def git(directory, *args):
     if result.returncode != 0:
         return None
     return result.stdout
-
-
-def index_is_empty(repo_root):
-    return (
-        subprocess.run(
-            ("git", "-C", repo_root, "diff", "--cached", "--quiet"),
-            capture_output=True,
-        ).returncode
-        == 0
-    )
 
 
 def git_invocation(words, git_index):
@@ -293,13 +277,6 @@ def main():
     if not repo_root:
         return 0
     repo = Repo(repo_root.strip(), sibling_root(directory))
-
-    if committing and not COMMIT_WITHOUT_INDEX.search(command) and index_is_empty(repo.root):
-        print(
-            "BLOCKED: nothing staged -- stage the files you mean to commit first.",
-            file=sys.stderr,
-        )
-        return 2
 
     sources = []
     if committing:
