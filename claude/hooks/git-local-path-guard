@@ -9,6 +9,7 @@ a broken guard must never wedge a session.
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 
@@ -60,7 +61,17 @@ GLOBAL_FLAGS_WITH_VALUE = frozenset(
     ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env")
 )
 
+# Fallback tokenizer, for a command whose quoting will not parse.
 SHELL_SEPARATORS = re.compile(r"[\s;|&()]+")
+
+SHELL_OPERATOR = re.compile(r"^[&|;]+$")
+
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+
+# Wrappers that stand in front of the real command. Ceiling: one that is not
+# listed here hides the git call, so the scan is skipped; add names as they
+# show up.
+WRAPPERS = frozenset(("sudo", "command", "env", "time", "timeout", "nice", "xargs"))
 
 # Characters that cannot appear inside a path, used to cut a line into tokens.
 TOKEN_SEPARATORS = re.compile(r"[^\w.@~${}/+-]+")
@@ -95,13 +106,72 @@ def git_invocation(words, git_index):
     return None, directory
 
 
+def shell_words(command):
+    """Command tokens with quoting resolved, or None if it will not parse."""
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    try:
+        return list(lexer)
+    except ValueError:
+        return None
+
+
+def sub_commands(words):
+    """Each shell sub-command as its own token list."""
+    segments, current = [], []
+    for word in words:
+        if SHELL_OPERATOR.match(word):
+            if current:
+                segments.append(current)
+            current = []
+            continue
+        current.append(word)
+    if current:
+        segments.append(current)
+    return segments
+
+
+def leading_command(words):
+    """(command token, its index), skipping what stands in front of it.
+
+    VAR=val assignments, a wrapper, and that wrapper's own flags or numeric
+    arguments -- `timeout 5 git push` runs git, not 5.
+    """
+    after_wrapper = False
+    for index, word in enumerate(words):
+        if ASSIGNMENT.match(word):
+            continue
+        if word in WRAPPERS:
+            after_wrapper = True
+            continue
+        if after_wrapper and (word.startswith("-") or word.isdigit()):
+            continue
+        return word, index
+    return None, 0
+
+
 def git_invocations(command):
-    words = SHELL_SEPARATORS.split(command)
-    return [
-        git_invocation(words, index)
-        for index, word in enumerate(words)
-        if word == "git"
-    ]
+    """(subcommand, `-C` directory) for each `git` standing in command position.
+
+    A `git` inside a quoted string or in an argument is text someone wrote, not
+    a command being run.
+    """
+    words = shell_words(command)
+    if words is None:
+        # Unparsable quoting: scan every bare `git` rather than trusting none.
+        fallback = SHELL_SEPARATORS.split(command)
+        return [
+            git_invocation(fallback, index)
+            for index, word in enumerate(fallback)
+            if word == "git"
+        ]
+
+    invocations = []
+    for segment in sub_commands(words):
+        command_token, index = leading_command(segment)
+        if command_token == "git":
+            invocations.append(git_invocation(segment, index))
+    return invocations
 
 
 def resolve_directory(candidate, cwd):
@@ -239,6 +309,39 @@ def scan_diff(repo, label, revisions):
                 yield path, token, reason
 
 
+def commit_messages(command):
+    """Every -m/--message value in a commit command, or None if it will not parse.
+
+    Only these reach history. The rest of the command line -- a `cd` prefix, a
+    `-C` target, any other argument -- names where the work happens, not what
+    the commit records. Ceiling: a message from `-F` or an editor is not on the
+    command line at all, so it cannot be checked here.
+    """
+    words = shell_words(command)
+    if words is None:
+        return None
+
+    messages, index = [], 0
+    while index < len(words):
+        word = words[index]
+        if word in ("-m", "--message"):
+            if index + 1 < len(words):
+                messages.append(words[index + 1])
+            index += 2
+            continue
+        if word.startswith("--message="):
+            messages.append(word.split("=", 1)[1])
+        elif word.startswith("-") and not word.startswith("--") and "m" in word:
+            value = word[word.index("m") + 1 :]
+            if value:
+                messages.append(value)
+            elif index + 1 < len(words):
+                messages.append(words[index + 1])
+                index += 1
+        index += 1
+    return messages
+
+
 def scan_message(repo, label, text):
     """Commit messages carry no file, so relative paths resolve from the root."""
     for token in path_tokens(text):
@@ -297,7 +400,10 @@ def main():
     sources = []
     if committing:
         sources.append(scan_diff(repo, "staged", ["--cached"]))
-        sources.append(scan_message(repo, "commit command", command))
+        # Unparsable quoting: fall back to the whole command rather than nothing.
+        messages = commit_messages(command)
+        for message in messages if messages is not None else [command]:
+            sources.append(scan_message(repo, "commit message", message))
     if pushing:
         outgoing = outgoing_range(repo.root)
         if outgoing:
