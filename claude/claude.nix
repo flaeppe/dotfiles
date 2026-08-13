@@ -115,6 +115,9 @@ in {
       ./hooks/cbm-session-reminder
     } "$HOME/.claude/hooks/cbm-session-reminder"
     install -m 755 ${
+      ./hooks/gcloud-command-gate
+    } "$HOME/.claude/hooks/gcloud-command-gate"
+    install -m 755 ${
       ./hooks/git-local-path-guard
     } "$HOME/.claude/hooks/git-local-path-guard"
     install -m 755 ${

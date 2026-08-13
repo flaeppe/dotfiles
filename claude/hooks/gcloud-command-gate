@@ -1,0 +1,166 @@
+#!/usr/bin/env python3
+"""Claude Code PreToolUse gate for `gcloud`: read-only `gcloud logging` calls
+run unprompted, every other gcloud command needs approval.
+
+Answers with a permissionDecision so the verdict holds in every permission mode,
+including the ones where a classifier would otherwise decide. A command it
+cannot read is asked about, not waved through.
+"""
+
+import json
+import re
+import shlex
+import sys
+
+# gcloud accepts its wide flags before the subcommand, so the command path has
+# to be read past them. Only the separate-value form needs listing; `--flag=x`
+# is a single word.
+WIDE_FLAGS_WITH_VALUE = frozenset(
+    (
+        "--access-token-file",
+        "--account",
+        "--billing-project",
+        "--configuration",
+        "--flags-file",
+        "--flatten",
+        "--format",
+        "--impersonate-service-account",
+        "--project",
+        "--trace-token",
+        "--user-output-enabled",
+        "--verbosity",
+    )
+)
+
+# Command paths that only read, matched as a prefix of the positional words so
+# any filter, resource name or flag may follow. `logging tail` is deliberately
+# absent: it streams until killed, and a call that occupies the session is worth
+# a prompt.
+READ_ONLY = frozenset(
+    (
+        ("logging", "read"),
+        ("logging", "buckets", "describe"),
+        ("logging", "buckets", "list"),
+        ("logging", "logs", "list"),
+        ("logging", "metrics", "describe"),
+        ("logging", "metrics", "list"),
+        ("logging", "operations", "describe"),
+        ("logging", "operations", "list"),
+        ("logging", "resource-descriptors", "list"),
+        ("logging", "sinks", "describe"),
+        ("logging", "sinks", "list"),
+        ("logging", "views", "describe"),
+        ("logging", "views", "list"),
+    )
+)
+
+# Shell punctuation, which the lexer reports as its own word only where the
+# shell would act on it. A decision covers the whole command line, so anything
+# beyond the one gcloud call has to be asked about.
+OPERATORS = frozenset("|&;<>()")
+
+# A leading `VAR=value` does not consume the command position.
+ASSIGNMENT = re.compile(r"^[A-Za-z_]\w*=")
+
+
+def words_of(command):
+    """Shell words of a command, or None when it cannot be lexed.
+
+    Unquoted shell punctuation becomes its own word; quoted punctuation stays
+    inside the word it belongs to.
+    """
+    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    try:
+        return list(lexer)
+    except ValueError:
+        return None
+
+
+def is_gcloud(word):
+    return word == "gcloud" or word.endswith("/gcloud")
+
+
+def invokes_gcloud(words):
+    """Whether gcloud stands where a command starts: first, or after an
+    operator. Elsewhere the name is an argument or a path -- grepping for it or
+    installing this file is not a gcloud call and gets no verdict."""
+    starting = True
+    for word in words:
+        if word and set(word) <= OPERATORS:
+            starting = True
+            continue
+        if ASSIGNMENT.match(word):
+            continue
+        if starting and is_gcloud(word):
+            return True
+        starting = False
+    return False
+
+
+def runs_more_than_gcloud(words):
+    return any(
+        (word and set(word) <= OPERATORS) or "`" in word for word in words
+    )
+
+
+def command_path(words):
+    """The positional words of a gcloud invocation, in order."""
+    path, index = [], 0
+    while index < len(words):
+        word = words[index]
+        if word.startswith("-"):
+            index += 2 if word in WIDE_FLAGS_WITH_VALUE else 1
+            continue
+        path.append(word)
+        index += 1
+    return path
+
+
+def is_read_only(words):
+    path = command_path(words[1:])
+    return tuple(path[:2]) in READ_ONLY or tuple(path[:3]) in READ_ONLY
+
+
+def decide(decision, reason):
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": decision,
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
+
+
+def main():
+    payload = json.load(sys.stdin)
+    if payload.get("tool_name") != "Bash":
+        return
+
+    command = payload.get("tool_input", {}).get("command", "")
+    if "gcloud" not in command:
+        return
+
+    words = words_of(command)
+    if words is None:
+        return decide("ask", "gcloud command could not be read")
+    if not invokes_gcloud(words):
+        return
+    if not is_gcloud(words[0]):
+        return decide("ask", "gcloud runs as part of a larger command")
+    if runs_more_than_gcloud(words):
+        return decide("ask", "the command does more than run gcloud")
+    if not is_read_only(words):
+        return decide("ask", "not a read-only gcloud logging command")
+    return decide("allow", "read-only gcloud logging")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        sys.exit(0)
