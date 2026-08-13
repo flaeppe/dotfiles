@@ -105,7 +105,7 @@ in {
     install -m 644 ${./settings.json} "$HOME/.claude/settings.json"
   '';
 
-  # Deploy codebase-memory-mcp hooks as executable copies (Nix store is read-only)
+  # Deploy hooks as executable copies (Nix store is read-only)
   home.activation.claudeHooks = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     mkdir -p "$HOME/.claude/hooks"
     install -m 755 ${
@@ -114,6 +114,9 @@ in {
     install -m 755 ${
       ./hooks/cbm-session-reminder
     } "$HOME/.claude/hooks/cbm-session-reminder"
+    install -m 755 ${
+      ./hooks/git-local-path-guard
+    } "$HOME/.claude/hooks/git-local-path-guard"
   '';
 
   # Status line script (referenced by settings.json statusLine.command)

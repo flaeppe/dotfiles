@@ -59,6 +59,15 @@
             "command": "~/.claude/hooks/cbm-code-discovery-gate"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/git-local-path-guard"
+          }
+        ]
       }
     ],
     "SessionStart": [

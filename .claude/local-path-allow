@@ -1,0 +1,7 @@
+# Sources exempt from the content scan in claude/hooks/git-local-path-guard.
+# One repo-relative path prefix per line. This repo defines the local-only
+# paths the guard looks for, so spelling them out here is the point.
+claude/hooks/git-local-path-guard
+git/git.nix
+opencode/skills/docs-expert/
+opencode/skills/planning/

@@ -1,0 +1,328 @@
+#!/usr/bin/env python3
+"""Claude Code PreToolUse guard: refuse `git commit`/`git push` that would
+record a path which only exists on this machine.
+
+Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0 --
+a broken guard must never wedge a session.
+"""
+
+import json
+import os
+import re
+import subprocess
+import sys
+
+HOME = os.path.expanduser("~")
+
+# Where plans and private notes live. Checked in file content too -- a reference
+# to one is worthless to anyone who pulls the commit.
+PLAN_FRAGMENTS = ("_private/", ".plan/")
+
+# Scratch trees and per-machine tool state. Checked on the paths being committed
+# but not in content: tooling that manages these directories has to name them.
+SCRATCH_FRAGMENTS = (
+    ".worktrees/",
+    ".claude/worktrees/",
+    ".claude/settings.local.json",
+    ".review/",
+)
+
+# Ignore files list local-only paths on purpose -- an entry is the opposite of a
+# leak, so their content is never scanned.
+IGNORE_FILENAMES = (
+    ".gitignore",
+    ".ignore",
+    ".cbmignore",
+    ".dockerignore",
+    ".npmignore",
+    ".eslintignore",
+    ".prettierignore",
+)
+
+# Sources exempt from the content scan, one repo-relative path prefix per line.
+# For files that legitimately document these paths as text.
+ALLOWLIST_FILE = ".claude/local-path-allow"
+
+MAX_FINDINGS = 12
+
+# Git global flags that consume the following word, so the subcommand is not it.
+GLOBAL_FLAGS_WITH_VALUE = frozenset(
+    ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env")
+)
+
+SHELL_SEPARATORS = re.compile(r"[\s;|&()]+")
+
+# Characters that cannot appear inside a path, used to cut a line into tokens.
+TOKEN_SEPARATORS = re.compile(r"[^\w.@~${}/+-]+")
+
+HOME_PREFIX = re.compile(re.escape(HOME) + r"/|~/|\$\{?HOME\}?/")
+
+# `git commit -a` / `--amend` / `--allow-empty` legitimately run with an empty
+# index, so the "nothing staged" check does not apply to them.
+COMMIT_WITHOUT_INDEX = re.compile(
+    r"--(amend|all|allow-empty)\b|(?<![\w-])-[a-zA-Z]*a[a-zA-Z]*(?![\w-])"
+)
+
+
+def git(directory, *args):
+    """stdout of a git command, or None if it failed."""
+    result = subprocess.run(
+        ("git", "-C", directory) + args,
+        capture_output=True,
+        text=True,
+        errors="replace",
+    )
+    if result.returncode != 0:
+        return None
+    return result.stdout
+
+
+def index_is_empty(repo_root):
+    return (
+        subprocess.run(
+            ("git", "-C", repo_root, "diff", "--cached", "--quiet"),
+            capture_output=True,
+        ).returncode
+        == 0
+    )
+
+
+def git_invocation(words, git_index):
+    """(subcommand, `-C` directory) for the `git` token at git_index."""
+    directory = None
+    index = git_index + 1
+    while index < len(words):
+        word = words[index]
+        if not word.startswith("-"):
+            return word, directory
+        if word == "-C" and index + 1 < len(words):
+            directory = words[index + 1]
+        index += 2 if word in GLOBAL_FLAGS_WITH_VALUE else 1
+    return None, directory
+
+
+def git_invocations(command):
+    words = SHELL_SEPARATORS.split(command)
+    return [
+        git_invocation(words, index)
+        for index, word in enumerate(words)
+        if word == "git"
+    ]
+
+
+def resolve_directory(candidate, cwd):
+    """A `-C` argument as a usable directory, falling back to the session cwd."""
+    if not candidate:
+        return cwd
+    expanded = os.path.expanduser(os.path.expandvars(candidate.strip("\"'")))
+    absolute = expanded if os.path.isabs(expanded) else os.path.join(cwd, expanded)
+    return absolute if os.path.isdir(absolute) else cwd
+
+
+def is_inside(root, path):
+    return path == root or path.startswith(root + os.sep)
+
+
+def path_tokens(text):
+    return [token for token in TOKEN_SEPARATORS.split(text) if "/" in token]
+
+
+def sibling_root(directory):
+    """The directory whose other children are neighbouring checkouts, worktrees
+    and plan directories, or None when that would be $HOME or the filesystem
+    root -- there the neighbours are ordinary config any machine may name."""
+    common_dir = git(directory, "rev-parse", "--git-common-dir")
+    if not common_dir:
+        return None
+    # Resolve from the main checkout so every linked worktree, nested or
+    # alongside, agrees on where its neighbours live.
+    main_checkout = os.path.dirname(
+        os.path.abspath(os.path.join(directory, common_dir.strip()))
+    )
+    parent = os.path.dirname(main_checkout)
+    return None if parent in (HOME, os.sep) else parent
+
+
+class Repo:
+    def __init__(self, root, siblings):
+        self.root = root
+        self.siblings = siblings
+        self.allowlist = read_allowlist(root)
+
+    def scans_content_of(self, path):
+        return not (
+            path.startswith(self.allowlist)
+            or os.path.basename(path) in IGNORE_FILENAMES
+        )
+
+
+def read_allowlist(repo_root):
+    try:
+        with open(os.path.join(repo_root, ALLOWLIST_FILE)) as handle:
+            lines = handle.read().splitlines()
+    except OSError:
+        return ()
+    return tuple(
+        line.strip() for line in lines if line.strip() and not line.startswith("#")
+    )
+
+
+def classify(token, file_dir, repo, fragments):
+    """Why this path token is local-only, or None if it is publishable."""
+    token = token.rstrip(".,;:")
+
+    for fragment in fragments:
+        if fragment in token:
+            return "local-only path (%s)" % fragment
+
+    home_match = HOME_PREFIX.search(token)
+    if home_match:
+        target = os.path.normpath(os.path.join(HOME, token[home_match.end() :]))
+        if is_inside(repo.root, target):
+            return None
+        if home_match.group().startswith(HOME):
+            return "absolute path outside the repo"
+        if repo.siblings and is_inside(repo.siblings, target):
+            return "sits beside the repo, not inside it"
+        return None
+
+    if "../" in token:
+        target = os.path.normpath(os.path.join(file_dir, token))
+        if not is_inside(repo.root, target):
+            return "escapes the repo root (-> %s)" % target
+
+    return None
+
+
+def added_lines(repo_root, revisions):
+    """(repo-relative path, absolute dir, added line) for each added diff line."""
+    diff = git(repo_root, "diff", "--unified=0", "--no-color", *revisions)
+    if diff is None:
+        return
+    path, file_dir = "", repo_root
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            target = line[4:]
+            path = target[2:] if target.startswith("b/") else target
+            file_dir = os.path.dirname(os.path.join(repo_root, path))
+            continue
+        if line.startswith("+"):
+            yield path, file_dir, line[1:]
+
+
+def changed_paths(repo_root, revisions):
+    output = git(repo_root, "diff", "--name-only", *revisions)
+    return output.splitlines() if output else []
+
+
+def outgoing_range(repo_root):
+    """`<base>...HEAD` covering the commits a push would publish, or None."""
+    for revision in ("@{upstream}", "origin/HEAD"):
+        if git(repo_root, "rev-parse", "--verify", "--quiet", revision):
+            return revision + "...HEAD"
+    return None
+
+
+def scan_diff(repo, label, revisions):
+    """(location, token, reason) for every local-only reference in a diff range."""
+    for path in changed_paths(repo.root, revisions):
+        reason = classify(path, repo.root, repo, PLAN_FRAGMENTS + SCRATCH_FRAGMENTS)
+        if reason:
+            yield "%s file" % label, path, reason
+
+    for path, file_dir, line in added_lines(repo.root, revisions):
+        if not repo.scans_content_of(path):
+            continue
+        for token in path_tokens(line):
+            reason = classify(token, file_dir, repo, PLAN_FRAGMENTS)
+            if reason:
+                yield path, token, reason
+
+
+def scan_message(repo, label, text):
+    """Commit messages carry no file, so relative paths resolve from the root."""
+    for token in path_tokens(text):
+        reason = classify(token, repo.root, repo, PLAN_FRAGMENTS + SCRATCH_FRAGMENTS)
+        if reason:
+            yield label, token, reason
+
+
+def deduplicated(sources):
+    seen, findings = set(), []
+    for finding in (finding for source in sources for finding in source):
+        if finding not in seen:
+            seen.add(finding)
+            findings.append(finding)
+    return findings
+
+
+def deny(headline, findings):
+    lines = ["BLOCKED: " + headline, ""]
+    for location, token, reason in findings[:MAX_FINDINGS]:
+        lines.append("  %s: %s  (%s)" % (location, token, reason))
+    if len(findings) > MAX_FINDINGS:
+        lines.append("  ... and %d more" % (len(findings) - MAX_FINDINGS))
+    lines += [
+        "",
+        "Rewrite the reference so it resolves inside this repo, unstage the file,",
+        "or add the source to %s if the path is documentation." % ALLOWLIST_FILE,
+    ]
+    print("\n".join(lines), file=sys.stderr)
+    return 2
+
+
+def main():
+    payload = json.load(sys.stdin)
+    if payload.get("tool_name") != "Bash":
+        return 0
+
+    command = payload.get("tool_input", {}).get("command", "")
+    publishing = [
+        (subcommand, directory)
+        for subcommand, directory in git_invocations(command)
+        if subcommand in ("commit", "push")
+    ]
+    if not publishing:
+        return 0
+    committing = any(subcommand == "commit" for subcommand, _ in publishing)
+    pushing = any(subcommand == "push" for subcommand, _ in publishing)
+
+    cwd = payload.get("cwd") or os.getcwd()
+    directory = resolve_directory(next((d for _, d in publishing if d), None), cwd)
+    repo_root = git(directory, "rev-parse", "--show-toplevel")
+    if not repo_root:
+        return 0
+    repo = Repo(repo_root.strip(), sibling_root(directory))
+
+    if committing and not COMMIT_WITHOUT_INDEX.search(command) and index_is_empty(repo.root):
+        print(
+            "BLOCKED: nothing staged -- stage the files you mean to commit first.",
+            file=sys.stderr,
+        )
+        return 2
+
+    sources = []
+    if committing:
+        sources.append(scan_diff(repo, "staged", ["--cached"]))
+        sources.append(scan_message(repo, "commit command", command))
+    if pushing:
+        outgoing = outgoing_range(repo.root)
+        if outgoing:
+            sources.append(scan_diff(repo, "outgoing", [outgoing]))
+            messages = git(repo.root, "log", "--format=%B", outgoing.replace("...", ".."))
+            if messages:
+                sources.append(scan_message(repo, "outgoing commit message", messages))
+
+    findings = deduplicated(sources)
+    if not findings:
+        return 0
+
+    what = "this commit" if committing else "these commits"
+    return deny("%s would record paths that only exist on this machine." % what, findings)
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit(0)
