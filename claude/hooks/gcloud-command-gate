@@ -8,15 +8,18 @@ that invokes gcloud gets a verdict: text that merely carries the name, such as a
 commit message or a grep pattern, gets none.
 """
 
+from __future__ import annotations
+
 import json
-import re
-import shlex
 import sys
+from typing import Final
+
+import shellwords
 
 # gcloud accepts its wide flags before the subcommand, so the command path has
 # to be read past them. Only the separate-value form needs listing; `--flag=x`
 # is a single word.
-WIDE_FLAGS_WITH_VALUE = frozenset(
+WIDE_FLAGS_WITH_VALUE: Final = frozenset(
     (
         "--access-token-file",
         "--account",
@@ -33,11 +36,16 @@ WIDE_FLAGS_WITH_VALUE = frozenset(
     )
 )
 
+# Substitution runs a second command inside an argument, where quoting hides it
+# from the word split -- `read "$(...)"` is one word. Whatever it runs is not
+# covered by a verdict about gcloud.
+SUBSTITUTION: Final = ("`", "$(")
+
 # Command paths that only read, matched as a prefix of the positional words so
 # any filter, resource name or flag may follow. `logging tail` is deliberately
 # absent: it streams until killed, and a call that occupies the session is worth
 # a prompt.
-READ_ONLY = frozenset(
+READ_ONLY: Final = frozenset(
     (
         ("logging", "read"),
         ("logging", "buckets", "describe"),
@@ -55,69 +63,42 @@ READ_ONLY = frozenset(
     )
 )
 
-# Shell punctuation, which the lexer reports as its own word only where the
-# shell would act on it. A decision covers the whole command line, so anything
-# beyond the one gcloud call has to be asked about.
-OPERATORS = frozenset("|&;<>()")
 
-# A leading `VAR=value` does not consume the command position.
-ASSIGNMENT = re.compile(r"^[A-Za-z_]\w*=")
-
-
-def words_of(command):
-    """Shell words of a command.
-
-    Unquoted shell punctuation becomes its own word; quoted punctuation stays
-    inside the word it belongs to. Text a shell lexer rejects -- a heredoc body
-    carrying an apostrophe, say -- is read again with quoting and escaping off,
-    which cannot fail and only ever splits into more words.
-    """
-    for quotes, escape in (("'\"", "\\"), ("", "")):
-        lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
-        lexer.whitespace_split = True
-        lexer.quotes = quotes
-        lexer.escape = escape
-        try:
-            return list(lexer)
-        except ValueError:
-            continue
-    return []
-
-
-def is_gcloud(word):
+def is_gcloud(word: str | None) -> bool:
+    if not word:
+        return False
     return word == "gcloud" or word.endswith("/gcloud")
 
 
-def invokes_gcloud(words):
-    """Whether gcloud stands where a command starts: first, or after an
-    operator. Elsewhere the name is an argument or a path -- a commit message
-    quoting a gcloud command line is not a gcloud call and gets no verdict.
+def invokes_gcloud(words: list[str]) -> bool:
+    """Whether gcloud stands where a command starts.
+
+    Elsewhere the name is an argument or a path -- a commit message quoting a
+    gcloud command line is not a gcloud call and gets no verdict.
 
     Ceiling: a call nested inside another command's argument, as in
     `bash -c "gcloud ..."`, reads as an argument too. Scan inside words if that
-    shows up."""
-    starting = True
-    for word in words:
-        if word and set(word) <= OPERATORS:
-            starting = True
-            continue
-        if ASSIGNMENT.match(word):
-            continue
-        if starting and is_gcloud(word):
-            return True
-        starting = False
-    return False
-
-
-def runs_more_than_gcloud(words):
+    shows up.
+    """
     return any(
-        (word and set(word) <= OPERATORS) or "`" in word for word in words
+        is_gcloud(shellwords.leading_command(segment)[0])
+        for segment in shellwords.sub_commands(words)
     )
 
 
-def command_path(words):
+def runs_more_than_gcloud(words: list[str]) -> bool:
+    """A decision covers the whole command line, so anything beyond the one
+    gcloud call has to be asked about."""
+    return any(
+        shellwords.is_operator(word) or any(form in word for form in SUBSTITUTION)
+        for word in words
+    )
+
+
+def command_path(words: list[str]) -> list[str]:
     """The positional words of a gcloud invocation, in order."""
-    path, index = [], 0
+    path: list[str] = []
+    index = 0
     while index < len(words):
         word = words[index]
         if word.startswith("-"):
@@ -128,12 +109,12 @@ def command_path(words):
     return path
 
 
-def is_read_only(words):
+def is_read_only(words: list[str]) -> bool:
     path = command_path(words[1:])
     return tuple(path[:2]) in READ_ONLY or tuple(path[:3]) in READ_ONLY
 
 
-def decide(decision, reason):
+def decide(decision: str, reason: str) -> None:
     print(
         json.dumps(
             {
@@ -147,7 +128,7 @@ def decide(decision, reason):
     )
 
 
-def main():
+def main() -> None:
     payload = json.load(sys.stdin)
     if payload.get("tool_name") != "Bash":
         return
@@ -156,16 +137,17 @@ def main():
     if "gcloud" not in command:
         return
 
-    words = words_of(command)
+    words = shellwords.words_of(command)
     if not invokes_gcloud(words):
         return
     if not is_gcloud(words[0]):
-        return decide("ask", "gcloud runs as part of a larger command")
-    if runs_more_than_gcloud(words):
-        return decide("ask", "the command does more than run gcloud")
-    if not is_read_only(words):
-        return decide("ask", "not a read-only gcloud logging command")
-    return decide("allow", "read-only gcloud logging")
+        decide("ask", "gcloud runs as part of a larger command")
+    elif runs_more_than_gcloud(words):
+        decide("ask", "the command does more than run gcloud")
+    elif not is_read_only(words):
+        decide("ask", "not a read-only gcloud logging command")
+    else:
+        decide("allow", "read-only gcloud logging")
 
 
 if __name__ == "__main__":

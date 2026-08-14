@@ -114,6 +114,9 @@ in {
     install -m 755 ${
       ./hooks/cbm-session-reminder
     } "$HOME/.claude/hooks/cbm-session-reminder"
+    # Imported by the hooks in this directory, which Python resolves from the
+    # running script's own directory. Not executable: nothing runs it directly.
+    install -m 644 ${./hooks/shellwords.py} "$HOME/.claude/hooks/shellwords.py"
     install -m 755 ${
       ./hooks/gcloud-command-gate
     } "$HOME/.claude/hooks/gcloud-command-gate"
