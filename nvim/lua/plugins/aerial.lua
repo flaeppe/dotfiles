@@ -4,6 +4,12 @@
 -- project and any .graphql outside a graphql-config root.
 require("aerial").setup({
     backends = { "lsp", "treesitter", "markdown", "man" },
+    -- marksman reports markdown headings as SymbolKind String, which the default
+    -- kind filter drops, leaving every .md file looking empty. An unfiltered
+    -- outline in markdown is the heading tree, which is the whole point of one
+    -- here. A filetype map with no "_" key leaves every other filetype on the
+    -- default filter.
+    filter_kind = { markdown = false },
     layout = { min_width = 34 },
     -- Follow the cursor, so the outline doubles as a "where am I" indicator in
     -- long files.
