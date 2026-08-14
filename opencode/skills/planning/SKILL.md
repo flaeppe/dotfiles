@@ -18,7 +18,7 @@ Do NOT use for trivial single-file changes or quick bug fixes.
 
 ### Location
 
-Every plan lives in one tracked tree, never inside a work checkout:
+Every plan lives in one tree, never inside a work checkout:
 
 ```
 Single-repo work:   ~/.plan/<repo>/<project>/NNN-description.md
@@ -27,9 +27,6 @@ Multi-repo work:    ~/.plan/_cross/<project>/NNN-description.md
 
 `<project>` is a short kebab-case name for the effort (e.g., `pydantic-v2`,
 `distributed-tracing`, `submission-mode`).
-
-`~/.plan` is a git repository. Commit plan changes like any other work — the
-history is what lets you ask when a status changed and what it changed from.
 
 ### Numbering
 
