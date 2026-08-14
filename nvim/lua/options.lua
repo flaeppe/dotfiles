@@ -34,12 +34,23 @@ vim.opt.swapfile = false
 vim.opt.termguicolors = true
 -- Always display statusbar
 vim.opt.laststatus = 2
+-- How far along a quickfix walk is, so the list can be followed by <Leader>qj/qk
+-- without keeping it open. Empty when there is no list, and cheap enough for a
+-- statusline: asking for idx and size never materialises the entries.
+function _G.quickfix_position()
+    local qf = vim.fn.getqflist({ idx = 0, size = 0 })
+    if qf.size == 0 then
+        return ""
+    end
+    return string.format("[qf %d/%d] ", qf.idx, qf.size)
+end
 -- What the status bar should look like
 vim.opt.statusline = "%-10.3n " -- %-10.3n: Buffer number, left-aligned, max 10 chars, min 3 chars
     .. "%f " -- %f: Full path to the file
     .. "%h%m%r%w " -- %h: Help file flag, %m: Modified flag, %r: Readonly flag, %w: Preview window flag
     .. "[%{strlen(&ft)?&ft:'none'}] " -- %{...}: Evaluate expression. Shows filetype or 'none' if empty.
     .. "%=" -- %=: Right-aligns the following items
+    .. "%{v:lua.quickfix_position()}" -- Current quickfix entry out of the list size
     .. "0x%-8B " -- 0x%-8B: Character value under cursor in hex, left-aligned, max 8 chars
     .. "%-14(%l,%c%V%) " -- %-14(...): Grouped items, left-aligned, max 14 chars.
     -- %l: Current line number

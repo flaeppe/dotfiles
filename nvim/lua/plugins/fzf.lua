@@ -69,6 +69,11 @@ end, { silent = true, desc = "Search files with FZF" })
 vim.keymap.set("n", "<Leader>b", function()
     fzf.buffers()
 end, { desc = "Open buffers" })
+-- Reach one quickfix entry by typing part of its text, for lists long enough
+-- that stepping to the entry costs more than naming it.
+vim.keymap.set("n", "<Leader>qf", function()
+    fzf.quickfix()
+end, { desc = "Quickfix entries" })
 -- Symbol navigation.
 --
 -- ctags and the LSP have complementary blind spots, so both stay bound rather

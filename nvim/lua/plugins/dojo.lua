@@ -85,8 +85,24 @@ local ENTRIES = {
 
     -- Quickfix: the loop that turns a search into a work list
     { group = "quickfix", keys = "<Leader>q", desc = "Open the quickfix list", added = "2025-08-09" },
-    { group = "quickfix", keys = "<Leader>qj", desc = "Next entry (wraps to first)", added = "2025-08-09" },
-    { group = "quickfix", keys = "<Leader>qk", desc = "Previous entry (wraps to last)", added = "2025-08-09" },
+    {
+        group = "quickfix",
+        keys = "<Leader>qj",
+        desc = "Next entry, or a count of them (wraps to first)",
+        added = "2025-08-09",
+    },
+    {
+        group = "quickfix",
+        keys = "<Leader>qk",
+        desc = "Previous entry, or a count of them (wraps to last)",
+        added = "2025-08-09",
+    },
+    {
+        group = "quickfix",
+        keys = "<Leader>qf",
+        desc = "Fuzzy-match an entry, for lists too long to step through",
+        added = "2026-08-14",
+    },
     {
         group = "quickfix",
         keys = "ctrl-q",

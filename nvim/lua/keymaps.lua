@@ -2,8 +2,19 @@ local bufopts = { noremap = true }
 --- Quicklist mappings
 vim.keymap.set("n", "<Leader>q", "<Cmd>copen<CR>", bufopts)
 vim.keymap.set("n", "<Leader>Q", "<Cmd>cclose<CR>", bufopts)
-vim.keymap.set("n", "<Leader>qj", "<Cmd>try | cnext | catch | cfirst | catch | endtry<CR>", bufopts)
-vim.keymap.set("n", "<Leader>qk", "<Cmd>try | cprevious | catch | clast | catch | endtry<CR>", bufopts)
+-- A count crosses several entries in one press, which is what a long list needs
+-- once the statusline says how far along it is. Running off either end wraps
+-- instead of erroring, so the walk never has to watch for the boundary.
+vim.keymap.set("n", "<Leader>qj", function()
+    if not pcall(vim.cmd, vim.v.count1 .. "cnext") then
+        pcall(vim.cmd.cfirst)
+    end
+end, bufopts)
+vim.keymap.set("n", "<Leader>qk", function()
+    if not pcall(vim.cmd, vim.v.count1 .. "cprevious") then
+        pcall(vim.cmd.clast)
+    end
+end, bufopts)
 
 --- Format buffer
 vim.keymap.set("n", "<Leader>ll", function()
