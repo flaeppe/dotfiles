@@ -18,13 +18,18 @@ Do NOT use for trivial single-file changes or quick bug fixes.
 
 ### Location
 
+Every plan lives in one tracked tree, never inside a work checkout:
+
 ```
-Single-repo work:   <repo>/_private/.plan/<project>/NNN-description.md
-Multi-repo work:    ~/anyfin/.plan/<project>/NNN-description.md
+Single-repo work:   ~/.plan/<repo>/<project>/NNN-description.md
+Multi-repo work:    ~/.plan/_cross/<project>/NNN-description.md
 ```
 
 `<project>` is a short kebab-case name for the effort (e.g., `pydantic-v2`,
 `distributed-tracing`, `submission-mode`).
+
+`~/.plan` is a git repository. Commit plan changes like any other work — the
+history is what lets you ask when a status changed and what it changed from.
 
 ### Numbering
 
@@ -35,17 +40,47 @@ highest number and work backwards.
 
 ### Header
 
-Every file starts with:
+Every file starts with YAML frontmatter, before the title:
 
 ```markdown
-# Title
+---
+status: Draft | In Progress | Complete | Deferred | Superseded | Abandoned
+category: code | docs | ticket | record
+services: [repo, other-repo@6537]
+verified: YYYY-MM-DD
+date: YYYY-MM-DD
+builds_on: NNN-filename.md
+next: NNN-filename.md
+---
 
-> **Date:** YYYY-MM-DD
-> **Status:** Draft | In Progress | Complete
-> **Builds on:** NN-filename.md (if applicable)
-> **Next:** NN-filename.md (if known)
-> **Repos:** repo1, repo2 (if multi-repo)
+# Title
 ```
+
+| field | rule |
+| --- | --- |
+| `status` | one of those six words, nothing else — any nuance goes in `status_note` |
+| `services` | every repo the work touches, not just the one it is filed under |
+| `@<ref>` | the PR or SHA that carried it. Never a branch — branches get deleted |
+| `verified` | date the status was last checked against reality |
+| `review` | why it could not be settled. Replaces `verified`; never sits beside it |
+
+- A ref hangs off its service because a PR number only resolves next to a repo.
+- `verified` is what makes drift detectable: a status is a claim, a status plus
+  a date is a claim with an age.
+- **Every write restamps `verified` to today** — a PreToolUse hook refuses the
+  edit otherwise. Touching the file means you read it, so say what you found.
+
+### Reading a series
+
+To see the state of a whole effort without opening every file:
+
+```
+~/.plan/bin/plan-status ~/.plan/<repo>/<project>
+~/.plan/bin/plan-status --stale 30 ~/.plan
+```
+
+It reads frontmatter only, so pointing it at the whole tree is cheap. `--stale`
+lists what has gone unverified and exits non-zero, so it works as a check.
 
 ### File Lifecycle
 
@@ -174,13 +209,18 @@ isolation.
 
 ## Resuming Existing Plans
 
-Before starting, check if a plan directory already exists:
-- Single-repo: `_private/.plan/` in the project root
-- Multi-repo: `~/anyfin/.plan/`
+Before starting, check whether a plan directory already exists:
+- Single-repo: `~/.plan/<repo>/`
+- Multi-repo: `~/.plan/_cross/`
 
-If one exists, read the existing files (highest number first) to understand
-current state before continuing. Then:
+Start with `plan-status` on the project directory — it gives you the whole
+series' state in one pass, and tells you which files are stale or carry a
+`review:` flag before you spend anything reading them. Then read the files
+themselves, highest number first. Then:
 
 1. Understand what's been completed and what remains
 2. Add a new file for the next phase of work
 3. Reference what it builds on
+4. Restamp `verified` on any file whose status you checked along the way —
+   including ones you did not otherwise change. A status you confirmed is a
+   result worth recording, not just a status you corrected.
