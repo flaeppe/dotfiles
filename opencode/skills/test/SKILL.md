@@ -172,6 +172,7 @@ def test_returns_user_for_valid_id():
     assert result.email == "user@example.com"
     assert result.status == "active"
 
+
 def test_returns_none_for_missing_id():
     result = get_user(missing_id)
     assert result is None
@@ -228,9 +229,9 @@ assert result.status == "success"
 # To:
 assert result.state == "completed"
 
-# ❌ DON'T: Update all 8 with replaceAll, run full suite, discover field is still "status", 
+# ❌ DON'T: Update all 8 with replaceAll, run full suite, discover field is still "status",
 #           fix all 8 again, run full suite again, repeat
-# ✅ DO: Update test_can_process_credit_card, run it, verify it passes, 
+# ✅ DO: Update test_can_process_credit_card, run it, verify it passes,
 #        THEN use replaceAll for the remaining 7 tests
 ```
 

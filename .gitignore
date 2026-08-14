@@ -12,5 +12,8 @@
 # .sqruff so per-repo dialect overrides stay local, but here it is source.
 !nvim/.sqruff
 
+# The tool environment pyproject.toml describes. uv.lock is tracked; this is not.
+.venv/
+
 # AI
 .claude/settings.local.json

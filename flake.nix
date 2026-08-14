@@ -81,12 +81,22 @@
         devShell = pkgs.mkShell {
           buildInputs = [
             pkgs.lua-language-server
-            pkgs.pyright
-            pkgs.ruff
+            pkgs.nodejs # Runtime pyright executes on
+            pkgs.python3 # Interpreter uv builds the tool environment against
             pkgs.stylua # Formatter for Lua code
+            pkgs.uv
           ];
+          # ruff and pyright come from pyproject.toml, which is also where their
+          # configuration lives, so there is one pinned version of each rather
+          # than a nixpkgs copy and a locked copy that drift. Editor LSPs resolve
+          # them by name, hence the venv on PATH.
           shellHook = ''
             echo '${luarcJsonContent}' > ./.luarc.json
+            uv sync --quiet
+            PATH="$PWD/.venv/bin:$PATH"
+            # git hooks are not tracked, so a fresh checkout has none until this
+            # runs. Idempotent.
+            uv run pre-commit install > /dev/null
           '';
         };
       });

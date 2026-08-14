@@ -1,0 +1,46 @@
+# Tooling for the Python in this repo -- the Claude Code hooks and the keystroke
+# report. Not a package: nothing here is imported from outside its own directory.
+[project]
+name = "dotfiles"
+version = "0"
+requires-python = ">=3.9"
+
+[dependency-groups]
+dev = ["pre-commit>=4.0", "pyright>=1.1.411", "ruff>=0.16.3"]
+
+[tool.uv]
+package = false
+# The interpreter comes from the devShell (or the system), so a checkout does not
+# also acquire a private CPython.
+python-preference = "only-system"
+
+[tool.ruff]
+# The hooks run outside any devShell, on whatever `python3` a Claude Code session
+# resolves to. That is the system interpreter.
+target-version = "py39"
+
+# Claude Code names hooks in settings.json without an extension, so the files
+# have none and neither ruff nor pyright discovers them on their own. Listed one
+# by one rather than globbed: the cbm-* hooks in the same directory are shell.
+extend-include = [
+    "claude/hooks/edit-content-guard",
+    "claude/hooks/format-after-edit",
+    "claude/hooks/gcloud-command-gate",
+    "claude/hooks/git-local-path-guard",
+    "claude/hooks/protected-path-guard",
+]
+
+[tool.ruff.lint]
+# The default (E4/E7/E9, F) plus what catches defects rather than taste: import
+# order, bugbear's foot-guns, and ruff's own checks. Deliberately absent are the
+# opinion rules -- ANN, D, and the pyupgrade rewrites that would only churn the
+# `%` formatting these files use throughout.
+select = ["E", "W", "F", "I", "B", "RUF"]
+
+[tool.pyright]
+# pyright has no extension-independent include, so on its own it would find only
+# the .py files here and report success over almost nothing. scripts/check-python.sh
+# passes the full list; invoking pyright directly checks less than it appears to.
+include = ["claude/hooks", ".claude/skills"]
+pythonVersion = "3.9"
+typeCheckingMode = "strict"

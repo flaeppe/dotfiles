@@ -41,6 +41,14 @@ export VIRTUAL_ENV=.venv
 layout python
 ```
 
+Entering the shell syncs the tool environment from `pyproject.toml` and installs the
+git hooks. ruff lints and formats the Python on commit; pyright is kept off the
+commit path and runs over everything on request:
+
+```bash
+pre-commit run --all-files --hook-stage manual pyright
+```
+
 ## Documentation
 
 - [Local PR review](docs/pr-review.md) — reviewing a pull request in the editor, with

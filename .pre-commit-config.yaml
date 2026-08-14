@@ -1,0 +1,33 @@
+# The tools run out of the uv environment rather than a pinned mirror revision, so
+# uv.lock stays the only place their versions are chosen.
+#
+# Files are selected by content, not by name: pre-commit identifies types from the
+# shebang, so the extensionless Claude Code hooks are recognised as Python while
+# the bash ones in the same directory are left alone.
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --fix --force-exclude
+        language: system
+        types_or: [python, pyi]
+
+      - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --force-exclude
+        language: system
+        # Markdown as well -- ruff formats the Python inside fenced blocks.
+        types_or: [python, pyi, markdown]
+
+      - id: pyright
+        name: pyright
+        entry: uv run pyright
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+        # Off the commit path: pyright needs a node runtime, and one commit's worth
+        # of files is not the set worth type-checking anyway. Run it over
+        # everything with
+        #   pre-commit run --all-files --hook-stage manual pyright
+        stages: [manual]

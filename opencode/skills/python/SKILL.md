@@ -45,20 +45,25 @@ If restructuring seems too complex, **ASK** - don't hide the problem with inline
 # Pydantic at boundaries
 from pydantic import BaseModel
 
+
 class UserInput(BaseModel):
     email: str
     name: str
 
+
 # NamedTuple for internal domain types
 from typing import NamedTuple
+
 
 class User(NamedTuple):
     id: str
     email: str
     roles: tuple[str, ...]  # tuple, not list - immutable
 
+
 # Frozen dataclass when kwargs matter or methods needed
 from dataclasses import dataclass
+
 
 @dataclass(frozen=True, slots=True, kw_only=True)
 class Config:
@@ -72,10 +77,12 @@ class Config:
 from typing import Protocol, Final
 from collections.abc import Sequence, Mapping  # not typing.*
 
+
 # Protocol for interfaces (structural subtyping, no inheritance)
 class Repository(Protocol):
     def get(self, id: str) -> User | None: ...
     def save(self, user: User) -> None: ...
+
 
 # Immutable collections
 ALLOWED_ROLES: Final = frozenset({"admin", "user", "guest"})
@@ -103,6 +110,7 @@ Ruff is nearly instant - run it on the entire codebase, not just changed files. 
 def create_user(input: UserInput) -> User:  # Pydantic in, domain type out
     return User(id=generate_id(), email=input.email, roles=())
 
+
 # After parsing, trust the types - no re-validation
 def send_welcome(user: User) -> None:
     send_email(user.email, "Welcome!")  # No need to check email format
@@ -115,11 +123,13 @@ def send_welcome(user: User) -> None:
 raise ValueError("User not found")
 raise Exception("Invalid state")
 
+
 # ✅ Domain-specific exceptions
 class UserNotFoundError(Exception):
     def __init__(self, user_id: str) -> None:
         self.user_id = user_id
         super().__init__(f"User not found: {user_id}")
+
 
 class InvalidStateError(Exception): ...
 ```
@@ -131,16 +141,22 @@ class InvalidStateError(Exception): ...
 class BaseService:
     def log(self, msg: str) -> None: ...
 
+
 class UserService(BaseService): ...
+
 
 # ✅ Composition
 class UserService:
     def __init__(self, logger: Logger) -> None:
         self._logger = logger
 
+
 # ❌ ABC for interfaces
 from abc import ABC, abstractmethod
+
+
 class Repository(ABC): ...
+
 
 # ✅ Protocol (structural, no inheritance needed)
 class Repository(Protocol): ...

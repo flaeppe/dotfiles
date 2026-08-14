@@ -35,6 +35,7 @@ For API details not covered here, query via context7:
 def user():
     return {"id": 1, "name": "Alice"}
 
+
 # Session scope - runs once for entire test session
 @pytest.fixture(scope="session")
 def db_engine():
@@ -121,13 +122,15 @@ For multiple parameters, use a tuple as the first argument:
 **Custom test IDs:** Use `pytest.param(..., id="name")` for descriptive test names:
 
 ```python
-@pytest.mark.parametrize("amount", [
-    pytest.param(0.01, id="small amount"),
-    pytest.param(99.99, id="typical amount"),
-    pytest.param(9999.99, id="large amount"),
-])
-def test_can_process_order(amount):
-    ...
+@pytest.mark.parametrize(
+    "amount",
+    [
+        pytest.param(0.01, id="small amount"),
+        pytest.param(99.99, id="typical amount"),
+        pytest.param(9999.99, id="large amount"),
+    ],
+)
+def test_can_process_order(amount): ...
 ```
 
 ## Async Testing
@@ -142,11 +145,12 @@ def test_rejects_invalid_input():
     with pytest.raises(ValueError, match="must be positive"):
         process(-1)
 
+
 # Exception info access
 def test_error_details():
     with pytest.raises(ValidationError) as exc_info:
         validate(bad_data)
-    
+
     assert exc_info.value.field == "email"
 ```
 
@@ -158,16 +162,18 @@ Use `freezegun` to prevent flaky time-dependent tests:
 from freezegun import freeze_time
 from datetime import datetime
 
+
 @freeze_time("2026-01-15 10:00:00")
 def test_token_expiry():
     token = create_token(expires_in_seconds=3600)
     assert token.expires_at == datetime(2026, 1, 15, 11, 0, 0)
 
+
 @freeze_time("2026-01-15 10:00:00")
 def test_time_travel():
     with freeze_time("2026-01-15 10:00:00") as frozen:
         item = create_item()
-        
+
         frozen.move_to("2026-01-20")
         assert item.age_days == 5
 ```
@@ -185,6 +191,7 @@ Test what the function returns, not how it does it:
 def test_create_user_executes_insert(fake_db, repository):
     user = await repository.create("alice@test.com", "Alice")
     assert "INSERT INTO users" in fake_db.queries[0]  # Knows SQL internals
+
 
 # ✅ GOOD - testing outcome
 def test_can_create_user(fake_db, repository):
