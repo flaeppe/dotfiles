@@ -6,18 +6,21 @@ Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0 --
 a broken guard must never wedge a session.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
 import subprocess
 import sys
+from typing import Final
 
 # Repo-relative escape hatch: one path prefix per line, '#' comments ignored.
-ALLOWLIST_FILE = ".claude/protected-path-allow"
+ALLOWLIST_FILE: Final = ".claude/protected-path-allow"
 
-EDIT_TOOLS = ("Edit", "Write", "NotebookEdit", "MultiEdit")
+EDIT_TOOLS: Final = ("Edit", "Write", "NotebookEdit", "MultiEdit")
 
-LOCKFILES = (
+LOCKFILES: Final = (
     "package-lock.json",
     "pnpm-lock.yaml",
     "yarn.lock",
@@ -30,7 +33,7 @@ LOCKFILES = (
     "composer.lock",
 )
 
-PROTECTED = (
+PROTECTED: Final = (
     (re.compile(r"(^|/)\.env(\.[^/]*)?$"), "holds secrets; edit it yourself"),
     (
         re.compile(r"(^|/)(%s)$" % "|".join(re.escape(name) for name in LOCKFILES)),
@@ -40,7 +43,7 @@ PROTECTED = (
 )
 
 
-def repo_root(path):
+def repo_root(path: str) -> str | None:
     """Enclosing work tree, or None outside a repo."""
     result = subprocess.run(
         ("git", "-C", os.path.dirname(path) or ".", "rev-parse", "--show-toplevel"),
@@ -50,7 +53,7 @@ def repo_root(path):
     return result.stdout.strip() if result.returncode == 0 else None
 
 
-def allowlist(root):
+def allowlist(root: str) -> tuple[str, ...]:
     try:
         with open(os.path.join(root, ALLOWLIST_FILE)) as handle:
             lines = handle.read().splitlines()
@@ -61,7 +64,7 @@ def allowlist(root):
     )
 
 
-def main():
+def main() -> int:
     payload = json.load(sys.stdin)
     if payload.get("tool_name") not in EDIT_TOOLS:
         return 0

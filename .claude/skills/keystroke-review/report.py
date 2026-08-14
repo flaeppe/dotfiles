@@ -5,6 +5,8 @@ Counting only. Every judgement call -- which habit is worth a drill, whether a
 binding should be pruned -- belongs to the reviewer, not to this file.
 """
 
+from __future__ import annotations
+
 import argparse
 import collections
 import datetime
@@ -14,24 +16,43 @@ import os
 import pathlib
 import re
 import sys
+from collections.abc import Sequence
+from typing import Any, Final
 
-KEYLOG = os.path.expanduser("~/.local/state/nvim/keylog")
+# One line of the keystroke log, as written.
+Record = dict[str, Any]
+
+# (date, that day's records), one entry per session file.
+Sessions = list[tuple[str, list[Record]]]
+
+KEYLOG: Final = os.path.expanduser("~/.local/state/nvim/keylog")
 # <repo>/.claude/skills/keystroke-review/report.py, so the dotfiles root is four
 # levels up. Derived rather than hardcoded: the repo is not checked out at the
 # same path on every machine.
-DOJO = pathlib.Path(__file__).resolve().parents[3] / "nvim/lua/plugins/dojo.lua"
+DOJO: Final = pathlib.Path(__file__).resolve().parents[3] / "nvim/lua/plugins/dojo.lua"
 
 # `keytrans` spells control keys with an upper-case letter; the Dojo writes them
 # the way vim documents them. Same key, two spellings, so one has to be folded.
-LEADER = "<Space>"
+LEADER: Final = "<Space>"
 
 # A run of one key at this median gap or below was the keyboard repeating, not a
 # finger pressing. macOS repeats at ~84ms at the fastest setting.
-REPEAT_MS = 120
-RUN_MIN = 5
+REPEAT_MS: Final = 120
+RUN_MIN: Final = 5
 
-MOTION_CLASSES = {
-    "vertical": ["j", "k", "<Down>", "<Up>", "<C-D>", "<C-U>", "<C-F>", "<C-B>", "G", "gg"],
+MOTION_CLASSES: Final = {
+    "vertical": [
+        "j",
+        "k",
+        "<Down>",
+        "<Up>",
+        "<C-D>",
+        "<C-U>",
+        "<C-F>",
+        "<C-B>",
+        "G",
+        "gg",
+    ],
     "search": ["/", "?", "n", "N", "*", "#"],
     "inline": ["f", "F", "t", "T", "0", "$", "^", "w", "b", "e", "W", "B", "%"],
     "targeted": ["<C-O>", "<C-I>", "gd", "grd", "grr", "<C-E>", "<C-P>"],
@@ -39,20 +60,20 @@ MOTION_CLASSES = {
 }
 
 
-def shift_day(date, days):
+def shift_day(date: str, days: int) -> str:
     stamp = datetime.date.fromisoformat(date) + datetime.timedelta(days=days)
     return stamp.isoformat()
 
 
-def day_after(date):
+def day_after(date: str) -> str:
     return shift_day(date, 1)
 
 
-def day_before(date):
+def day_before(date: str) -> str:
     return shift_day(date, -1)
 
 
-def dojo_entries(path):
+def dojo_entries(path: str | os.PathLike[str]) -> list[tuple[str, str, str, str]]:
     """[(group, keys, desc, added)] in the order the Dojo lists them."""
     src = open(path).read()
     table = src[src.index("local ENTRIES = {") : src.index("\n-- Written by")]
@@ -60,10 +81,13 @@ def dojo_entries(path):
         r'group\s*=\s*"([^"]+)"\s*,\s*keys\s*=\s*"([^"]+)"\s*,'
         r'\s*desc\s*=\s*"((?:[^"\\]|\\.)*)"\s*,\s*added\s*=\s*"([^"]+)"'
     )
-    return [m.groups() for m in re.finditer(pattern, table)]
+    return [
+        (m.group(1), m.group(2), m.group(3), m.group(4))
+        for m in re.finditer(pattern, table)
+    ]
 
 
-def keytrans_forms(written):
+def keytrans_forms(written: str) -> list[str]:
     """A Dojo `keys` field -> the raw log spellings that count toward it.
 
     Two keys on one row ("¨f  åf") are one habit and count together.
@@ -76,12 +100,15 @@ def keytrans_forms(written):
     return forms
 
 
-def read_sessions(keylog):
+def read_sessions(keylog: str) -> Sessions:
     """[(date, [record, ...])] -- one entry per session file, chronological."""
-    out = []
+    out: Sessions = []
     for path in sorted(glob.glob(f"{keylog}/keys-*.jsonl")):
-        date = re.search(r"keys-(\d{4}-\d{2}-\d{2})", path).group(1)
-        records = []
+        stamp = re.search(r"keys-(\d{4}-\d{2}-\d{2})", path)
+        if not stamp:
+            continue
+        date = stamp.group(1)
+        records: list[Record] = []
         for line in open(path):
             line = line.strip()
             if not line:
@@ -99,14 +126,26 @@ def read_sessions(keylog):
 class Window:
     """Everything counted over one date range."""
 
-    def __init__(self, sessions, lo, hi, label):
+    label: str
+    keys: collections.Counter[str]
+    cmds: collections.Counter[str]
+    by_filetype: collections.Counter[str]
+    vertical_by_filetype: collections.Counter[str]
+    keys_in_filetype: collections.defaultdict[str, collections.Counter[str]]
+    # (key, length, median gap ms, filetype)
+    runs: list[tuple[str, int, int, str]]
+    dates: set[str]
+    sessions: int
+    cwds: collections.Counter[str]
+
+    def __init__(self, sessions: Sessions, lo: str, hi: str, label: str) -> None:
         self.label = label
         self.keys = collections.Counter()
         self.cmds = collections.Counter()
         self.by_filetype = collections.Counter()
         self.vertical_by_filetype = collections.Counter()
         self.keys_in_filetype = collections.defaultdict(collections.Counter)
-        self.runs = []  # (key, length, median gap ms, filetype)
+        self.runs = []
         self.dates = set()
         self.sessions = 0
         self.cwds = collections.Counter()
@@ -119,9 +158,12 @@ class Window:
             self.sessions += 1
             self._scan(records, vertical)
 
-    def _scan(self, records, vertical):
-        filetype, cwd = "", None
-        run_key, run_times, run_filetype = None, [], ""
+    def _scan(self, records: list[Record], vertical: set[str]) -> None:
+        filetype = ""
+        cwd: str | None = None
+        run_key: str | None = None
+        run_times: list[int] = []
+        run_filetype = ""
         for record in records:
             if "cwd" in record and "k" not in record:
                 cwd = record["cwd"]
@@ -147,27 +189,29 @@ class Window:
                 run_key, run_times, run_filetype = key, [record["t"]], filetype
         self._close_run(run_key, run_times, run_filetype)
 
-    def _close_run(self, key, times, filetype):
+    def _close_run(self, key: str | None, times: Sequence[int], filetype: str) -> None:
         if key not in ("j", "k") or len(times) < RUN_MIN:
             return
         gaps = sorted(times[i + 1] - times[i] for i in range(len(times) - 1))
         self.runs.append((key, len(times), gaps[len(gaps) // 2], filetype))
 
     @property
-    def total(self):
+    def total(self) -> int:
         return sum(self.keys.values())
 
-    def rate(self, count):
+    def rate(self, count: int) -> float:
         """Per 1000 keys, so windows of different length compare."""
         return 1000 * count / self.total if self.total else 0.0
 
-    def count(self, forms):
+    def count(self, forms: Sequence[str]) -> int:
         keys = sum(self.keys[form] for form in forms)
-        cmds = sum(self.cmds[form.lstrip(":")] for form in forms if form.startswith(":"))
+        cmds = sum(
+            self.cmds[form.lstrip(":")] for form in forms if form.startswith(":")
+        )
         return keys + cmds
 
 
-def print_window(window):
+def print_window(window: Window) -> None:
     dates = sorted(window.dates)
     span = f"{dates[0]} .. {dates[-1]}" if dates else "(empty)"
     print(f"\n===== {window.label}: {span} =====")
@@ -191,25 +235,30 @@ def print_window(window):
 
     vertical = sum(window.keys[k] for k in MOTION_CLASSES["vertical"])
     print(f"\nvertical by filetype: {window.vertical_by_filetype.most_common(10)}")
-    print(f"runs of >={RUN_MIN}: {len(window.runs)}, keys spent in them: {sum(r[1] for r in window.runs)}")
+    in_runs = sum(r[1] for r in window.runs)
+    print(f"runs of >={RUN_MIN}: {len(window.runs)}, keys spent in them: {in_runs}")
     if window.runs:
         longest = sorted(window.runs, key=lambda r: -r[1])[:8]
         print("longest (key, len, median gap ms, filetype):", longest)
         held = [r for r in window.runs if r[2] <= REPEAT_MS]
+        held_keys = sum(r[1] for r in held)
         print(
-            f"  {len(held)} of those ({sum(r[1] for r in held)} keys) at <={REPEAT_MS}ms "
+            f"  {len(held)} of those ({held_keys} keys) at <={REPEAT_MS}ms "
             "median gap -- key-repeat, one press held"
         )
-    print(f"\nvertical movement is {100 * vertical / window.total:.0f}% of every key pressed")
+    vertical_share = 100 * vertical / window.total
+    print(f"\nvertical movement is {vertical_share:.0f}% of every key pressed")
 
     # The filetypes that soak up the most vertical movement are where a better
     # motion would pay; the keys pressed inside them say which one is missing.
     for filetype, _ in window.vertical_by_filetype.most_common(4):
         inside = window.keys_in_filetype[filetype]
-        print(f"  in {filetype} ({sum(inside.values())} keys): {inside.most_common(10)}")
+        print(
+            f"  in {filetype} ({sum(inside.values())} keys): {inside.most_common(10)}"
+        )
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--keylog", default=KEYLOG)
     parser.add_argument("--dojo", default=DOJO)
@@ -245,7 +294,9 @@ def main():
             since = day_after(previous["generated"])
     since = since or dates[0]
 
-    before = Window(sessions, dates[0], day_before(since), "before (up to the previous review)")
+    before = Window(
+        sessions, dates[0], day_before(since), "before (up to the previous review)"
+    )
     now = Window(sessions, since, dates[-1], "since the previous review")
     full = Window(sessions, dates[0], dates[-1], "full retained window")
 
@@ -259,17 +310,18 @@ def main():
     print_window(full)
 
     print("\n===== DOJO ENTRIES =====")
-    print(f"{'group':<10} {'keys':<16} {'before/1k':>10} {'now/1k':>8} {'before':>7} {'now':>5}  desc")
-    counts = {}
-    for group, written, desc, added in dojo_entries(args.dojo):
+    print(
+        f"{'group':<10} {'keys':<16} {'before/1k':>10} {'now/1k':>8} "
+        f"{'before':>7} {'now':>5}  desc"
+    )
+    counts: dict[str, int] = {}
+    for group, written, desc, _added in dojo_entries(args.dojo):
         forms = keytrans_forms(written)
         was, is_now = before.count(forms), now.count(forms)
         if was + is_now:
             counts[written] = was + is_now
-        print(
-            f"{group:<10} {written:<16} {before.rate(was):>10.2f} {now.rate(is_now):>8.2f} "
-            f"{was:>7} {is_now:>5}  {desc[:50]}"
-        )
+        rates = f"{before.rate(was):>10.2f} {now.rate(is_now):>8.2f}"
+        print(f"{group:<10} {written:<16} {rates} {was:>7} {is_now:>5}  {desc[:50]}")
 
     if args.review is not None:
         out = {

@@ -6,47 +6,59 @@ Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0 --
 a broken guard must never wedge a session.
 """
 
+from __future__ import annotations
+
 import json
 import os
 import re
 import sys
+from collections.abc import Iterator, Mapping
+from typing import Any, Final
 
 # Escape hatch: set to any value to disable every rule for a session.
-DISABLE = "CLAUDE_SKIP_CONTENT_GUARD"
+DISABLE: Final = "CLAUDE_SKIP_CONTENT_GUARD"
 
-EDIT_TOOLS = ("Edit", "Write", "MultiEdit")
+EDIT_TOOLS: Final = ("Edit", "Write", "MultiEdit")
 
-TEST_FILE = re.compile(r"(^test_[^/]*|[^/]*_test)\.py$")
+TEST_FILE: Final = re.compile(r"(^test_[^/]*|[^/]*_test)\.py$")
 
-BODY_FILE = ("pr-body.md", "review-body.md")
+BODY_FILE: Final = ("pr-body.md", "review-body.md")
+
+# What the edit would introduce, and why that cannot stand.
+Finding = tuple[str, str]
 
 # Ceiling: single-line signatures only; one wrapped across lines slips through.
 # Widen with a real parser if that shows up.
-NONE_RETURN = re.compile(
+NONE_RETURN: Final = re.compile(
     r"^[ \t]*(async[ \t]+)?def[ \t]+test_\w*[ \t]*\([^)]*\)[ \t]*->[ \t]*None[ \t]*:",
     re.M,
 )
 
 # A bare #123. A qualified ref (owner/repo#123) or a URL keeps its '#'.
-BARE_ISSUE_REF = re.compile(r"(?<![\w/])#\d+\b")
+BARE_ISSUE_REF: Final = re.compile(r"(?<![\w/])#\d+\b")
 
-FENCED_BLOCK = re.compile(r"^```.*?^```", re.M | re.S)
+FENCED_BLOCK: Final = re.compile(r"^```.*?^```", re.M | re.S)
 
 
-def new_text(tool_name, tool_input):
+def text_of(value: object) -> str:
+    """A field of the tool payload as text, empty when it holds anything else."""
+    return value if isinstance(value, str) else ""
+
+
+def new_text(tool_name: str, tool_input: Mapping[str, Any]) -> str:
     """The text this edit would introduce."""
     if tool_name == "Write":
-        return tool_input.get("content", "")
+        return text_of(tool_input.get("content"))
     if tool_name == "Edit":
-        return tool_input.get("new_string", "")
+        return text_of(tool_input.get("new_string"))
     if tool_name == "MultiEdit":
         return "\n".join(
-            edit.get("new_string", "") for edit in tool_input.get("edits", ())
+            text_of(edit.get("new_string")) for edit in tool_input.get("edits", ())
         )
     return ""
 
 
-def none_return_finding(text):
+def none_return_finding(text: str) -> Finding | None:
     match = NONE_RETURN.search(text)
     if not match:
         return None
@@ -58,7 +70,7 @@ def none_return_finding(text):
     )
 
 
-def bare_issue_finding(text):
+def bare_issue_finding(text: str) -> Finding | None:
     match = BARE_ISSUE_REF.search(FENCED_BLOCK.sub("", text))
     if not match:
         return None
@@ -70,7 +82,7 @@ def bare_issue_finding(text):
     )
 
 
-def findings_for(path, text):
+def findings_for(path: str, text: str) -> Iterator[Finding | None]:
     name = os.path.basename(path)
     if TEST_FILE.search(name):
         yield none_return_finding(text)
@@ -78,7 +90,7 @@ def findings_for(path, text):
         yield bare_issue_finding(text)
 
 
-def main():
+def main() -> int:
     if os.environ.get(DISABLE):
         return 0
 
