@@ -31,6 +31,26 @@ local EXCLUDED_DIR = "_private"
 -- The same threshold `plan-status --stale` defaults to, so ?stale means one thing.
 local STALE_DAYS = 30
 
+-- How wide the preview has to be, and no wider.
+--
+-- Measured against the tree rather than picked: glow re-wraps a plan to whatever width it
+-- is handed, so what the files themselves are wrapped at decides nothing. Rendered at 96
+-- columns every plan here comes out with no line cut; at 88, all but a handful, and those
+-- by four columns. Anything past that is blank band -- and the columns it hands back are
+-- what let a row show its title and its facets at the same time.
+local PREVIEW_COLUMNS = 96
+-- What `winopts.width` in the fzf-lua setup leaves the picker of the terminal.
+local WINDOW_FRACTION = 0.9
+
+local function preview_width()
+    return math.max(48, math.min(PREVIEW_COLUMNS, math.floor(vim.o.columns * WINDOW_FRACTION * 0.5)))
+end
+
+--- The columns the list gets once the window and the preview have taken theirs.
+local function list_width()
+    return math.floor(vim.o.columns * WINDOW_FRACTION) - preview_width()
+end
+
 local ANSI = {
     directory = "\27[36m",
     service = "\27[35m",
@@ -159,10 +179,14 @@ local function rows()
         end
     end
 
-    -- Half the window, less what the sequence and status columns spend. A plan with many
-    -- services runs its facets past the edge; fzf clips the display but still matches
-    -- against the whole row, so nothing becomes unfindable by being off-screen.
-    local budget = math.max(30, math.floor(vim.o.columns * 0.5) - 22)
+    -- Where a title stops and its facets start. A cap, not a column: padding every title
+    -- out to the same width lines the facets up, and costs the alignment far more than it
+    -- is worth -- it spends the gap after a short title on nothing, which pushes that row's
+    -- facets off the edge for no reason. Ragged, four rows in ten fit the list entirely
+    -- against one in a hundred padded, and three quarters of all facets are on screen
+    -- against half. 72 is past where these titles stop getting longer, so the cap still
+    -- leaves nearly nine in ten of them whole.
+    local budget = math.max(30, math.min(72, math.floor((list_width() - 19) * 0.6)))
 
     local built = {}
     for _, path in ipairs(paths) do
@@ -176,7 +200,11 @@ local function rows()
                 title = vim.fn.strcharpart(title, 0, budget - 1) .. "…"
             end
 
-            local facets = { ANSI.directory .. "#" .. vim.fs.dirname(relative) .. ANSI.off }
+            -- Ordered by what is worth the screen columns rather than by kind, since only
+            -- the first few survive the edge: a flag is the reason to look at the row at
+            -- all, the services are what the row is about, and the folder is both the
+            -- longest token and the one the sort order has already grouped the row by.
+            local facets = {}
             if meta.review then
                 table.insert(facets, ANSI.flag .. "?review" .. ANSI.off)
             end
@@ -185,6 +213,7 @@ local function rows()
                 table.insert(facets, ANSI.flag .. ("?stale(%dd)"):format(age) .. ANSI.off)
             end
             vim.list_extend(facets, service_tokens(meta.services))
+            table.insert(facets, ANSI.directory .. "#" .. vim.fs.dirname(relative) .. ANSI.off)
             table.insert(facets, ANSI.dim .. "." .. (meta.category or "?") .. ANSI.off)
             -- The filename last, because typing at it has to work: on half of these plans it
             -- carries a word the heading does not (`scope-and-sequence` over "Mark the
@@ -202,7 +231,7 @@ local function rows()
                 ("%-13s"):format("=" .. status),
                 ANSI.off,
                 title,
-                string.rep(" ", math.max(2, budget - vim.fn.strdisplaywidth(title) + 2)),
+                "  ",
                 table.concat(facets, " "),
             })
             table.insert(built, row)
@@ -272,8 +301,12 @@ local function grep(narrowing)
     end
     fzf.live_grep({
         prompt = "plan grep> ",
-        -- Absolute, so the search is scoped the same wherever the editor is standing.
-        search_paths = paths,
+        -- Searched and reported relative to the plan tree, so a result reads as the plan it
+        -- is rather than spending its first 24 columns on a prefix every row shares.
+        cwd = PLAN_ROOT,
+        search_paths = vim.tbl_map(function(path)
+            return path:sub(#PLAN_ROOT + 2)
+        end, paths),
         winopts = { title = (" %d plan%s "):format(#paths, #paths == 1 and "" or "s") },
     })
 end
@@ -289,16 +322,27 @@ local function list()
             title = (" %d plans · @service #dir =status .category ?review ?stale · 'fuzzy · ctrl-g grep these "):format(
                 #all
             ),
-            preview = { layout = "flex" },
+            preview = { layout = "flex", horizontal = ("right:%d"):format(preview_width()) },
         },
         -- Rendered rather than raw: deciding which plan to open is mostly reading what
         -- each one says it is, and the header this list filters on is the top of the file.
-        preview = "glow -s dark -w ${FZF_PREVIEW_COLUMNS:-80} {1}",
+        --
+        -- The fallback matches the pane asked for just above, so that losing the variable
+        -- costs a couple of columns rather than wrapping the text at an unrelated width and
+        -- leaving the rest of the pane empty.
+        preview = ("glow -s dark -w ${FZF_PREVIEW_COLUMNS:-%d} {1}"):format(preview_width()),
         fzf_opts = vim.tbl_extend("error", MATCHING, {
             ["--ansi"] = true,
             -- The path is field 1 and stays hidden; the eye and the query see from 2 on.
             ["--delimiter"] = "\t",
             ["--with-nth"] = "2..",
+            -- Rows stay anchored at their left edge. Left to scroll, fzf chases a match
+            -- that sits out past the edge -- and since the facets are the rightmost thing
+            -- on the row, typing a facet is exactly the case that scrolls: every row slides
+            -- until the sequence, status and title are gone and the list reads as a column
+            -- of sentence fragments. The match highlight goes off-screen instead, which
+            -- costs nothing, because the query is the thing you just typed.
+            ["--no-hscroll"] = true,
         }),
         actions = {
             ["default"] = function(selected)

@@ -41,6 +41,27 @@ local ENTRIES = {
         added = "2026-07-27",
     },
 
+    -- Plans: the header is the index, so the vocabulary earns a row of its own
+    {
+        group = "plan",
+        keys = "<Leader>p",
+        desc = "What was the plan? Every plan, narrowed by what its header claims (ctrl-g: grep just those)",
+        added = "2026-08-16",
+    },
+    {
+        group = "plan",
+        keys = "<Leader>P",
+        desc = "Search the text of every plan, when there is no facet to narrow by first",
+        added = "2026-08-16",
+    },
+    {
+        group = "plan",
+        keys = "@svc =status #dir",
+        desc = "In that list: @service, =status, #folder, .category, ?review, ?stale -- and 'word to match fuzzily",
+        added = "2026-08-16",
+        run = false,
+    },
+
     -- Symbols: the two indexes answer different questions
     {
         group = "symbol",
