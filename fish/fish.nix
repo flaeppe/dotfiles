@@ -127,6 +127,25 @@
             ${builtins.readFile ./functions/_review_skim.fish}
           '';
         };
+        wt = {
+          description =
+            "Lists every worktree with what it would cost to delete it, oldest first";
+          body = ''
+            ${builtins.readFile ./functions/worktrees.fish}
+          '';
+        };
+        _wt_repo = {
+          description = "Renders one repository's worktrees for `wt`";
+          body = ''
+            ${builtins.readFile ./functions/_wt_repo.fish}
+          '';
+        };
+        _wt_age = {
+          description = "Formats a unix timestamp as a short age";
+          body = ''
+            ${builtins.readFile ./functions/_wt_age.fish}
+          '';
+        };
         # Shared by `review <pr>` and `review skim`: both must prepare a worktree
         # identically, or a language server works in one surface and not the next.
         _review_prepare_tree = {
