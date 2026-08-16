@@ -38,6 +38,9 @@ end
 set -l records (_wt_trees $root)
 set -l failed 0
 
+set -l force_arg
+set -q _flag_force; and set force_arg --force
+
 for target in $argv
     # Accepts what the listing prints, a bare directory name, or any trailing part of the
     # path. Ambiguity is reported rather than guessed at, since guessing wrong here deletes
@@ -123,8 +126,16 @@ for target in $argv
         cd $root
     end
 
-    git -C $root worktree remove (set -q _flag_force; and echo --force) $path
-    or begin
+    # Go writes its module cache read-only, directories included, and direnv puts one inside
+    # the worktree. Nothing can unlink an entry from a directory it cannot write, so deletion
+    # fails partway -- and `git worktree remove` deregisters the worktree anyway, leaving a
+    # stub directory belonging to nothing and a branch that never got cleaned up. Making the
+    # tree writable first is what avoids that; it is about to be deleted either way.
+    # Symlinks are not followed, so a dependency tree linked from the main checkout is safe.
+    chmod -R u+w $path 2>/dev/null
+
+    if not git -C $root worktree remove $force_arg $path
+        echo "wt rm: git would not remove $target — $path is still there"
         set failed 1
         continue
     end
