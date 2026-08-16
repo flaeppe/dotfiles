@@ -175,6 +175,8 @@
               -- Reads a PR without a session: the org-wide PR list is a picker, and the
               -- changed-file surface is fzf-lua's own git_diff.
               ${builtins.readFile ./lua/plugins/pr.lua}
+              -- The plan tree as a picker, filtered on what each plan's header says.
+              ${builtins.readFile ./lua/plugins/plan.lua}
             '';
           }
           # Incremental tag generation
