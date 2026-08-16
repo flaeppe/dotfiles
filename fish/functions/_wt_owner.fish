@@ -2,9 +2,9 @@
 #
 #   _wt_owner <path>
 #
-# Empty for a worktree made by hand. The rest have a lifecycle belonging to whatever made
-# them, and from the outside a live one is indistinguishable from an abandoned branch, so
-# nothing here judges or removes them.
+# Empty for a worktree made by hand. Naming the owner is all this does; what follows from it
+# differs per tool. A review session is the only one holding state another command is keeping
+# for it, and so the only one that must not be removed from here.
 
 switch $argv[1]
     case '*/.worktrees/review/*'

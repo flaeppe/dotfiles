@@ -3,8 +3,10 @@
 #   _wt_candidates
 #
 # Tab-separated name and description, which is the format `complete -a` reads. The repo's
-# own checkout and the trees `review` owns are left out, because `wt rm` refuses them and a
-# completion that offers a name only to produce an error is worse than one that stays quiet.
+# own checkout and its review sessions are left out, being the two things `wt rm` refuses,
+# and a completion offering a name only to produce an error is worse than one that is quiet.
+# The skim surface and agent worktrees are offered: they are removable like any other, and
+# leaving them out made the ones that most need clearing the ones that could not be named.
 #
 # Named by directory alone where that is unique, which it nearly always is; the longer form
 # is a tie-break rather than the default, because it is not something worth typing otherwise.
@@ -19,7 +21,7 @@ for record in (_wt_trees $root)
     set -l fields (string split \t -- $record)
     test $fields[1] = $root; and continue
     set -l owner (_wt_owner $fields[1])
-    test -n "$owner"; and continue
+    test "$owner" = review; and continue
 
     set -a paths $fields[1]
     if test -n "$fields[3]"

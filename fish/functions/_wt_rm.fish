@@ -68,17 +68,14 @@ for target in $argv
         continue
     end
 
+    # Only a review session, and only because retiring one archives its findings first --
+    # taking its trees down here loses them. The skim surface and an agent's worktree hold
+    # nothing another command is keeping for them, so what protects those is the same test
+    # that protects everything else: whether anything would be lost.
     set -l owner (_wt_owner $path)
-    if test -n "$owner"
-        switch $owner
-            case review
-                # The PR number is the directory holding head/ and stack/.
-                echo "wt rm: $target is a review session — `review retire "(basename (dirname $path))"` archives it first"
-            case skim
-                echo "wt rm: $target is the skim surface, which `review skim` reuses in place"
-            case agent
-                echo "wt rm: $target belongs to an agent session"
-        end
+    if test "$owner" = review
+        # The PR number is the directory holding head/ and stack/.
+        echo "wt rm: $target is a review session — `review retire "(basename (dirname $path))"` archives it first"
         set failed 1
         continue
     end
@@ -132,6 +129,7 @@ for target in $argv
         continue
     end
     echo "wt rm: removed $target"
+    test "$owner" = skim; and echo "       `review skim` builds it again when it is next wanted"
 
     # Only when the work landed. A branch kept past a --force removal is the whole reason
     # the removal needed forcing.
