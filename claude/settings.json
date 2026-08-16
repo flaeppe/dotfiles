@@ -4,6 +4,8 @@
     "command": "bash ~/.claude/statusline-command.sh"
   },
   "effortLevel": "high",
+  "tui": "fullscreen",
+  "editorMode": "vim",
   "enabledPlugins": {
     "pg@aiguide": true,
     "context7-plugin@context7-marketplace": true
