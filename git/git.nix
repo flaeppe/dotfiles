@@ -25,6 +25,11 @@
         # Core commands -- network
         push = { default = "simple"; };
         pull = { ff = "only"; };
+        # A remote-tracking ref outlives the branch it tracks, so a branch deleted upstream
+        # is indistinguishable from one still being worked on and reads as live forever.
+        # Pruning is what turns it into `gone`, which is the only signal a squash merge
+        # leaves behind.
+        fetch = { prune = true; };
         # Core commands -- diff
         diff = {
           colorMoved = true;
