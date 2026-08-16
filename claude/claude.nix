@@ -100,9 +100,19 @@ in {
     ".claude/skills/upgrade-risk".source = ./skills/upgrade-risk;
   };
 
-  # Deploy as writable copy (not symlink) so `claude plugin install` can write to it
+  # Deploy as writable copy (not symlink) so `claude plugin install` can write
+  # to it. Claude Code also persists its own /config choices here (theme,
+  # editorMode, model, tui, permissions.defaultMode, ...), so merge rather than
+  # overwrite: keys defined below win, everything else on disk survives.
+  # Consequence: dropping a key here no longer removes it from the live file.
   home.activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    install -m 644 ${./settings.json} "$HOME/.claude/settings.json"
+    settings="$HOME/.claude/settings.json"
+    if [ -f "$settings" ]; then
+      ${unstable.jq}/bin/jq -s '.[0] * .[1]' "$settings" ${./settings.json} \
+        > "$settings.new" && mv "$settings.new" "$settings"
+    else
+      install -m 644 ${./settings.json} "$settings"
+    fi
   '';
 
   # Deploy hooks as executable copies (Nix store is read-only)
