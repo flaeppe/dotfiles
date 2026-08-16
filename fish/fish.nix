@@ -6,6 +6,9 @@
   # Fuzzy find Git hashes with preview and actions. It needs more than a simple function
   # so we manually declared the config file.
   xdg.configFile."fish/functions/flog.fish".source = ./functions/flog.fish;
+  # Completions are a file rather than a function, and `programs.fish` has nowhere to put
+  # one, so it is placed directly.
+  xdg.configFile."fish/completions/wt.fish".source = ./completions/wt.fish;
 
   programs = {
     fish = {
@@ -138,6 +141,45 @@
           description = "Renders one repository's worktrees for `wt`";
           body = ''
             ${builtins.readFile ./functions/_wt_repo.fish}
+          '';
+        };
+        _wt_new = {
+          description = "Creates a worktree in .worktrees/ and prepares it for editing";
+          body = ''
+            ${builtins.readFile ./functions/_wt_new.fish}
+          '';
+        };
+        _wt_rm = {
+          description =
+            "Removes worktrees that hold no unsaved work, and the branches they finished";
+          body = ''
+            ${builtins.readFile ./functions/_wt_rm.fish}
+          '';
+        };
+        # Shared by the listing and the remover, so that what `wt` calls removable and what
+        # `wt rm` agrees to remove cannot drift apart.
+        _wt_verdict = {
+          description = "Reports what a worktree's git state says about removing it";
+          body = ''
+            ${builtins.readFile ./functions/_wt_verdict.fish}
+          '';
+        };
+        _wt_trees = {
+          description = "Reassembles `git worktree list --porcelain` into one record a line";
+          body = ''
+            ${builtins.readFile ./functions/_wt_trees.fish}
+          '';
+        };
+        _wt_owner = {
+          description = "Names the tool a worktree belongs to, if any";
+          body = ''
+            ${builtins.readFile ./functions/_wt_owner.fish}
+          '';
+        };
+        _wt_candidates = {
+          description = "Lists the worktrees `wt rm` will consider, for completion";
+          body = ''
+            ${builtins.readFile ./functions/_wt_candidates.fish}
           '';
         };
         _wt_age = {

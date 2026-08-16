@@ -1,7 +1,9 @@
 # An overview of every worktree and what it would cost to delete one.
 #
-#   wt           worktrees of this repository
-#   wt --all     every repository under the workspace root (this repository's parent directory)
+#   wt                    worktrees of this repository
+#   wt --all              every repository under the workspace root (this one's parent)
+#   wt new <name> [<branch>]   create one in .worktrees/ and prepare it
+#   wt rm [--force] <name>...  remove ones that hold nothing, and their branches
 #
 # `git worktree list` says where the worktrees are and nothing about whether they still hold
 # anything, so they accumulate: there is never a moment where one visibly becomes garbage.
@@ -14,14 +16,25 @@
 # current as the last fetch. The header dates every repository for that reason; against a
 # stale fetch this whole listing understates how finished things are.
 
+switch "$argv[1]"
+    case new
+        _wt_new $argv[2..]
+        return $status
+    case rm
+        _wt_rm $argv[2..]
+        return $status
+end
+
 argparse a/all h/help -- $argv
 or return 1
 
 if set -q _flag_help
-    echo "Usage: wt [--all]"
+    echo "Usage: wt [--all] | wt new <name> [<branch>] | wt rm [--force] <name>..."
     echo
-    echo "  wt          worktrees of this repository"
-    echo "  wt --all    every repository under the workspace root"
+    echo "  wt                          worktrees of this repository"
+    echo "  wt --all                    every repository under the workspace root"
+    echo "  wt new <name> [<branch>]    create one in .worktrees/ and prepare it"
+    echo "  wt rm [--force] <name>...   remove ones that hold nothing, and their branches"
     return 0
 end
 
