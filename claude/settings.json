@@ -6,6 +6,10 @@
   "effortLevel": "high",
   "tui": "fullscreen",
   "editorMode": "vim",
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "enabledPlugins": {
     "pg@aiguide": true,
     "context7-plugin@context7-marketplace": true
