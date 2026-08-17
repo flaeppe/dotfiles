@@ -197,21 +197,6 @@ If unsure about base branch, **ASK**.
 ### Exploration
 - Check for an existing implementation before writing new code; read the tests to learn expected behavior.
 
-### gcloud
-- Prefer an available Cloud Logging/Monitoring MCP tool over the `gcloud` CLI for reads —
-  it isn't subject to the Bash gate below at all.
-- When the CLI is the only option, issue `gcloud` calls as single, direct Bash
-  invocations — never inside a shell `for` loop, pipe, `&&`/`;` chain, or command
-  substitution. Need several lookups? One direct `gcloud` call per resource, not a
-  scripted loop. Need filtering/reshaping? Use gcloud's own `--format`/`--filter` flags,
-  not `| jq` / `| grep`.
-- Why: `~/.claude/hooks/gcloud-command-gate` only auto-allows read-only `gcloud logging`
-  reads when `gcloud` is the very first word and the command does nothing else beyond
-  that one call; any operator/substitution around it always asks, by design, since a
-  loop could be hiding a non-read-only call behind an apparently-safe one. That gate
-  stays strict on purpose — route around the prompt by not writing compound commands,
-  never by asking for it to be relaxed.
-
 ### Knowledge Base (kb)
 My work documents are indexed in a local knowledge base, exposed as the `kb`
 MCP server (`kb_find`: hybrid semantic search). It holds whatever I decide to
