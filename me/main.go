@@ -159,7 +159,7 @@ func kittySeed() string {
 func settingsSeed() string {
 	briefHook := map[string]string{"type": "command", "command": "~/.local/bin/me brief"}
 	sessionStart := make([]map[string]any, 0, 3)
-	for _, source := range []string{"startup", "resume", "clear"} {
+	for _, source := range []string{"startup", "resume", "clear", "compact"} {
 		sessionStart = append(sessionStart, map[string]any{
 			"matcher": source,
 			"hooks":   []map[string]string{briefHook},
