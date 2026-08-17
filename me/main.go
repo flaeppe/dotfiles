@@ -53,6 +53,9 @@ func helpText() string {
 		"  note <text>   timestamped line into inbox/notes.md",
 		"  sessions      live Claude sessions: title, status, age, dir",
 		"  inbox         untriaged inbox lines",
+		"  prs           tracked PRs: repo#number, state, title",
+		"  prs sweep     mechanical PR sweep (gh + worktree rebase); meant for the launchd timer",
+		"  pulse         reconcile ended/idle sessions, commit if dirty; meant for the launchd timer",
 		"  day start     roll the board to today (idempotent), commit, print brief",
 		"  sam           find the live Sam session or open his kitty window",
 		"  hook <event>  Claude Code hook plumbing (session-end); always exits 0",
@@ -553,7 +556,10 @@ func cmdSessions() int {
 		return sessions[a].UpdatedAt > sessions[b].UpdatedAt
 	})
 	nowMs := time.Now().UnixMilli()
-	table := [][4]string{{"SESSION", "STATUS", "AGE", "DIR"}}
+	// STARTED and IDLE read different things: a session running 5 hours but typed in
+	// 2 minutes ago is fresh, not stale -- IDLE (from UpdatedAt) is the number that
+	// answers that, and used to not exist here at all.
+	table := [][5]string{{"SESSION", "STATUS", "STARTED", "IDLE", "DIR"}}
 	for _, live := range sessions {
 		title := lastAiTitle(transcriptPath(live.Cwd, live.SessionID))
 		if title == "" {
@@ -569,13 +575,17 @@ func cmdSessions() int {
 		if live.WaitingFor != "" {
 			status += " (" + live.WaitingFor + ")"
 		}
-		age := "?"
+		started := "?"
 		if live.StartedAt != 0 {
-			age = fmtSpan((nowMs - live.StartedAt) / 1000)
+			started = fmtSpan((nowMs - live.StartedAt) / 1000)
 		}
-		table = append(table, [4]string{title, status, age, shortDir(live.Cwd)})
+		idle := "?"
+		if live.UpdatedAt != 0 {
+			idle = fmtSpan((nowMs - live.UpdatedAt) / 1000)
+		}
+		table = append(table, [5]string{title, status, started, idle, shortDir(live.Cwd)})
 	}
-	var widths [4]int
+	var widths [5]int
 	for _, row := range table {
 		for column, cell := range row {
 			if len([]rune(cell)) > widths[column] {
@@ -599,7 +609,7 @@ func cmdInbox() int {
 		return 1
 	}
 	empty := true
-	for _, name := range []string{"notes.md", "sessions.md", "hook-errors.log"} {
+	for _, name := range []string{"notes.md", "sessions.md", "prs.md", "hook-errors.log"} {
 		content, err := os.ReadFile(filepath.Join(inboxDir, name))
 		if err != nil {
 			continue
@@ -884,6 +894,23 @@ func reconcileMe() {
 	}
 }
 
+// dueOnCadence answers a background timer's own throttling question: given when it
+// last actually did real work, should this tick? Awake hours are 07:00-21:00;
+// 07:00-17:00 tracks the timer's own firing interval (so effectively every tick),
+// 17:00-21:00 loosens to hourly, and outside that window it's always no. Shared by
+// every launchd-fed verb (prs sweep, pulse) so the hours policy lives in one place.
+func dueOnCadence(lastRun, now time.Time) bool {
+	hour := now.Hour()
+	switch {
+	case hour < 7 || hour >= 21:
+		return false
+	case hour < 17:
+		return now.Sub(lastRun) >= 15*time.Minute
+	default:
+		return now.Sub(lastRun) >= 60*time.Minute
+	}
+}
+
 // Hook plumbing must never wedge a session: every path exits 0, and failures
 // surface in inbox/hook-errors.log for Sam's triage instead.
 func cmdHook(rest []string) int {
@@ -920,6 +947,10 @@ func run(argv []string) int {
 		return cmdSessions()
 	case "inbox":
 		return cmdInbox()
+	case "prs":
+		return cmdPRs(rest)
+	case "pulse":
+		return cmdPulse()
 	case "day":
 		return cmdDay(rest)
 	case "sam":
