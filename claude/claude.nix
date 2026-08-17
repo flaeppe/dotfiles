@@ -142,6 +142,9 @@ in {
     install -m 755 ${
       ./hooks/format-after-edit
     } "$HOME/.claude/hooks/format-after-edit"
+    install -m 755 ${
+      ./hooks/session-end-inbox
+    } "$HOME/.claude/hooks/session-end-inbox"
   '';
 
   # Status line script (referenced by settings.json statusLine.command)

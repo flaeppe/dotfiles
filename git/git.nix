@@ -93,6 +93,9 @@
         # Marks a repo as one the Postgres language server should attach to, and
         # carries local database connection details; opt-in per machine.
         "postgres-language-server.jsonc"
+        # Per-repo optimizer state (session prep notes, structural context);
+        # machine-local, never part of any repo's build.
+        ".me/"
       ];
     } // (if isWork then {
       signing = {

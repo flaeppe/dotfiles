@@ -1,0 +1,6 @@
+#!/bin/bash
+# SessionEnd -> one inbox line in ME_HOME, via `me hook session-end`.
+# Never blocks a session: an absent binary or any failure exits 0 silently.
+[ -x "$HOME/.local/bin/me" ] || exit 0
+"$HOME/.local/bin/me" hook session-end 2>/dev/null
+exit 0
