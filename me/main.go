@@ -416,6 +416,51 @@ func historyFor(sessionID string) (int, int64, string) {
 	return prompts, firstMs, firstDisplay
 }
 
+// transcriptPrompts is historyFor's fallback: it scans the transcript itself
+// for typed human turns instead of the prompt index. SDK-invoked sessions
+// (promptSource "sdk") carry no interactive-input-box entry in history.jsonl
+// at all, which historyFor reads as "no human prompt" -- true for those, but
+// also the shape of a session whose interactive turns simply never made it
+// into that index. Only "typed" turns count as one of Sam's own.
+func transcriptPrompts(transcript string) (int, int64, string) {
+	content, err := os.ReadFile(transcript)
+	if err != nil {
+		return 0, 0, ""
+	}
+	prompts := 0
+	var firstMs int64
+	firstDisplay := ""
+	for _, raw := range strings.Split(string(content), "\n") {
+		if !strings.Contains(raw, `"promptSource":"typed"`) {
+			continue
+		}
+		var record struct {
+			Type    string `json:"type"`
+			Message struct {
+				Content json.RawMessage `json:"content"`
+			} `json:"message"`
+			Timestamp string `json:"timestamp"`
+		}
+		if json.Unmarshal([]byte(raw), &record) != nil || record.Type != "user" {
+			continue
+		}
+		prompts++
+		if firstMs != 0 {
+			continue
+		}
+		parsed, err := time.Parse(time.RFC3339, record.Timestamp)
+		if err != nil {
+			continue
+		}
+		firstMs = parsed.UnixMilli()
+		var text string
+		if json.Unmarshal(record.Message.Content, &text) == nil {
+			firstDisplay = strings.Join(strings.Fields(text), " ")
+		}
+	}
+	return prompts, firstMs, firstDisplay
+}
+
 func cmdInit() int {
 	for _, dir := range []string{meHome, inboxDir, filepath.Join(meHome, ".claude")} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
@@ -577,6 +622,14 @@ func cmdBrief() int {
 	if !requireHome() {
 		return 1
 	}
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				hookError(fmt.Sprintf("brief: reconcile panic: %v", recovered))
+			}
+		}()
+		reconcileMe()
+	}()
 	content, err := os.ReadFile(boardPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "me: %v\n", err)
@@ -724,6 +777,49 @@ func hookError(message string) {
 	_ = appendLocked(filepath.Join(inboxDir, "hook-errors.log"), "- "+now+" "+message)
 }
 
+// sessionLine renders one sessions.md entry for a session that has ended, or
+// ("", 0) if it never carried a real prompt (subagent, -p, or an SDK-invoked
+// probe -- see transcriptPrompts). historyFor is tried first since it also
+// carries prompts made before the session's own transcript existed; its
+// fallback covers the sessions it misses entirely.
+func sessionLine(sessionID, cwd string, endTime time.Time) (string, int) {
+	transcript := transcriptPath(cwd, sessionID)
+	prompts, firstMs, firstDisplay := historyFor(sessionID)
+	if prompts == 0 {
+		prompts, firstMs, firstDisplay = transcriptPrompts(transcript)
+	}
+	if prompts == 0 {
+		return "", 0
+	}
+	tags := "[end]"
+	if cwd == meHome {
+		tags += "[me]"
+	}
+	if strings.Contains(cwd, "/.worktrees/") {
+		tags += "[review]"
+	}
+	title := lastAiTitle(transcript)
+	if title == "" {
+		title = firstDisplay
+		if len([]rune(title)) > 60 {
+			title = string([]rune(title)[:60])
+		}
+	}
+	if title == "" && cwd != "" {
+		title = filepath.Base(cwd)
+	}
+	span := "?"
+	if firstMs != 0 {
+		span = fmtSpan(endTime.Unix() - firstMs/1000)
+	}
+	line := fmt.Sprintf(
+		"- %s %s %q dir=%s span=%s prompts=%d id=%s",
+		endTime.Format("2006-01-02 15:04"), tags, title,
+		shortDir(cwd), span, prompts, sessionID[:8],
+	)
+	return line, prompts
+}
+
 func hookSessionEnd() error {
 	var payload map[string]any
 	if err := json.NewDecoder(os.Stdin).Decode(&payload); err != nil {
@@ -738,7 +834,6 @@ func hookSessionEnd() error {
 		sessionID = asString("sessionId")
 	}
 	cwd := asString("cwd")
-	transcript := asString("transcript_path")
 	// Real ids are 36-char UUIDs; anything shorter would panic the id slice
 	// and make the substring scan over history.jsonl match everything.
 	if len(sessionID) < 8 {
@@ -750,44 +845,43 @@ func hookSessionEnd() error {
 	if strings.HasPrefix(cwd, "/private/tmp/claude") || strings.HasPrefix(cwd, claudeDir) {
 		return nil
 	}
-	prompts, firstMs, firstDisplay := historyFor(sessionID)
-	// No line in history.jsonl means no human prompt: subagent or -p noise.
+	line, prompts := sessionLine(sessionID, cwd, time.Now())
 	if prompts == 0 {
 		return nil
 	}
-	tags := "[end]"
-	if cwd == meHome {
-		tags += "[me]"
+	return upsertLocked(filepath.Join(inboxDir, "sessions.md"), "id="+sessionID[:8], line)
+}
+
+// reconcileMe backfills any Sam session (cwd == meHome) whose SessionEnd hook
+// never landed a line -- upstream, Ctrl-C can cancel the hook before it runs
+// (anthropics/claude-code#32712), and SessionEnd has no documented reason for
+// that exit path at all. Runs from `me brief` instead, which fires on every
+// SessionStart, using each transcript file as the durable record rather than
+// a one-shot event.
+func reconcileMe() {
+	live := map[string]bool{}
+	for _, s := range liveSessions() {
+		live[s.SessionID] = true
 	}
-	if strings.Contains(cwd, "/.worktrees/") {
-		tags += "[review]"
+	matches, err := filepath.Glob(filepath.Join(claudeDir, "projects", slug(meHome), "*.jsonl"))
+	if err != nil {
+		return
 	}
-	title := ""
-	if transcript != "" {
-		title = lastAiTitle(transcript)
-	}
-	if title == "" {
-		title = firstDisplay
-		if len([]rune(title)) > 60 {
-			title = string([]rune(title)[:60])
+	for _, transcript := range matches {
+		sessionID := strings.TrimSuffix(filepath.Base(transcript), ".jsonl")
+		if len(sessionID) < 8 || live[sessionID] {
+			continue
 		}
+		info, err := os.Stat(transcript)
+		if err != nil {
+			continue
+		}
+		line, prompts := sessionLine(sessionID, meHome, info.ModTime())
+		if prompts == 0 {
+			continue
+		}
+		_ = upsertLocked(filepath.Join(inboxDir, "sessions.md"), "id="+sessionID[:8], line)
 	}
-	if title == "" && cwd != "" {
-		title = filepath.Base(cwd)
-	}
-	now := time.Now()
-	span := "?"
-	if firstMs != 0 {
-		span = fmtSpan(now.Unix() - firstMs/1000)
-	}
-	line := fmt.Sprintf(
-		"- %s %s %q dir=%s span=%s prompts=%d id=%s",
-		now.Format("2006-01-02 15:04"), tags, title,
-		shortDir(cwd), span, prompts, sessionID[:8],
-	)
-	return upsertLocked(
-		filepath.Join(inboxDir, "sessions.md"), "id="+sessionID[:8], line,
-	)
 }
 
 // Hook plumbing must never wedge a session: every path exits 0, and failures
