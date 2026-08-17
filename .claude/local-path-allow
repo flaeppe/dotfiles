@@ -2,6 +2,8 @@
 # One repo-relative path prefix per line. This repo defines the local-only
 # paths the guard looks for, so spelling them out here is the point.
 claude/hooks/git-local-path-guard
+claude/hooks/plan-verified-guard
 git/git.nix
+nvim/lua/plugins/plan.lua
 opencode/skills/docs-expert/
 opencode/skills/planning/

@@ -40,8 +40,8 @@ Load relevant domain skills for the code you're documenting:
 
 Detect mode from context, in this order:
 
-1. **Planning directory has unprocessed plans** — if `_private/.plan/` (single
-   repo) or `~/anyfin/.plan/` (multi-repo) contains plans whose corresponding
+1. **Planning directory has unprocessed plans** — if `~/.plan/<repo>/` (single
+   repo) or `~/.plan/_cross/` (multi-repo) contains plans whose corresponding
    module/code shows no README of comparable scope, enter **Plan → Docs** mode.
 2. **Changed code since base branch** — diff against `origin/main` /
    `origin/master`. If there are added or changed source files, enter

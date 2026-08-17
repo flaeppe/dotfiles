@@ -85,6 +85,10 @@
           {
             "type": "command",
             "command": "~/.claude/hooks/edit-content-guard"
+          },
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/plan-verified-guard"
           }
         ]
       }

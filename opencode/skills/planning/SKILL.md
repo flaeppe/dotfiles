@@ -18,19 +18,27 @@ Do NOT use for trivial single-file changes or quick bug fixes.
 
 ### Location
 
-Every plan lives in one tree, never inside a work checkout:
+Every plan lives in one tree, never inside a work checkout. The repository the
+work belongs to picks the directory — `_cross` when it belongs to several — and
+the plan's shape picks what sits under it:
 
 ```
-Single-repo work:   ~/.plan/<repo>/<project>/NNN-description.md
-Multi-repo work:    ~/.plan/_cross/<project>/NNN-description.md
+Multi-file:   ~/.plan/<repo>/<project>/NNN-description.md
+Single-file:  ~/.plan/<repo>/description.md
+Multi-repo:   ~/.plan/_cross/ + either shape
 ```
 
 `<project>` is a short kebab-case name for the effort (e.g., `pydantic-v2`,
-`distributed-tracing`, `submission-mode`).
+`distributed-tracing`, `submission-mode`): a directory per effort, a file per
+increment. A single-file plan is one document — no directory, no number.
 
 ### Numbering
 
 Zero-padded, monotonically increasing: `001`, `002`, `003`, ...
+
+A number is a position in a series, so it belongs only inside a `<project>/`
+directory — a flat file has no series to be second in. A single-file plan that
+grows increments gets a directory and moves in as `001`.
 
 The sequence IS the history. To understand the full picture, start at the
 highest number and work backwards.
@@ -91,7 +99,7 @@ lists what has gone unverified and exits non-zero, so it works as a check.
 ## The Decomposition Procedure
 
 This procedure is mandatory for all multi-step work. First choose the plan's
-**shape**: **one file** for a single design plus a mechanical rollout over
+**shape**: **single-file** for a single design plus a mechanical rollout over
 similar items (rollout as a checklist, no 002+); **multi-file** (001 + a file
 per increment) when increments each carry distinct design worth its own document.
 
@@ -112,7 +120,7 @@ files build on it.
 End 001 with a section that previews the incremental sequence and the
 rationale for that ordering.
 
-### Phase 2: Incremental Extraction → 002, 003, … (one-file mode: a checklist in 001)
+### Phase 2: Incremental Extraction → 002, 003, … (single-file mode: a checklist in the one document)
 
 From the full scope in 001, extract independently deployable increments.
 
@@ -206,11 +214,10 @@ isolation.
 
 ## Resuming Existing Plans
 
-Before starting, check whether a plan directory already exists:
-- Single-repo: `~/.plan/<repo>/`
-- Multi-repo: `~/.plan/_cross/`
+Before starting, check whether the effort already has files under its
+repository's directory, or under `_cross/`.
 
-Start with `plan-status` on the project directory — it gives you the whole
+Start with `plan-status` on that directory — it gives you the whole
 series' state in one pass, and tells you which files are stale or carry a
 `review:` flag before you spend anything reading them. Then read the files
 themselves, highest number first. Then:

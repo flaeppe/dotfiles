@@ -1,9 +1,10 @@
 -- Every planning document under ~/.plan, filterable by what its header claims it is.
 --
--- A plan is filed under the repository it belongs to (~/.plan/<repo>/<project>/NNN-*.md),
--- except the cross-repo ones, which are filed under _cross/ and belong to several. The
--- filing directory therefore cannot answer "what is still open in payout" -- only the
--- header's `services:` list can, and that list has the same shape for both kinds of plan.
+-- A plan is filed under the repository it belongs to -- ~/.plan/<repo>/, as a flat
+-- <description>.md or a <project>/NNN-*.md series -- except the cross-repo ones, which
+-- are filed under _cross/ and belong to several. The filing directory therefore cannot
+-- answer "what is still open in payout" -- only the header's `services:` list can, and
+-- that list has the same shape for both kinds of plan.
 -- So each row carries its header as sigil-prefixed tokens and fzf's own query algebra does
 -- the filtering: `@payout =draft`, `@api !=complete`, `#_cross ?`.
 --

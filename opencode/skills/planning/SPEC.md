@@ -17,7 +17,8 @@ survives across PRs and sessions. It plans the work; it does not perform it.
 - History lives in git (commit messages + `git log`) — no changelog file here.
 
 **Size budget:** 8000 chars, worst-path load across the skill dir (SKILL.md +
-the largest single leaf). Currently 6694; check with `wc -c`.
+the largest single leaf). Currently 8804 — over the ceiling; check with `wc -c`.
+Trim back or raise the ceiling deliberately, and restamp this figure either way.
 
 **Rehaul threshold:** a change touching >25% of SKILL.md lines, or the
 frontmatter description, or the section structure — do it as its own rewrite
