@@ -1,14 +1,16 @@
 # Completions for `wt`.
 #
-# `rm` offers only the worktrees it would actually consider: the repository's own checkout
-# and the trees `review` owns are absent, because `wt rm` refuses both and completing to a
-# name that can only produce an error is worse than completing to nothing.
+# `rm` offers only the worktrees it would actually consider, spelled the way the listing
+# spells them: the repository's own checkout and its review sessions are absent, because
+# `wt rm` refuses both and completing to a name that can only produce an error is worse than
+# completing to nothing.
 
 complete -c wt -f
 
 complete -c wt -n __fish_use_subcommand -a new -d 'Create a worktree and prepare it'
 complete -c wt -n __fish_use_subcommand -a rm -d 'Remove worktrees that hold nothing'
 complete -c wt -n __fish_use_subcommand -s a -l all -d 'Every repository under the workspace root'
+complete -c wt -n __fish_use_subcommand -s s -l size -d 'Measure each worktree on disk (slow)'
 complete -c wt -n __fish_use_subcommand -s h -l help -d 'Usage'
 
 complete -c wt -n '__fish_seen_subcommand_from rm' -a '(_wt_candidates)'

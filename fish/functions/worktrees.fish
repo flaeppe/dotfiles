@@ -2,6 +2,7 @@
 #
 #   wt                    worktrees of this repository
 #   wt --all              every repository under the workspace root (this one's parent)
+#   wt --size             measure each one on disk (slow: it walks every file)
 #   wt new <name> [<branch>]   create one in .worktrees/ and prepare it
 #   wt rm [--force] <name>...  remove ones that hold nothing, and their branches
 #
@@ -25,14 +26,15 @@ switch "$argv[1]"
         return $status
 end
 
-argparse a/all h/help -- $argv
+argparse a/all s/size h/help -- $argv
 or return 1
 
 if set -q _flag_help
-    echo "Usage: wt [--all] | wt new <name> [<branch>] | wt rm [--force] <name>..."
+    echo "Usage: wt [--all] [--size] | wt new <name> [<branch>] | wt rm [--force] <name>..."
     echo
     echo "  wt                          worktrees of this repository"
     echo "  wt --all                    every repository under the workspace root"
+    echo "  wt --size                   measure each one on disk (slow)"
     echo "  wt new <name> [<branch>]    create one in .worktrees/ and prepare it"
     echo "  wt rm [--force] <name>...   remove ones that hold nothing, and their branches"
     return 0
@@ -48,8 +50,13 @@ end
 # directory holding the repositories rather than to any one checkout.
 set -l workspace (dirname (dirname $common))
 
+# Passed on as a value rather than read again, because `_wt_repo` is a function and argparse's
+# flags are local to this one.
+set -l measure
+set -q _flag_size; and set measure yes
+
 if not set -q _flag_all
-    _wt_repo $common $workspace
+    _wt_repo $common $workspace $measure
     return $status
 end
 
@@ -72,7 +79,7 @@ for c in (printf '%s\n' $commons | sort -u)
         set single (math $single + 1)
         continue
     end
-    _wt_repo $c $workspace
+    _wt_repo $c $workspace $measure
 end
 
 printf '%s%d repositories, %d with only their own checkout (not shown)%s\n' \

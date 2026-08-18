@@ -1,9 +1,10 @@
 # One repository's worktrees, oldest first, with the reason each one is or is not finished.
 #
-#   _wt_repo <git-common-dir> <workspace-root>
+#   _wt_repo <git-common-dir> <workspace-root> [<measure-size>]
 
 set -l common $argv[1]
 set -l workspace $argv[2]
+set -l measure $argv[3]
 set -l root (dirname $common)
 
 # The base every branch is measured against. origin/HEAD is the only place the default branch
@@ -20,9 +21,26 @@ set -l refinfo (git -C $root for-each-ref \
     --format='%(refname:short)|%(committerdate:unix)|%(upstream:short)|%(upstream:track)' \
     refs/heads/)
 
+set -l records (_wt_trees $root)
+
+# Measured in one parallel batch rather than per row: walking a worktree that has ever built
+# anything means hundreds of thousands of files, and doing that serially takes long enough
+# that it has to be asked for. `du` reports the tree it is given, so a worktree nested inside
+# the checkout is counted in both -- only the removable rows are ever summed, and those do
+# not nest inside one another.
+set -l sizes
+if test -n "$measure"
+    set -l paths
+    for record in $records
+        set -a paths (string split -f1 \t -- $record)
+    end
+    set sizes (printf '%s\n' $paths | xargs -P 8 -I{} du -sk {} 2>/dev/null)
+end
+
 set -l rows
 set -l removable 0
-for record in (_wt_trees $root)
+set -l reclaimable 0
+for record in $records
     set -l fields (string split \t -- $record)
     set -l path $fields[1]
     set -l sha $fields[2]
@@ -51,6 +69,12 @@ for record in (_wt_trees $root)
     set -l behind $v[4]
     set -l push $v[5]
 
+    set -l kb
+    if test -n "$measure"
+        set -l hit (string match -r -- '^(\d+)\t'(string escape --style=regex -- $path)'$' $sizes)
+        test (count $hit) -ge 2; and set kb $hit[2]
+    end
+
     set -l owner (_wt_owner $path)
     set -l note
     set -l colour normal
@@ -77,10 +101,12 @@ for record in (_wt_trees $root)
                 set note 'merged — removable'
                 set colour green
                 set removable (math $removable + 1)
+                test -n "$kb"; and set reclaimable (math $reclaimable + $kb)
             case gone
                 set note 'branch gone from origin — removable'
                 set colour green
                 set removable (math $removable + 1)
+                test -n "$kb"; and set reclaimable (math $reclaimable + $kb)
             case '*'
                 set note active
         end
@@ -92,11 +118,12 @@ for record in (_wt_trees $root)
     test -z "$order"; and set order 9999999999
     test $path = $root; and set order 0
 
-    set -a rows (printf '%010d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' $order \
+    set -a rows (printf '%010d\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' $order \
         (string replace "$workspace/" '' -- $path) \
         (test -n "$branch"; and echo $branch; or echo (string sub -l 8 -- $sha)) \
         (_wt_age $stamp) "$ahead" "$behind" "$dirty" "$push" \
-        (string trim -- "$note $wflags") $colour)
+        (string trim -- "$note $wflags") $colour \
+        (test -n "$kb"; and _wt_size $kb; or echo -))
 end
 
 set -l fetched ?
@@ -107,6 +134,9 @@ end
 printf '\n%s%s%s  %s  ·  %d worktree' (set_color --bold) (basename $root) (set_color normal) $base (count $rows)
 test (count $rows) -gt 1; and printf s
 test $removable -gt 0; and printf ', %d removable' $removable
+if test $reclaimable -gt 0
+    printf ' holding %s' (_wt_size $reclaimable)
+end
 printf '%s  ·  fetched %s ago%s\n' (set_color brblack) $fetched (set_color normal)
 
 # Padded before colouring: escape sequences count towards printf's field width and would
@@ -121,15 +151,20 @@ end
 test $width_path -gt 44; and set width_path 44
 test $width_branch -gt 44; and set width_branch 44
 
-printf '%s  %s  %s  %5s %6s %6s %6s %6s  %s%s\n' (set_color brblack) \
+set -l size_head ''
+test -n "$measure"; and set size_head ' '(string pad -w 7 SIZE)
+
+printf '%s  %s  %s  %5s%s %6s %6s %6s %6s  %s%s\n' (set_color brblack) \
     (string pad -r -w $width_path WORKTREE) (string pad -r -w $width_branch BRANCH) \
-    AGE AHEAD BEHIND DIRTY PUSH NOTE (set_color normal)
+    AGE "$size_head" AHEAD BEHIND DIRTY PUSH NOTE (set_color normal)
 
 for row in (printf '%s\n' $rows | sort -n)
     set -l f (string split \t -- $row)
-    printf '  %s%s%s  %s%s%s  %5s %6s %6s %6s %6s  %s%s%s\n' \
+    set -l size_cell ''
+    test -n "$measure"; and set size_cell ' '(string pad -w 7 -- $f[11])
+    printf '  %s%s%s  %s%s%s  %5s%s %6s %6s %6s %6s  %s%s%s\n' \
         (set_color $f[10]) (string pad -r -w $width_path -- (string shorten --left -m $width_path -- $f[2])) (set_color normal) \
         (set_color cyan) (string pad -r -w $width_branch -- (string shorten -m $width_branch -- $f[3])) (set_color normal) \
-        $f[4] "+$f[5]" "-$f[6]" $f[7] $f[8] \
+        $f[4] "$size_cell" "+$f[5]" "-$f[6]" $f[7] $f[8] \
         (set_color $f[10]) $f[9] (set_color normal)
 end

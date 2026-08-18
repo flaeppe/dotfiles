@@ -182,6 +182,12 @@
             ${builtins.readFile ./functions/_wt_candidates.fish}
           '';
         };
+        _wt_size = {
+          description = "Formats a size in kilobytes for the SIZE column";
+          body = ''
+            ${builtins.readFile ./functions/_wt_size.fish}
+          '';
+        };
         _wt_age = {
           description = "Formats a unix timestamp as a short age";
           body = ''
