@@ -17,6 +17,10 @@ let
   # /usr/bin/git, gh has no such fallback and fails "not found in $PATH".
   launchdPath = "${config.home.homeDirectory}/.nix-profile/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 in {
+  # npx, for `ccusage` (statusline session-spend reporting) -- no first-party
+  # `claude usage` CLI exists yet.
+  home.packages = [ pkgs.nodejs ];
+
   # The stable absolute path the session-end hook shim references.
   home.file.".local/bin/me".source = "${me}/bin/me";
 
