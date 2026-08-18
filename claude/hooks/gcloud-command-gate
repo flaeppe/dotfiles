@@ -1,14 +1,15 @@
 #!/usr/bin/python3
 """Claude Code PreToolUse gate for `gcloud`: any `gcloud logging` call is
-denied outright and redirected to `glog`, the read-only Cloud Logging CLI;
-every other gcloud command needs approval, same as before.
+denied outright and redirected to `anyfin log`, the read-only Cloud Logging
+CLI; every other gcloud command needs approval, same as before.
 
 `gcloud logging` used to get a narrow read-only allowlist here, parsed out of
 the shell command line -- fragile by construction, since a call nested inside
 another command's argument (`bash -c "gcloud logging read ..."`) escapes a
-parser working off word position. `glog` sidesteps the whole class of problem:
-it is physically incapable of writes, so it can be allowlisted wholesale
-(see ~/.dotfiles/claude/settings.json) instead of gated command-by-command.
+parser working off word position. `anyfin` sidesteps the whole class of
+problem: it is physically incapable of writes, so it can be allowlisted
+wholesale (see ~/.dotfiles/claude/settings.json) instead of gated
+command-by-command.
 
 Answers with a permissionDecision so the verdict holds in every permission mode,
 including the ones where a classifier would otherwise decide. Only a command
@@ -53,9 +54,9 @@ WIDE_FLAGS_WITH_VALUE: Final = frozenset(
 # covered by a verdict about gcloud.
 SUBSTITUTION: Final = ("`", "$(")
 
-GLOG_REDIRECT: Final = (
-    "gcloud logging is retired here -- use `glog` (read-only Cloud Logging CLI): "
-    "glog read <filter> --freshness 1h"
+ANYFIN_LOG_REDIRECT: Final = (
+    "gcloud logging is retired here -- use `anyfin log read <filter> --freshness 1h` "
+    "(read-only Cloud Logging CLI)"
 )
 
 
@@ -140,7 +141,7 @@ def main() -> None:
     elif runs_more_than_gcloud(words):
         decide("ask", "the command does more than run gcloud")
     elif is_logging_command(words):
-        decide("deny", GLOG_REDIRECT)
+        decide("deny", ANYFIN_LOG_REDIRECT)
     else:
         decide("ask", "gcloud requires approval")
 
