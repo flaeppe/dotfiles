@@ -167,6 +167,7 @@ func cmdPulse() int {
 	commitIfDirty(now)
 	backfillEndedSessions(&state, now)
 	flagIdleSessions(&state, now)
+	scanFrictionSafely(now)
 
 	if err := savePulseState(state); err != nil {
 		hookError("pulse: save state: " + err.Error())

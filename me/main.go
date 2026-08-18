@@ -56,6 +56,7 @@ func helpText() string {
 		"  prs           tracked PRs: repo#number, state, title",
 		"  prs sweep     mechanical PR sweep (gh + worktree rebase); meant for the launchd timer",
 		"  pulse         reconcile ended/idle sessions, commit if dirty; meant for the launchd timer",
+		"  friction      scan transcripts for repeated command shapes across sessions, feed inbox",
 		"  day start     roll the board to today (idempotent), commit, print brief",
 		"  sam           find the live Sam session or open his kitty window",
 		"  wt <args>     git worktree management (new/list/retire/...); passthrough to the",
@@ -342,6 +343,35 @@ func upsertLocked(path, key, line string) error {
 	return err
 }
 
+// replaceLocked overwrites a file's full contents under flock, for writers that
+// recompute their entire state each run (friction.go) rather than merging one line at
+// a time the way upsertLocked does.
+func replaceLocked(path string, lines []string) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	handle, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o644)
+	if err != nil {
+		return err
+	}
+	defer handle.Close()
+	if err := syscall.Flock(int(handle.Fd()), syscall.LOCK_EX); err != nil {
+		return err
+	}
+	if err := handle.Truncate(0); err != nil {
+		return err
+	}
+	if _, err := handle.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	content := ""
+	if len(lines) > 0 {
+		content = strings.Join(lines, "\n") + "\n"
+	}
+	_, err = handle.WriteString(content)
+	return err
+}
+
 func requireHome() bool {
 	info, err := os.Stat(meHome)
 	if err == nil && info.IsDir() {
@@ -611,7 +641,7 @@ func cmdInbox() int {
 		return 1
 	}
 	empty := true
-	for _, name := range []string{"notes.md", "sessions.md", "prs.md", "hook-errors.log"} {
+	for _, name := range []string{"notes.md", "sessions.md", "prs.md", "friction.md", "hook-errors.log"} {
 		content, err := os.ReadFile(filepath.Join(inboxDir, name))
 		if err != nil {
 			continue
@@ -990,6 +1020,8 @@ func run(argv []string) int {
 		return cmdPRs(rest)
 	case "pulse":
 		return cmdPulse()
+	case "friction":
+		return cmdFriction()
 	case "day":
 		return cmdDay(rest)
 	case "sam":
