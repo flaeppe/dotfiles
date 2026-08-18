@@ -1,4 +1,4 @@
-{ lib, unstable, ... }:
+{ pkgs, lib, unstable, ... }:
 let
   opencode = ../opencode;
 
@@ -58,6 +58,10 @@ let
     };
   }) sharedSkills);
 in {
+  # npx, for `ccusage` (statusline session-spend reporting) -- no first-party
+  # `claude usage` CLI exists yet.
+  home.packages = [ pkgs.nodejs ];
+
   home.file = sharedRuleEntries // alwaysRuleEntries // sharedSkillEntries
     // claudeAgentEntries // {
     # Global instructions -- shared, single source in opencode/AGENTS.md

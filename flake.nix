@@ -50,7 +50,6 @@
           ./fish/fish.nix
           ./git/git.nix
           ./i3/i3.nix
-          ./me/me.nix
           ./nvim/nvim.nix
         ];
       };
@@ -80,7 +79,6 @@
               ./claude/claude.nix
               ./fish/fish.nix
               ./git/git.nix
-              ./me/me.nix
               ./nvim/nvim.nix
               ./opencode/opencode.nix
               tools.homeModules.default
