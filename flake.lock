@@ -98,8 +98,8 @@
         "nixpkgs": "nixpkgs_2"
       },
       "locked": {
-        "lastModified": 1787070132,
-        "narHash": "sha256-gI4VKjK3jq2B3YwcjdJcuyUX4gwmttzg94AkIL26XRk=",
+        "lastModified": 1787070411,
+        "narHash": "sha256-sg/cq6Nc1LuGsUqbXRG/YyKYM35ePDF6QjWEOzA3oiA=",
         "path": "/Users/petter.friberg/anyfin/.me/tools",
         "type": "path"
       },

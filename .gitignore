@@ -17,7 +17,3 @@
 
 # AI
 .claude/settings.local.json
-
-# nix builds glog out-of-tree; this only guards against a stray `go build`
-# writing its binary into the module directory by mistake.
-glog/glog
