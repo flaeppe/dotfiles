@@ -30,29 +30,55 @@ if test -z "$common"
 end
 set -l root (dirname $common)
 set -l repo (basename $root)
-set -l tree "$root/.worktrees/skim"
 
+# The author's seat: a PR whose branch is checked out in one of this repository's
+# worktrees is own work, and the surface to open is that worktree. The diff machinery is
+# identical -- :PrDiff signs against the merge base without touching a checkout that is
+# already on the PR's branch -- but edits land on the live branch instead of a
+# read-only copy.
+set -l own_tree ""
+if test -n "$pr"
+    set -l head_branch (gh pr view $pr --json headRefName --jq .headRefName 2>/dev/null)
+    if test -n "$head_branch"
+        set own_tree (git worktree list --porcelain | \
+            awk -v ref="branch refs/heads/$head_branch" '/^worktree /{wt=substr($0,10)} $0==ref{print wt; exit}')
+    end
+end
+
+set -l tree "$root/.worktrees/skim"
+set -l title "skim $repo"
 # One editor per repository, addressable: the PR list spans the whole organisation, so
 # picking a PR in another repository has to reach that repository's surface. With a
 # socket it retargets the window already open there instead of opening a second one.
+# Own worktrees get a socket each: retargeting a PR into the wrong worktree's editor
+# would `gh pr checkout` over work in progress.
 set -l socket "/tmp/nvim-skim-$repo.sock"
-
-if not test -d $tree
-    echo "review skim: creating the skim worktree"
-    # Detached at whatever the main checkout is on, which is only a placeholder until the
-    # first PR is picked. Never a branch -- the reviewer is frequently the author, and a
-    # branch already checked out in the main worktree cannot be checked out here too.
-    git worktree add -q --detach $tree HEAD; or return 1
+if test -n "$own_tree"
+    set -l wt_name (basename $own_tree)
+    set tree $own_tree
+    set title "own $repo $wt_name"
+    set socket "/tmp/nvim-own-$repo-$wt_name.sock"
 end
 
-_review_prepare_tree $root $tree skim
+if test -z "$own_tree"
+    if not test -d $tree
+        echo "review skim: creating the skim worktree"
+        # Detached at whatever the main checkout is on, which is only a placeholder until the
+        # first PR is picked. Never a branch -- the reviewer is frequently the author, and a
+        # branch already checked out in the main worktree cannot be checked out here too.
+        git worktree add -q --detach $tree HEAD; or return 1
+    end
 
-# Presence of this file is what tells the editor it is standing on the skim surface, and
-# therefore that loading a PR means a detached checkout here rather than `gh pr checkout`
-# in place. It carries the current PR so the surface survives closing the editor; the
-# editor rewrites it on every switch.
-if not test -f "$tree/.review/skim.json"
-    printf '{\n  "repo": "%s",\n  "pr": null\n}\n' $repo >"$tree/.review/skim.json"
+    _review_prepare_tree $root $tree skim
+
+    # Presence of this file is what tells the editor it is standing on the skim surface, and
+    # therefore that loading a PR means a detached checkout here rather than `gh pr checkout`
+    # in place. It carries the current PR so the surface survives closing the editor; the
+    # editor rewrites it on every switch. An own worktree must never get one: it is not the
+    # skim surface, and the marker file would make loading another PR there detach it.
+    if not test -f "$tree/.review/skim.json"
+        printf '{\n  "repo": "%s",\n  "pr": null\n}\n' $repo >"$tree/.review/skim.json"
+    end
 end
 
 # An editor already listening is the one to reuse -- a second window on the same worktree
@@ -87,7 +113,7 @@ if test -S $socket
     end
     # Bring it forward, since the point of asking was to look at it.
     if test -n "$kitty_socket"
-        kitty @ --to $kitty_socket focus-tab --match "title:^skim $repo\$" >/dev/null 2>&1
+        kitty @ --to $kitty_socket focus-tab --match "title:^$title\$" >/dev/null 2>&1
     end
     return 0
 end
@@ -102,7 +128,7 @@ set -l launch "direnv export fish | source; and nvim --listen $socket -c \"$entr
 if test -n "$kitty_socket"
     # The editor first, then a shell beside it. The second launch lands in the tab the
     # first one created, which kitty has made active by then.
-    kitty @ --to $kitty_socket launch --type=tab --tab-title "skim $repo" \
+    kitty @ --to $kitty_socket launch --type=tab --tab-title "$title" \
         --cwd $tree fish -i -c $launch >/dev/null
     or begin
         echo "review skim: could not open a kitty tab (is remote control allowed?)"
@@ -113,10 +139,14 @@ if test -n "$kitty_socket"
     return 0
 end
 
-# No kitty listening to ask, so an OS window is the only option left.
+# No kitty listening to ask, so an OS window is the only option left. The session file
+# stays out of an own worktree, whose git status it would pollute.
 set -l session_file "$tree/.review/kitty-session"
-printf 'os_window_name skim %s\nfocus_os_window\n\n' $repo >$session_file
-printf 'new_tab skim %s\nlayout tall\n' $repo >>$session_file
+if test -n "$own_tree"
+    set session_file (mktemp -t kitty-own-session)
+end
+printf 'os_window_name %s\nfocus_os_window\n\n' $title >$session_file
+printf 'new_tab %s\nlayout tall\n' $title >>$session_file
 printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $tree $launch >>$session_file
 printf 'launch --location=hsplit --cwd %s\n' $tree >>$session_file
 

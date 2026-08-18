@@ -162,7 +162,8 @@ function PR.load(input)
         return warn(("expected a PR number or a pull-request URL, got %q"):format(input))
     end
 
-    local raw, code, stderr = capture({ "gh", "pr", "view", number, "--json", "title,headRefOid,baseRefName" }, root)
+    local raw, code, stderr =
+        capture({ "gh", "pr", "view", number, "--json", "title,headRefOid,baseRefName,headRefName" }, root)
     if code ~= 0 then
         return warn(("gh could not read PR #%s in %s -- %s"):format(number, root, stderr))
     end
@@ -172,7 +173,12 @@ function PR.load(input)
     end
 
     local skim = skim_state(root)
-    if capture({ "git", "rev-parse", "HEAD" }, root) ~= pr.headRefOid then
+    -- The author's own worktree: the PR's branch is already checked out here, so there is
+    -- nothing to check out and nothing the dirty guard below protects. HEAD may sit ahead
+    -- of the pushed tip -- unpushed commits are still the PR from the author's seat, and
+    -- what is on disk is what wants signing.
+    local author_here = capture({ "git", "branch", "--show-current" }, root) == pr.headRefName
+    if not author_here and capture({ "git", "rev-parse", "HEAD" }, root) ~= pr.headRefOid then
         -- Markers are uncommitted edits, so tracked modifications are usually findings not
         -- yet pasted anywhere. Never discarded silently, and never stashed on the
         -- reviewer's behalf either -- both lose work in a way that is hard to notice.

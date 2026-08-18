@@ -950,11 +950,28 @@ func cmdHook(rest []string) int {
 	return 0
 }
 
+// logInvocation appends one line per invocation to a state file: which verbs
+// actually get used is the signal for what tooling earns polish and what has
+// rotted. Verb and subverb only -- never free-text arguments, which can carry
+// note contents.
+func logInvocation(argv []string) {
+	verb := argv[0]
+	switch verb {
+	case "prs", "board", "day", "hook", "wt":
+		if len(argv) > 1 {
+			verb += " " + argv[1]
+		}
+	}
+	line := time.Now().Format("2006-01-02T15:04:05") + " " + verb
+	_ = appendLocked(filepath.Join(homeDir, ".local", "state", "me", "invocations.log"), line)
+}
+
 func run(argv []string) int {
 	if len(argv) == 0 || argv[0] == "help" || argv[0] == "-h" || argv[0] == "--help" {
 		fmt.Println(helpText())
 		return 0
 	}
+	logInvocation(argv)
 	command, rest := argv[0], argv[1:]
 	switch command {
 	case "init":
