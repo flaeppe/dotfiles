@@ -58,6 +58,8 @@ func helpText() string {
 		"  pulse         reconcile ended/idle sessions, commit if dirty; meant for the launchd timer",
 		"  day start     roll the board to today (idempotent), commit, print brief",
 		"  sam           find the live Sam session or open his kitty window",
+		"  wt <args>     git worktree management (new/list/retire/...); passthrough to the",
+		"                fish `wt` function, invisible to a plain zsh/bash shell otherwise",
 		"  hook <event>  Claude Code hook plumbing (session-end); always exits 0",
 		"",
 		"ME_HOME defaults to " + defaultMeHome + "; override with $ME_HOME.",
@@ -782,6 +784,26 @@ func cmdSam() int {
 	return 0
 }
 
+// cmdWt passes through to the fish `wt` function -- worktree management (new/list/retire/...)
+// lives there, not duplicated here. `wt` is a fish function, invisible to a plain zsh/bash
+// shell (and to Claude Code's Bash tool, which runs zsh); running it via `fish -i` (the `-i`
+// is what loads fish functions) is what makes `me wt ...` callable from anywhere.
+func cmdWt(rest []string) int {
+	args := append([]string{"-i", "-c", "wt $argv"}, rest...)
+	cmd := exec.Command("fish", args...)
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return exitErr.ExitCode()
+		}
+		fmt.Fprintf(os.Stderr, "me wt: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
 func hookError(message string) {
 	now := time.Now().Format("2006-01-02 15:04")
 	_ = appendLocked(filepath.Join(inboxDir, "hook-errors.log"), "- "+now+" "+message)
@@ -955,6 +977,8 @@ func run(argv []string) int {
 		return cmdDay(rest)
 	case "sam":
 		return cmdSam()
+	case "wt":
+		return cmdWt(rest)
 	case "hook":
 		return cmdHook(rest)
 	}
