@@ -71,11 +71,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/gcloud-command-gate"
+            "command": "env -u DEVELOPER_DIR ~/.claude/hooks/gcloud-command-gate"
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/git-local-path-guard"
+            "command": "env -u DEVELOPER_DIR ~/.claude/hooks/git-local-path-guard"
           }
         ]
       },
@@ -84,15 +84,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/protected-path-guard"
+            "command": "env -u DEVELOPER_DIR ~/.claude/hooks/protected-path-guard"
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/edit-content-guard"
+            "command": "env -u DEVELOPER_DIR ~/.claude/hooks/edit-content-guard"
           },
           {
             "type": "command",
-            "command": "~/.claude/hooks/plan-verified-guard"
+            "command": "env -u DEVELOPER_DIR ~/.claude/hooks/plan-verified-guard"
           }
         ]
       }
@@ -103,7 +103,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "~/.claude/hooks/format-after-edit"
+            "command": "env -u DEVELOPER_DIR ~/.claude/hooks/format-after-edit"
           }
         ]
       }
