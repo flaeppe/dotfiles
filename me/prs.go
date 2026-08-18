@@ -258,6 +258,12 @@ func refreshWorktree(now time.Time, key string, node prNode) {
 	}
 	worktreePath := filepath.Join(repoDir, ".worktrees", node.HeadRefName)
 	if _, err := os.Stat(worktreePath); err != nil {
+		if branchCheckedOutElsewhere(repoDir, node.HeadRefName) {
+			// Already your own manual checkout of this branch (e.g. you're working the PR
+			// directly) -- git allows a branch in only one worktree, so `wt new` would
+			// collide. Nothing to refresh; that checkout is yours to manage.
+			return
+		}
 		// $argv rather than string-interpolating the branch into the -c script: a ref name
 		// is attacker-shaped input by the time it has come back through a GraphQL response.
 		newTree := exec.Command("fish", "-i", "-c", "wt new $argv[1]", node.HeadRefName)
@@ -277,6 +283,23 @@ func refreshWorktree(now time.Time, key string, node prNode) {
 		return
 	}
 	appendPRLine(fmt.Sprintf("- %s [prs] rebased %s onto %s, clean", now.Format("2006-01-02 15:04"), key, node.BaseRefName))
+}
+
+// branchCheckedOutElsewhere reports whether branch is already the checked-out HEAD of
+// some other worktree of the repo at repoDir -- git allows a branch in only one
+// worktree at a time, so `wt new` would fail with "already used by worktree at ...".
+func branchCheckedOutElsewhere(repoDir, branch string) bool {
+	output, err := exec.Command("git", "-C", repoDir, "worktree", "list", "--porcelain").Output()
+	if err != nil {
+		return false
+	}
+	want := "branch refs/heads/" + branch
+	for _, line := range strings.Split(string(output), "\n") {
+		if strings.TrimSpace(line) == want {
+			return true
+		}
+	}
+	return false
 }
 
 const osascriptPath = "/usr/bin/osascript"
