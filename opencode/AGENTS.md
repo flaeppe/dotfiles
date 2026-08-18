@@ -13,6 +13,12 @@ Treat me as experienced - skip beginner explanations.
 - Run `direnv status` to see the currently active environment and its source `.envrc`.
 - The correct binary versions are those activated by direnv in the project's shell environment — these are the versions in PATH when the shell is inside the project directory.
 - If a binary is missing from PATH, it likely means the shell isn't inside a direnv-managed project directory, or `direnv allow` hasn't been run yet.
+- To set up a git worktree, use `wt new <name> [<branch>]` rather than hand-rolling one with
+  `git worktree add`. It lands in `.worktrees/<name>` inside the repo and links dependency
+  trees (e.g. `node_modules`) into the new worktree automatically — hand-rolled worktrees
+  skip that and need a full reinstall. `wt` is a fish function, invisible to a zsh/bash
+  shell — run it as `fish -i -c "wt new <name> <branch>"` (the `-i` is required, it's what
+  loads fish functions).
 
 ---
 
