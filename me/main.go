@@ -384,7 +384,7 @@ func requireHome() bool {
 // Bookkeeping commits skip GPG: both machines sign by default, and a locked
 // agent would wedge the morning roll on a pinentry prompt.
 func gitCommit(message string) {
-	add := exec.Command("git", "-C", meHome, "add", "-A")
+	add := exec.Command("git", "-C", meHome, "add", "-A", "--", ".", ":(exclude)tools")
 	_ = add.Run()
 	commit := exec.Command(
 		"git", "-C", meHome, "-c", "commit.gpgsign=false",
