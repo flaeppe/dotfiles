@@ -46,7 +46,8 @@
       "Bash(gh run list*)",
       "Bash(gh run view*)",
       "Bash(gh label list*)",
-      "Bash(direnv status*)"
+      "Bash(direnv status*)",
+      "Bash(glog *)"
     ],
     "deny": [
       "Bash(rm -rf /*)",

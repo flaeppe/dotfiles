@@ -75,6 +75,7 @@
               ./claude/claude.nix
               ./fish/fish.nix
               ./git/git.nix
+              ./glog/glog.nix
               ./me/me.nix
               ./nvim/nvim.nix
               ./opencode/opencode.nix

@@ -1,6 +1,14 @@
 #!/usr/bin/python3
-"""Claude Code PreToolUse gate for `gcloud`: read-only `gcloud logging` calls
-run unprompted, every other gcloud command needs approval.
+"""Claude Code PreToolUse gate for `gcloud`: any `gcloud logging` call is
+denied outright and redirected to `glog`, the read-only Cloud Logging CLI;
+every other gcloud command needs approval, same as before.
+
+`gcloud logging` used to get a narrow read-only allowlist here, parsed out of
+the shell command line -- fragile by construction, since a call nested inside
+another command's argument (`bash -c "gcloud logging read ..."`) escapes a
+parser working off word position. `glog` sidesteps the whole class of problem:
+it is physically incapable of writes, so it can be allowlisted wholesale
+(see ~/.dotfiles/claude/settings.json) instead of gated command-by-command.
 
 Answers with a permissionDecision so the verdict holds in every permission mode,
 including the ones where a classifier would otherwise decide. Only a command
@@ -45,26 +53,9 @@ WIDE_FLAGS_WITH_VALUE: Final = frozenset(
 # covered by a verdict about gcloud.
 SUBSTITUTION: Final = ("`", "$(")
 
-# Command paths that only read, matched as a prefix of the positional words so
-# any filter, resource name or flag may follow. `logging tail` is deliberately
-# absent: it streams until killed, and a call that occupies the session is worth
-# a prompt.
-READ_ONLY: Final = frozenset(
-    (
-        ("logging", "read"),
-        ("logging", "buckets", "describe"),
-        ("logging", "buckets", "list"),
-        ("logging", "logs", "list"),
-        ("logging", "metrics", "describe"),
-        ("logging", "metrics", "list"),
-        ("logging", "operations", "describe"),
-        ("logging", "operations", "list"),
-        ("logging", "resource-descriptors", "list"),
-        ("logging", "sinks", "describe"),
-        ("logging", "sinks", "list"),
-        ("logging", "views", "describe"),
-        ("logging", "views", "list"),
-    )
+GLOG_REDIRECT: Final = (
+    "gcloud logging is retired here -- use `glog` (read-only Cloud Logging CLI): "
+    "glog read <filter> --freshness 1h"
 )
 
 
@@ -113,9 +104,9 @@ def command_path(words: list[str]) -> list[str]:
     return path
 
 
-def is_read_only(words: list[str]) -> bool:
+def is_logging_command(words: list[str]) -> bool:
     path = command_path(words[1:])
-    return tuple(path[:2]) in READ_ONLY or tuple(path[:3]) in READ_ONLY
+    return bool(path) and path[0] == "logging"
 
 
 def decide(decision: str, reason: str) -> None:
@@ -148,10 +139,10 @@ def main() -> None:
         decide("ask", "gcloud runs as part of a larger command")
     elif runs_more_than_gcloud(words):
         decide("ask", "the command does more than run gcloud")
-    elif not is_read_only(words):
-        decide("ask", "not a read-only gcloud logging command")
+    elif is_logging_command(words):
+        decide("deny", GLOG_REDIRECT)
     else:
-        decide("allow", "read-only gcloud logging")
+        decide("ask", "gcloud requires approval")
 
 
 if __name__ == "__main__":
