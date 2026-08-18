@@ -55,7 +55,7 @@ WIDE_FLAGS_WITH_VALUE: Final = frozenset(
 SUBSTITUTION: Final = ("`", "$(")
 
 ANYFIN_LOG_REDIRECT: Final = (
-    "gcloud logging is retired here -- use `anyfin log read <filter> --freshness 1h` "
+    "gcloud logging is retired here -- use `anyfin log read <filter> --since 1h` "
     "(read-only Cloud Logging CLI)"
 )
 
