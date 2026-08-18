@@ -1,4 +1,4 @@
-{ pkgs, lib, multiRepoRoot ? "~/anyfin", ... }:
+{ pkgs, lib, config, multiRepoRoot ? "~/anyfin", ... }:
 let
   # Compiled so the tool depends on no ambient interpreter version; the state
   # root default is baked in per host from the same multiRepoRoot the rendered
@@ -10,6 +10,12 @@ let
     vendorHash = null;
     ldflags = [ "-X" "main.defaultMeHome=${multiRepoRoot}/.me" ];
   };
+  # launchd gives jobs a bare-bones PATH (/usr/bin:/bin:/usr/sbin:/sbin) with no
+  # inheritance from the interactive shell's direnv/nix-profile PATH. `me` shells
+  # out to bare command names (gh, fish, git) via exec.Command, which resolve
+  # against this env at run time -- git happens to survive on macOS's system
+  # /usr/bin/git, gh has no such fallback and fails "not found in $PATH".
+  launchdPath = "${config.home.homeDirectory}/.nix-profile/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 in {
   # The stable absolute path the session-end hook shim references.
   home.file.".local/bin/me".source = "${me}/bin/me";
@@ -29,6 +35,7 @@ in {
       ProgramArguments = [ "${me}/bin/me" "prs" "sweep" ];
       StartInterval = 900; # 15 minutes
       RunAtLoad = false;
+      EnvironmentVariables.PATH = launchdPath;
     };
   };
 
@@ -39,6 +46,7 @@ in {
       ProgramArguments = [ "${me}/bin/me" "pulse" ];
       StartInterval = 900; # 15 minutes
       RunAtLoad = false;
+      EnvironmentVariables.PATH = launchdPath;
     };
   };
 }
