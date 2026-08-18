@@ -139,6 +139,13 @@ in {
     } "$HOME/.claude/statusline-command.sh"
   '';
 
+  # Subagent status line script (referenced by settings.json subagentStatusLine.command)
+  home.activation.claudeSubagentStatusLine = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+    install -m 755 ${
+      ./subagent-statusline.sh
+    } "$HOME/.claude/subagent-statusline.sh"
+  '';
+
   # Pin the MCP binary at the stable ~/.local/bin path that the MCP
   # registration (~/.claude.json) and the discovery hook both reference.
   home.activation.claudeCbmBinary = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
