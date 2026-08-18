@@ -1,6 +1,14 @@
 #!/bin/bash
 # SessionStart hook: remind agent to use codebase-memory-mcp tools.
 # Fires on startup/resume/clear/compact.
+#
+# Skipped in the Sam state repo: ME.md's token ladder (mechanical/grep first)
+# is the operating protocol there, the repo is small enough that grep wins,
+# and this reminder pushing cbm-first drove sessions into agent-fork loops.
+cwd=$(jq -r '.cwd // empty' 2>/dev/null)
+case "$cwd" in
+  */anyfin/.me|*/anyfin/.me/*) exit 0 ;;
+esac
 cat << 'REMINDER'
 CRITICAL - Code Discovery Protocol:
 1. ALWAYS use codebase-memory-mcp tools FIRST for ANY code exploration:
