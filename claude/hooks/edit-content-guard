@@ -1,9 +1,11 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """Claude Code PreToolUse guard: refuse edits that introduce content the
 instructions forbid outright.
 
 Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0 --
 a broken guard must never wedge a session.
+
+Shebang is an absolute path, not `env python3` -- see git-local-path-guard for why.
 """
 
 from __future__ import annotations

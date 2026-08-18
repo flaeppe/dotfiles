@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """Claude Code PreToolUse gate for `gcloud`: read-only `gcloud logging` calls
 run unprompted, every other gcloud command needs approval.
 
@@ -6,6 +6,10 @@ Answers with a permissionDecision so the verdict holds in every permission mode,
 including the ones where a classifier would otherwise decide. Only a command
 that invokes gcloud gets a verdict: text that merely carries the name, such as a
 commit message or a grep pattern, gets none.
+
+Shebang is an absolute path, not `env python3`: this hook fires from whatever
+project directory the Bash tool is in, and a project's own direnv/flake shell
+can shadow the global `python3` on PATH with an older interpreter version.
 """
 
 from __future__ import annotations

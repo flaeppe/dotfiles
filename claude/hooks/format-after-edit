@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/python3
 """Claude Code PostToolUse hook: format a just-edited file with the formatter
 that repo has available.
 
@@ -6,6 +6,8 @@ Runs only when the formatter is actually installed, so a repo without it is
 untouched. Exits 2 only when the file was rewritten, so Claude learns its copy
 is stale; silent otherwise. Any internal failure exits 0 -- a broken hook must
 never wedge a session.
+
+Shebang is an absolute path, not `env python3` -- see git-local-path-guard for why.
 """
 
 from __future__ import annotations
