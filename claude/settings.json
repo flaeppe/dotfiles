@@ -119,6 +119,17 @@
         ]
       }
     ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "mkdir -p ~/.local/state/claude && jq -c '{t:(now|todate),tool:.tool_name,cmd:(.tool_input.command // .tool_input.file_path // null)}' >> ~/.local/state/claude/permission-prompts.jsonl",
+            "async": true
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "startup",
