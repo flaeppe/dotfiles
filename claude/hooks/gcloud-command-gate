@@ -1,12 +1,12 @@
 #!/usr/bin/python3
 """Claude Code PreToolUse gate for `gcloud`: any `gcloud logging` call is
-denied outright and redirected to `anyfin log`, the read-only Cloud Logging
+denied outright and redirected to `af log`, the read-only Cloud Logging
 CLI; every other gcloud command needs approval, same as before.
 
 `gcloud logging` used to get a narrow read-only allowlist here, parsed out of
 the shell command line -- fragile by construction, since a call nested inside
 another command's argument (`bash -c "gcloud logging read ..."`) escapes a
-parser working off word position. `anyfin` sidesteps the whole class of
+parser working off word position. `af` sidesteps the whole class of
 problem: it is physically incapable of writes, so it can be allowlisted
 wholesale (see ~/.dotfiles/claude/settings.json) instead of gated
 command-by-command.
@@ -55,7 +55,7 @@ WIDE_FLAGS_WITH_VALUE: Final = frozenset(
 SUBSTITUTION: Final = ("`", "$(")
 
 ANYFIN_LOG_REDIRECT: Final = (
-    "gcloud logging is retired here -- use `anyfin log read <filter> --since 1h` "
+    "gcloud logging is retired here -- use `af log read <filter> --since 1h` "
     "(read-only Cloud Logging CLI)"
 )
 
