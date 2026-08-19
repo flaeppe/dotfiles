@@ -16,6 +16,13 @@ including the ones where a classifier would otherwise decide. Only a command
 that invokes gcloud gets a verdict: text that merely carries the name, such as a
 commit message or a grep pattern, gets none.
 
+Composition does not soften the verdict. A real logging call practically never
+arrives bare -- it comes wrapped in `timeout`, piped into `head`, chained behind
+something else -- so the call is denied wherever on the line it sits, and the
+denial covers the line entire, siblings included. The redirect stays accurate
+about why the line was refused, and re-issuing a sibling on its own costs
+nothing, where an `ask` would let the retired call through on one approval.
+
 Shebang is an absolute path, not `env python3`: this hook fires from whatever
 project directory the Bash tool is in, and a project's own direnv/flake shell
 can shadow the global `python3` on PATH with an older interpreter version.
@@ -49,11 +56,6 @@ WIDE_FLAGS_WITH_VALUE: Final = frozenset(
     )
 )
 
-# Substitution runs a second command inside an argument, where quoting hides it
-# from the word split -- `read "$(...)"` is one word. Whatever it runs is not
-# covered by a verdict about gcloud.
-SUBSTITUTION: Final = ("`", "$(")
-
 ANYFIN_LOG_REDIRECT: Final = (
     "gcloud logging is retired here -- use `af log read <filter> --since 1h` "
     "(read-only Cloud Logging CLI)"
@@ -66,29 +68,25 @@ def is_gcloud(word: str | None) -> bool:
     return word == "gcloud" or word.endswith("/gcloud")
 
 
-def invokes_gcloud(words: list[str]) -> bool:
-    """Whether gcloud stands where a command starts.
+def gcloud_invocations(words: list[str]) -> list[list[str]]:
+    """Every gcloud call on the command line, each from its own gcloud word on.
 
-    Elsewhere the name is an argument or a path -- a commit message quoting a
-    gcloud command line is not a gcloud call and gets no verdict.
+    A sub-command runs gcloud where gcloud stands in its command position, which
+    a pipeline segment and a wrapped call both have: `timeout 60 gcloud ... |
+    head` runs gcloud. Anywhere else the name is an argument or a path -- a
+    commit message quoting a gcloud command line is not a gcloud call and gets no
+    verdict.
 
     Ceiling: a call nested inside another command's argument, as in
     `bash -c "gcloud ..."`, reads as an argument too. Scan inside words if that
     shows up.
     """
-    return any(
-        is_gcloud(shellwords.leading_command(segment)[0])
-        for segment in shellwords.sub_commands(words)
-    )
-
-
-def runs_more_than_gcloud(words: list[str]) -> bool:
-    """A decision covers the whole command line, so anything beyond the one
-    gcloud call has to be asked about."""
-    return any(
-        shellwords.is_operator(word) or any(form in word for form in SUBSTITUTION)
-        for word in words
-    )
+    invocations: list[list[str]] = []
+    for segment in shellwords.sub_commands(words):
+        command, index = shellwords.leading_command(segment)
+        if is_gcloud(command):
+            invocations.append(segment[index:])
+    return invocations
 
 
 def command_path(words: list[str]) -> list[str]:
@@ -105,8 +103,9 @@ def command_path(words: list[str]) -> list[str]:
     return path
 
 
-def is_logging_command(words: list[str]) -> bool:
-    path = command_path(words[1:])
+def is_logging_command(invocation: list[str]) -> bool:
+    """Whether a gcloud invocation, gcloud word included, is a logging one."""
+    path = command_path(invocation[1:])
     return bool(path) and path[0] == "logging"
 
 
@@ -133,17 +132,13 @@ def main() -> None:
     if "gcloud" not in command:
         return
 
-    words = shellwords.words_of(command)
-    if not invokes_gcloud(words):
+    invocations = gcloud_invocations(shellwords.words_of(command))
+    if not invocations:
         return
-    if not is_gcloud(words[0]):
-        decide("ask", "gcloud runs as part of a larger command")
-    elif runs_more_than_gcloud(words):
-        decide("ask", "the command does more than run gcloud")
-    elif is_logging_command(words):
+    if any(is_logging_command(invocation) for invocation in invocations):
         decide("deny", ANYFIN_LOG_REDIRECT)
-    else:
-        decide("ask", "gcloud requires approval")
+        return
+    decide("ask", "gcloud requires approval")
 
 
 if __name__ == "__main__":
