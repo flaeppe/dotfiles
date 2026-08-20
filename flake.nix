@@ -13,14 +13,9 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # A path input copies the working tree of this subdirectory only -- the
-    # rest of the state repo (BOARD.md, inbox/, session state) never reaches
-    # the world-readable nix store. Untracked files in tools/ still build;
-    # promotion to a pinned narHash is a deliberate `nix flake update tools`.
-    tools.url = "path:/Users/petter.friberg/anyfin/.me/tools";
   };
 
-  outputs = { nixpkgs, home-manager, flake-utils, tools, ... }:
+  outputs = { nixpkgs, home-manager, flake-utils, ... }:
     let
       # The same nixpkgs, re-imported to permit the unfree packages opted into
       # by name. Modules receive this as `unstable`; it is no longer a newer
@@ -42,7 +37,6 @@
         extraSpecialArgs = {
           isWork = false;
           unstable = archUnstable;
-          multiRepoRoot = "~/repos";
         };
         modules = [
           ./arch.nix
@@ -72,7 +66,6 @@
             extraSpecialArgs = {
               unstable = unstable;
               isWork = true;
-              multiRepoRoot = "~/anyfin";
             };
             modules = [
               ./darwin.nix
@@ -81,15 +74,7 @@
               ./git/git.nix
               ./nvim/nvim.nix
               ./opencode/opencode.nix
-              tools.homeModules.default
-              ({ config, ... }: {
-                # Same value as extraSpecialArgs.multiRepoRoot above; the tools
-                # module takes it as a home-manager option instead, since it
-                # lives outside dotfiles and can't share that let-binding.
-                tools.multiRepoRoot = "~/anyfin";
-                tools.kittyAppPath =
-                  "${config.home.homeDirectory}/Applications/Home Manager Apps/kitty.app/Contents/MacOS/kitty";
-              })
+              ./me.nix
             ];
           };
         devShell = pkgs.mkShell {
