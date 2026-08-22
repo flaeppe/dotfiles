@@ -109,16 +109,25 @@ def git_invocation(words: list[str], git_index: int) -> tuple[str | None, str | 
 
 
 def git_invocations(command: str) -> list[tuple[str | None, str | None]]:
-    """(subcommand, `-C` directory) for each `git` standing in command position.
+    """(subcommand, effective directory) for each `git` standing in command
+    position. The directory is the `-C` argument when given, else the target
+    of the closest preceding `cd` in the same command line -- `cd <repo> &&
+    git commit` publishes from <repo>, not from the session cwd.
 
     A `git` inside a quoted string or in an argument is text someone wrote, not
     a command being run.
     """
     invocations: list[tuple[str | None, str | None]] = []
+    cd_target: str | None = None
     for segment in shellwords.sub_commands(shellwords.words_of(command)):
         word, index = shellwords.leading_command(segment)
+        if word == "cd" and index + 1 < len(segment):
+            candidate = segment[index + 1]
+            if not candidate.startswith("-"):
+                cd_target = candidate
         if word == "git":
-            invocations.append(git_invocation(segment, index))
+            subcommand, directory = git_invocation(segment, index)
+            invocations.append((subcommand, directory or cd_target))
     return invocations
 
 
@@ -267,50 +276,6 @@ def scan_diff(repo: Repo, label: str, revisions: Sequence[str]) -> Iterator[Find
                 yield path, token, reason
 
 
-def commit_messages(command: str) -> list[str] | None:
-    """Every -m/--message value in a commit command, or None if it will not parse.
-
-    Only these reach history. The rest of the command line -- a `cd` prefix, a
-    `-C` target, any other argument -- names where the work happens, not what
-    the commit records. Quoting has to resolve for this: a half-parsed message is
-    a message read wrong, and the caller has a safe answer for None. Ceiling: a
-    message from `-F` or an editor is not on the command line at all, so it
-    cannot be checked here.
-    """
-    words = shellwords.strict_words_of(command)
-    if words is None:
-        return None
-
-    messages: list[str] = []
-    index = 0
-    while index < len(words):
-        word = words[index]
-        if word in ("-m", "--message"):
-            if index + 1 < len(words):
-                messages.append(words[index + 1])
-            index += 2
-            continue
-        if word.startswith("--message="):
-            messages.append(word.split("=", 1)[1])
-        elif word.startswith("-") and not word.startswith("--") and "m" in word:
-            value = word[word.index("m") + 1 :]
-            if value:
-                messages.append(value)
-            elif index + 1 < len(words):
-                messages.append(words[index + 1])
-                index += 1
-        index += 1
-    return messages
-
-
-def scan_message(repo: Repo, label: str, text: str) -> Iterator[Finding]:
-    """Commit messages carry no file, so relative paths resolve from the root."""
-    for token in path_tokens(text):
-        reason = classify(token, repo.root, repo, PLAN_FRAGMENTS + SCRATCH_FRAGMENTS)
-        if reason:
-            yield label, token, reason
-
-
 def deduplicated(sources: Sequence[Iterable[Finding]]) -> list[Finding]:
     seen: set[Finding] = set()
     findings: list[Finding] = []
@@ -359,20 +324,17 @@ def main() -> int:
         return 0
     repo = Repo(repo_root.strip(), sibling_root(directory))
 
+    # Diffs only -- the paths being recorded and the lines being added. A
+    # path-like token in a commit message is prose about the work, not a
+    # reference that resolves for anyone who pulls it; scanning messages
+    # blocked far more honest commits than it caught leaks.
     sources: list[Iterable[Finding]] = []
     if committing:
         sources.append(scan_diff(repo, "staged", ["--cached"]))
-        # Unparsable quoting: fall back to the whole command rather than nothing.
-        messages = commit_messages(command)
-        for message in messages if messages is not None else [command]:
-            sources.append(scan_message(repo, "commit message", message))
     if pushing:
         outgoing = outgoing_range(repo.root)
         if outgoing:
             sources.append(scan_diff(repo, "outgoing", [outgoing]))
-            log = git(repo.root, "log", "--format=%B", outgoing.replace("...", ".."))
-            if log:
-                sources.append(scan_message(repo, "outgoing commit message", log))
 
     findings = deduplicated(sources)
     if not findings:
