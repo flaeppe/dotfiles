@@ -203,6 +203,11 @@ If unsure about base branch, **ASK**.
 ### Exploration
 - Check for an existing implementation before writing new code; read the tests to learn expected behavior.
 
+### Org bookkeeping
+- When you surface something that's org-bookkeeping rather than your task — broken
+  shared tooling, config drift, "someone should track this" — run `me note "<one line>"`
+  and move on.
+
 ### Knowledge Base (kb)
 My work documents are indexed in a local knowledge base, exposed as the `kb`
 MCP server (`kb_find`: hybrid semantic search). It holds whatever I decide to
