@@ -35,6 +35,7 @@ in {
       less
       openssl
       ripgrep
+      terminal-notifier
       uv
       yq-go
     ]) ++ [
