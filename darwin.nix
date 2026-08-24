@@ -36,6 +36,7 @@ in {
       openssl
       ripgrep
       uv
+      yq-go
     ]) ++ [
       (pkgs.writeShellScriptBin "claude" ''
         set -euo pipefail
