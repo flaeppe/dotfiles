@@ -6,6 +6,10 @@
 #   review skim          open the surface where it last was
 #   review skim <pr>     open it on a PR
 #
+# <pr> is a bare number in this repository, or a pull-request URL naming another one --
+# own PRs included, so a link pasted out of a browser or Slack works exactly like a
+# number typed by hand. See `_review_pr_ref`.
+#
 # See docs/pr-review.md for why this is a third surface rather than a mode of a session.
 #
 # One per repository, not one per PR, because it holds nothing worth keeping: findings
@@ -15,11 +19,19 @@
 # Deliberately outside `.worktrees/review/`, whose children are all PR numbers to
 # `review list`.
 
-if test -n "$argv[1]"; and not string match -qr '^\d+$' -- "$argv[1]"
-    echo "review skim: '$argv[1]' is not a PR number"
-    return 1
+set -l pr
+if test -n "$argv[1]"
+    set -l ref (_review_pr_ref $argv[1])
+    or return 1
+    set -l fields (string split \t -- $ref)
+    if test (count $fields) -eq 2
+        # The ref named another repository -- hand off to that clone's own skim surface
+        # rather than running git commands against this one.
+        fish -c "cd $fields[1]; and review skim $fields[2]"
+        return $status
+    end
+    set pr $fields[1]
 end
-set -l pr $argv[1]
 
 # The main checkout even when invoked from a linked worktree, so `review skim` from
 # inside a session reaches the one surface rather than nesting another.

@@ -278,6 +278,12 @@ explicit separate step.
 review <pr>
 ```
 
+`<pr>` is a bare number in this repository, or a pull-request URL naming another one
+— own PRs included, so a link pasted out of a browser or Slack works exactly like a
+number typed by hand. A URL for another repository hands off to that repository's
+own clone, found as a sibling directory (`_review_pr_ref.fish`); `review skim`
+accepts the same argument shape.
+
 Resolves the PR, fetches its head, creates both worktrees, copies in the gitignored
 local configuration a fresh worktree lacks (so the toolchain activates), writes
 `session.json`, and opens a terminal session with one tab per worktree. Re-running

@@ -130,6 +130,13 @@
             ${builtins.readFile ./functions/_review_skim.fish}
           '';
         };
+        _review_pr_ref = {
+          description =
+            "Resolves a review command's PR argument: a bare number, or a pull-request URL naming another repository";
+          body = ''
+            ${builtins.readFile ./functions/_review_pr_ref.fish}
+          '';
+        };
         wt = {
           description =
             "Lists every worktree with what it would cost to delete it, oldest first";

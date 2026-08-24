@@ -11,6 +11,10 @@
 #   review skim [<pr>]   the read-only surface: browse PRs across the org, one worktree
 #   review list          every session in this repo, live or retired
 #   review retire <pr>   archive a session and take its worktrees down
+#
+# <pr> is a bare number in this repository, or a pull-request URL naming another one --
+# own PRs included, so a link pasted out of a browser or Slack works exactly like a
+# number typed by hand. See `_review_pr_ref`.
 
 switch "$argv[1]"
     case list
@@ -25,15 +29,21 @@ switch "$argv[1]"
 end
 
 if test -z "$argv[1]"
-    echo "Usage: review <pr-number> | review skim [<pr-number>] | review list | review retire <pr-number>"
-    return 1
-end
-if not string match -qr '^\d+$' -- "$argv[1]"
-    echo "review: '$argv[1]' is not a PR number"
+    echo "Usage: review <pr-number|url> | review skim [<pr-number|url>] | review list | review retire <pr-number>"
     return 1
 end
 
-set -l pr $argv[1]
+set -l ref (_review_pr_ref $argv[1])
+or return 1
+set -l fields (string split \t -- $ref)
+if test (count $fields) -eq 2
+    # The ref named another repository -- hand off to that clone rather than running
+    # git commands against this one.
+    fish -c "cd $fields[1]; and review $fields[2]"
+    return $status
+end
+
+set -l pr $fields[1]
 set -l root (git rev-parse --show-toplevel 2>/dev/null)
 if test -z "$root"
     echo "review: not inside a git repository"
