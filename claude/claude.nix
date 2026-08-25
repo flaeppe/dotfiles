@@ -67,6 +67,8 @@ in {
     # Global instructions -- shared, single source in opencode/AGENTS.md
     ".claude/CLAUDE.md".source = "${opencode}/AGENTS.md";
 
+    ".claude/commands/delegate.md".source = ./commands/delegate.md;
+
     # Claude-specific workflow commands
     ".claude/skills/explore".source = ./skills/explore;
     ".claude/skills/pr".source = ./skills/pr;
