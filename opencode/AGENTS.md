@@ -6,6 +6,22 @@ Treat me as experienced - skip beginner explanations.
 
 ---
 
+## `me` — my tooling, start here
+
+`me --help` lists every verb; each self-documents (`me <verb> --help`). **Explore it
+before assuming a capability doesn't exist**, and prefer a `me` verb over hand-rolling
+the equivalent — it is the entry point to my board, inbox, notes, sessions, PRs,
+worktrees and review flow.
+
+**`me` is always safe to run.** No verb needs sign-off and there is nothing to fence
+off — a verb that isn't safe is a bug in the tool, not something for you to guard
+against. Treat it as free to use.
+
+When briefing a subagent, point at the verb rather than restating what it does
+(`me wt new <name>`, `me dirty`, `me brief`). Shorter briefs, consistent behaviour.
+
+---
+
 ## Environment
 
 - **macOS with Nix, Home Manager, and direnv.** All project toolchains (Python, Node, compilers, etc.) are managed through Nix flakes with direnv integration.
