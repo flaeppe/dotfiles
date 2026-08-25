@@ -287,7 +287,7 @@ local ENTRIES = {
     {
         group = "hunk",
         keys = "<Leader>hD",
-        desc = "How big is this? Every changed file against the base (the :PrDiff overview)",
+        desc = "How big is this? Every changed file against the base -- the loaded PR's, or the branch's",
         added = "2026-08-10",
     },
     {

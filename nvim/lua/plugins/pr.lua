@@ -15,6 +15,10 @@
 --   <Leader>hD             how big is this? -- every changed file, side by side
 --   <Leader>hd, ¨h, åh     one file against the base, then hunk by hunk
 --
+-- The two surfaces over the change work without a PR loaded at all: with no base named
+-- they fall back to the merge base with the default branch, so `nvim` in an ordinary
+-- checkout answers "what has this branch changed" with the same keys. See `pr_base`.
+--
 -- Loading a PR fails silently when done by hand, which is what most of this file is
 -- about. The working tree has to sit at the PR's head, or the signs describe whatever
 -- branch is checked out instead. The base has to be the *merge base*, because gitsigns
@@ -147,6 +151,9 @@ function PR.load(input)
 
     if input:match("^%s*off%s*$") then
         require("gitsigns").reset_base(true)
+        -- Cleared rather than left standing: with it set, the surfaces would keep
+        -- answering with a PR the sign column has already stopped signing.
+        vim.env.REVIEW_BASE = nil
         local skim = skim_state(root)
         if skim then
             skim.pr = nil
@@ -246,7 +253,11 @@ function PR.load(input)
         render_pr_tag(skim)
     end
 
+    -- Both, always together: the sign column and the surfaces over the change read
+    -- different variables, and one of them left behind is a panel describing the PR that
+    -- was loaded before this one.
     require("gitsigns").change_base(base, true)
+    vim.env.REVIEW_BASE = base
     -- The checkout rewrote files under any buffer still open on them.
     vim.cmd("checktime")
 
@@ -273,15 +284,43 @@ function PR.load(input)
 end
 
 -- Surfaces over the change ------------------------------------------------
---
--- The base is read back out of gitsigns rather than kept in a second variable here,
--- which is what stops these surfaces from ever disagreeing with the sign column about
--- which PR is on screen.
 
+--- The revision the surfaces below measure against, resolved at the keypress rather than
+--- held anywhere -- because most of the time the question is asked in a checkout nobody
+--- ran `:PrDiff` in, and a base captured at startup would have nothing to say there.
+---
+--- `$REVIEW_BASE` first. It is where a base that cannot be worked out from the
+--- repository alone gets stated: a stacked PR's base is the branch below it, not the
+--- default branch. `review` and `review skim` export it, loading a PR rewrites it, and
+--- setting it by hand overrides both.
+---
+--- Then the merge base with the default branch, which is what "what did this branch
+--- change" means outside a review. On the default branch itself that is HEAD and the
+--- comparison is empty, which is the honest answer rather than a failure.
+---
+--- Only then the base gitsigns is signing against, which is the answer while a PR is
+--- loaded in a repository with no reachable default branch at all.
 local function pr_base()
-    local base = require("gitsigns.config").config.base
-    if base then
-        return base
+    if vim.env.REVIEW_BASE and vim.env.REVIEW_BASE ~= "" then
+        return vim.env.REVIEW_BASE
+    end
+
+    local root = worktree_root()
+    if root then
+        -- origin/HEAD is the default branch wherever the clone recorded one; the two
+        -- names after it are for a clone where it was never set, which is most clones
+        -- made by `git clone --depth` or by tooling.
+        for _, target in ipairs({ "origin/HEAD", "origin/main", "origin/master" }) do
+            local base, code = capture({ "git", "merge-base", "HEAD", target }, root)
+            if code == 0 and base ~= "" then
+                return base
+            end
+        end
+    end
+
+    local loaded = require("gitsigns.config").config.base
+    if loaded then
+        return loaded
     end
     warn("no base is set -- run `:PrDiff <pr>` or pick one with `:PrList` first")
 end
@@ -825,6 +864,7 @@ vim.api.nvim_create_autocmd("VimEnter", {
                 return
             end
             require("gitsigns").change_base(state.base, true)
+            vim.env.REVIEW_BASE = state.base
             render_pr_tag(state)
         end)
     end,
