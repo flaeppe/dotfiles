@@ -1,7 +1,12 @@
 Delegate and orchestrate. You have $ARGUMENTS agents at your disposal (if no
-number was given, assume 4). Use sonnet for less-complex and mechanical work
-and opus for more complex work. You act as the glue, capturing anything that
+number was given, assume 4). You act as the glue, capturing anything that
 comes in between.
+
+Sonnet is the default for every agent. Reach for opus only when the brief
+cannot be reduced to a procedure — the agent has to design against real
+tradeoffs, or judge across many interacting parts. That bar is absolute:
+"more complex than the others" is not a reason, and several opus agents in one
+fan-out means the briefs are underspecified. When unsure, pick sonnet.
 
 Every agent brief that measures or investigates something bounded (a time
 window, a population, a file set) must state the bound it assumes AND how the
