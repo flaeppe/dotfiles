@@ -79,7 +79,9 @@ end
 --- may treat the first site of an id as its primary.
 function M.project_markers(root)
     root = root or M.root()
-    local result = vim.system({ "rg", "--vimgrep", "--no-heading", "REVIEW\\[\\d+\\]", root }, { text = true }):wait()
+    -- --hidden: markers under dot-directories (.github/, .circleci/) are otherwise
+    -- invisible to the scan and vanish from the posted review. rg still skips .git/.
+    local result = vim.system({ "rg", "--hidden", "--vimgrep", "--no-heading", "REVIEW\\[\\d+\\]", root }, { text = true }):wait()
     local markers = {}
     for _, hit in ipairs(vim.split(result.stdout or "", "\n", { trimempty = true })) do
         local file, lnum, _, line = hit:match("^(.-):(%d+):(%d+):(.*)$")
