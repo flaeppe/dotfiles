@@ -170,7 +170,16 @@ end
 # already computed above, which is against the PR's declared base branch rather than the
 # default branch. That distinction is the whole point for a stacked PR, whose base is the
 # branch below it.
-set -l launch "set -x REVIEW_BASE $merge_base; and direnv export fish | source; and nvim -c Review"
+#
+# REVIEW_BASE_DIR names the worktree the base was minted for, and is what stops it
+# spreading. Both variables are inherited by everything the editor spawns -- a `:terminal`
+# that cd's to another worktree of this repository and starts an editor there would
+# otherwise measure that worktree against this PR's base, silently, because the commit
+# resolves in a shared object database. One string per worktree rather than one shared:
+# the value differs, which is the entire point.
+set -l base_env "set -x REVIEW_BASE $merge_base; and set -x REVIEW_BASE_DIR"
+set -l review_launch "$base_env $review_tree; and direnv export fish | source; and nvim -c Review"
+set -l stack_launch "$base_env $stack_tree; and direnv export fish | source; and nvim -c Review"
 
 # One tab per loop: curating findings and building suggestions are different
 # worktrees, so they need separate cwd, LSP root and tag file rather than one
@@ -178,11 +187,11 @@ set -l launch "set -x REVIEW_BASE $merge_base; and direnv export fish | source; 
 set -l session_file "$review_tree/.review/kitty-session"
 printf 'os_window_name review %s\nfocus_os_window\n\n' $pr >$session_file
 printf 'new_tab review %s\nlayout tall\n' $pr >>$session_file
-printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $review_tree $launch >>$session_file
+printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $review_tree $review_launch >>$session_file
 printf 'launch --location=hsplit --cwd %s\n' $review_tree >>$session_file
 printf 'focus\n\n' >>$session_file
 printf 'new_tab stack %s\nlayout tall\n' $pr >>$session_file
-printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $stack_tree $launch >>$session_file
+printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $stack_tree $stack_launch >>$session_file
 printf 'launch --location=hsplit --cwd %s\n' $stack_tree >>$session_file
 
 echo "review $pr: $title"

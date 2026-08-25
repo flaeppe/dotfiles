@@ -154,6 +154,7 @@ function PR.load(input)
         -- Cleared rather than left standing: with it set, the surfaces would keep
         -- answering with a PR the sign column has already stopped signing.
         vim.env.REVIEW_BASE = nil
+        vim.env.REVIEW_BASE_DIR = nil
         local skim = skim_state(root)
         if skim then
             skim.pr = nil
@@ -253,11 +254,14 @@ function PR.load(input)
         render_pr_tag(skim)
     end
 
-    -- Both, always together: the sign column and the surfaces over the change read
+    -- All three, always together: the sign column and the surfaces over the change read
     -- different variables, and one of them left behind is a panel describing the PR that
-    -- was loaded before this one.
+    -- was loaded before this one. The worktree the base belongs to travels with it, so
+    -- an editor started from here in another worktree does not inherit an answer about
+    -- this one.
     require("gitsigns").change_base(base, true)
     vim.env.REVIEW_BASE = base
+    vim.env.REVIEW_BASE_DIR = root
     -- The checkout rewrote files under any buffer still open on them.
     vim.cmd("checktime")
 
@@ -301,15 +305,32 @@ end
 --- Only then the base gitsigns is signing against, which is the answer while a PR is
 --- loaded in a repository with no reachable default branch at all.
 local function pr_base()
+    local root = worktree_root()
+
+    -- An environment variable is inherited by every descendant process, so a base minted
+    -- for one worktree reaches an editor started from a `:terminal` in another one -- and
+    -- there the commit still resolves, out of the same object database, so the wrong
+    -- answer arrives without an error. REVIEW_BASE_DIR is the worktree the base was minted
+    -- for, and a mismatch means this base is not about the code on screen.
+    --
+    -- Absent, the base is trusted: that is a base exported by hand, which is the supported
+    -- way to name one nothing else can work out.
     if vim.env.REVIEW_BASE and vim.env.REVIEW_BASE ~= "" then
-        return vim.env.REVIEW_BASE
+        local minted_for = vim.env.REVIEW_BASE_DIR
+        if minted_for == nil or minted_for == "" or minted_for == root then
+            return vim.env.REVIEW_BASE
+        end
     end
 
-    local root = worktree_root()
     if root then
         -- origin/HEAD is the default branch wherever the clone recorded one; the two
         -- names after it are for a clone where it was never set, which is most clones
         -- made by `git clone --depth` or by tooling.
+        --
+        -- Read as the clone last left it, never fetched: this runs on a keypress, and a
+        -- network round trip per keypress is not worth paying. The ceiling is that the
+        -- base is as old as the last fetch -- which shows up as a diff carrying commits
+        -- that have since landed on the default branch. `git fetch` is the fix.
         for _, target in ipairs({ "origin/HEAD", "origin/main", "origin/master" }) do
             local base, code = capture({ "git", "merge-base", "HEAD", target }, root)
             if code == 0 and base ~= "" then
@@ -859,12 +880,14 @@ end, {
 vim.api.nvim_create_autocmd("VimEnter", {
     callback = function()
         vim.schedule(function()
-            local state = skim_state()
+            local root = worktree_root()
+            local state = skim_state(root)
             if not (state and state.pr and state.base) then
                 return
             end
             require("gitsigns").change_base(state.base, true)
             vim.env.REVIEW_BASE = state.base
+            vim.env.REVIEW_BASE_DIR = root
             render_pr_tag(state)
         end)
     end,

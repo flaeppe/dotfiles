@@ -148,11 +148,17 @@ set -l launch "direnv export fish | source; and nvim --listen $socket -c \"$entr
 # Only computable here on an own worktree, which is already standing on the PR's head.
 # The skim worktree is not on the PR until the editor checks it out, so there `:PrDiff`
 # exports this itself once it knows the head.
+#
+# REVIEW_BASE_DIR names the worktree the base was minted for, and is what stops it
+# spreading. Both variables are inherited by everything the editor spawns -- a `:terminal`
+# that cd's to another worktree of this repository and starts an editor there would
+# otherwise measure that worktree against this PR's base, silently, because the commit
+# resolves in a shared object database.
 if test -n "$own_tree"; and test -n "$base_branch"
     git -C $tree fetch -q origin $base_branch 2>/dev/null
     set -l review_base (git -C $tree merge-base HEAD "origin/$base_branch" 2>/dev/null)
     if test -n "$review_base"
-        set launch "set -x REVIEW_BASE $review_base; and $launch"
+        set launch "set -x REVIEW_BASE $review_base; and set -x REVIEW_BASE_DIR $tree; and $launch"
     end
 end
 

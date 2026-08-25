@@ -295,11 +295,26 @@ session is read from the working directory.
 Both editors are launched with `REVIEW_BASE` set to the merge base against the PR's
 declared base branch, which is what the editor's file panel and changed-file finder
 measure against. `review skim` exports it too, on an own worktree; on the skim worktree
-the editor sets it when it loads the PR. Exporting it by hand overrides all of that,
-which is the way to name a base nothing else can work out — the previous branch in a
-stack whose PR has since been retargeted, say. With it unset and no PR loaded, the
-editor falls back to the merge base with the default branch, so those keys also answer
-"what has this branch changed" in an ordinary checkout.
+the editor sets it when it loads the PR.
+
+Alongside it goes `REVIEW_BASE_DIR`, the worktree that base was minted for. Environment
+variables are inherited, so without it a `:terminal` that cd's to another worktree of the
+same repository and opens an editor there would measure that worktree against this PR's
+base — silently, because the commit resolves out of the shared object database. The
+editor uses `REVIEW_BASE` only when `REVIEW_BASE_DIR` is unset, or names the worktree it
+is standing in.
+
+To name a base by hand, export `REVIEW_BASE` **alone**: with no `REVIEW_BASE_DIR` beside
+it, it is trusted wherever it is set. That is the way to state a base nothing else can
+work out — the previous branch in a stack whose PR has since been retargeted, say. There
+is deliberately no flag for it.
+
+With both unset and no PR loaded, the editor falls back to the merge base with the
+default branch, so those keys also answer "what has this branch changed" in an ordinary
+checkout. That fallback reads the remote-tracking refs as the clone last left them and
+never fetches — a keypress should not cost a network round trip — so it is as old as the
+last `git fetch`, which shows as a diff carrying commits that have since landed on the
+default branch.
 
 ```
 review list
