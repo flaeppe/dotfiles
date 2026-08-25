@@ -292,6 +292,15 @@ against the same PR reuses the worktrees, so a session survives closing the edit
 Re-entry after a crash or a stray `:q` is `nvim -c Review` in either worktree — the
 session is read from the working directory.
 
+Both editors are launched with `REVIEW_BASE` set to the merge base against the PR's
+declared base branch, which is what the editor's file panel and changed-file finder
+measure against. `review skim` exports it too, on an own worktree; on the skim worktree
+the editor sets it when it loads the PR. Exporting it by hand overrides all of that,
+which is the way to name a base nothing else can work out — the previous branch in a
+stack whose PR has since been retargeted, say. With it unset and no PR loaded, the
+editor falls back to the merge base with the default branch, so those keys also answer
+"what has this branch changed" in an ordinary checkout.
+
 ```
 review list
 review retire <pr> [--force]
