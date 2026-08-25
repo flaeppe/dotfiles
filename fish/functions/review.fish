@@ -166,17 +166,23 @@ for role in review stack
     printf '}\n' >>"$tree/.review/session.json"
 end
 
+# The base the editor's diff surfaces measure against, as a commit -- the merge base
+# already computed above, which is against the PR's declared base branch rather than the
+# default branch. That distinction is the whole point for a stacked PR, whose base is the
+# branch below it.
+set -l launch "set -x REVIEW_BASE $merge_base; and direnv export fish | source; and nvim -c Review"
+
 # One tab per loop: curating findings and building suggestions are different
 # worktrees, so they need separate cwd, LSP root and tag file rather than one
 # editor straddling both.
 set -l session_file "$review_tree/.review/kitty-session"
 printf 'os_window_name review %s\nfocus_os_window\n\n' $pr >$session_file
 printf 'new_tab review %s\nlayout tall\n' $pr >>$session_file
-printf 'launch --location=hsplit --cwd %s fish -i -c \'direnv export fish | source; and nvim -c Review\'\n' $review_tree >>$session_file
+printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $review_tree $launch >>$session_file
 printf 'launch --location=hsplit --cwd %s\n' $review_tree >>$session_file
 printf 'focus\n\n' >>$session_file
 printf 'new_tab stack %s\nlayout tall\n' $pr >>$session_file
-printf 'launch --location=hsplit --cwd %s fish -i -c \'direnv export fish | source; and nvim -c Review\'\n' $stack_tree >>$session_file
+printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $stack_tree $launch >>$session_file
 printf 'launch --location=hsplit --cwd %s\n' $stack_tree >>$session_file
 
 echo "review $pr: $title"

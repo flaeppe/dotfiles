@@ -49,9 +49,14 @@ set -l repo (basename $root)
 # already on the PR's branch -- but edits land on the live branch instead of a
 # read-only copy.
 set -l own_tree ""
+set -l base_branch ""
 if test -n "$pr"
-    set -l head_branch (gh pr view $pr --json headRefName --jq .headRefName 2>/dev/null)
-    if test -n "$head_branch"
+    set -l meta (gh pr view $pr --json headRefName,baseRefName \
+        --jq '[.headRefName, .baseRefName] | @tsv' 2>/dev/null)
+    if test -n "$meta"
+        set -l pr_fields (string split \t -- $meta)
+        set -l head_branch $pr_fields[1]
+        set base_branch $pr_fields[2]
         set own_tree (git worktree list --porcelain | \
             awk -v ref="branch refs/heads/$head_branch" '/^worktree /{wt=substr($0,10)} $0==ref{print wt; exit}')
     end
@@ -135,6 +140,21 @@ if test -n "$pr"
     set entry "PrDiff $pr"
 end
 set -l launch "direnv export fish | source; and nvim --listen $socket -c \"$entry\""
+
+# The base the editor's diff surfaces measure against, as a commit. The PR's declared
+# base branch, never the default branch: a stacked PR sits on the branch below it, and
+# diffing that against master shows the whole stack instead of this PR.
+#
+# Only computable here on an own worktree, which is already standing on the PR's head.
+# The skim worktree is not on the PR until the editor checks it out, so there `:PrDiff`
+# exports this itself once it knows the head.
+if test -n "$own_tree"; and test -n "$base_branch"
+    git -C $tree fetch -q origin $base_branch 2>/dev/null
+    set -l review_base (git -C $tree merge-base HEAD "origin/$base_branch" 2>/dev/null)
+    if test -n "$review_base"
+        set launch "set -x REVIEW_BASE $review_base; and $launch"
+    end
+end
 
 # One tab, unlike a session's two: there is no stack to build here.
 if test -n "$kitty_socket"
