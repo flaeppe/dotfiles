@@ -57,8 +57,15 @@ else if git -C $root show-ref --verify --quiet "refs/remotes/origin/$branch"
     echo "wt new: tracking origin/$branch"
     git -C $root worktree add -q --track -b $branch $tree "origin/$branch"; or return 1
 else
+    # --no-track: $base is a remote-tracking ref, and git's default
+    # branch.autoSetupMerge would otherwise point the new branch's upstream
+    # at $base itself (e.g. origin/master) rather than at a same-named
+    # branch that doesn't exist yet. Left alone, that upstream is wrong for
+    # every push -- `git push` reports the two names don't match, and the
+    # only way past it is a refspec spelling out where to push, on every
+    # single push.
     echo "wt new: branching $branch off $base"
-    git -C $root worktree add -q -b $branch $tree $base; or return 1
+    git -C $root worktree add -q --no-track -b $branch $tree $base; or return 1
 end
 
 # The same preparation a review worktree gets, and the same per-repository `.review/setup`
