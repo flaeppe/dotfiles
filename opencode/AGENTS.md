@@ -44,6 +44,30 @@ When briefing a subagent, point at the verb rather than restating what it does
 - Use code over prose when demonstrating concepts. For yes/no questions, lead with the answer. When I ask "why", give me the technical reasoning, not a high-level summary.
 - Only ask when genuinely ambiguous — otherwise make reasonable assumptions and state them. Batch related questions; suggest a default for each.
 
+### Written deliverables are short
+
+PR descriptions, review comments, commit bodies, issue comments, plan
+summaries and handovers are **artifacts other people have to read**, and length
+is a cost they pay. The same brevity that governs replies governs these — more
+so, because they outlive the conversation.
+
+- **A PR description is not a report.** What changed, why it had to change, and
+  the one thing a reviewer should push back on. If a reviewer can get it from
+  the diff, don't restate it in prose.
+- **Evidence, not narration.** One line with a citation (`file:line`, an error
+  string, a count) beats a paragraph explaining the same thing. Quote the error;
+  don't describe it.
+- **No journey.** What was tried, what was ruled out, how the investigation
+  unfolded — none of it belongs unless a reader needs it to decide something.
+  Ruling out an alternative is one clause, not a section.
+- **No restating the brief back.** Headings that mirror the instructions you
+  were given are padding.
+- Structure earns its place: a table beats six bullets that each say one thing;
+  a heading over two sentences is noise.
+
+If it reads like it was written to demonstrate thoroughness, cut it. Thorough
+work shows in the diff and the evidence, never in the word count.
+
 ---
 
 ## Coding Standards
