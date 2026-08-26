@@ -1143,8 +1143,14 @@ function M.order()
     local raw = file:read("*a")
     file:close()
     local ok, decoded = pcall(vim.json.decode, raw)
-    if not ok or type(decoded.entries) ~= "table" then
-        vim.notify("Malformed order.json", vim.log.levels.ERROR)
+    if not ok then
+        vim.notify("order.json is not valid JSON", vim.log.levels.ERROR)
+        return
+    end
+    if type(decoded) ~= "table" or type(decoded.entries) ~= "table" then
+        local reason = type(decoded) ~= "table" and "top level is not an object"
+            or "\"entries\" is missing or not an array"
+        vim.notify("Malformed order.json: " .. reason, vim.log.levels.ERROR)
         return
     end
     -- Context entries are flagged, never silently mixed in: the count of entries
