@@ -67,6 +67,14 @@ checked, and never call it verified.
 3. **Write `.review/order.json`, `summary.md`, and `policy.json`** if a policy came
    back. `order.json` and `summary.md` are derived, so rewrite them **whole** — an
    order that shrinks to this run's findings hides the rest of the change.
+
+   `order.json` on disk is an **object**, not the bare `order` array — the reader
+   errors on anything else. `entries`: one object per `order` item, with `file`
+   (repo-relative), `lnum` (integer, `line` renamed, default 1), `why`, and
+   `context` (boolean) when set:
+   ```json
+   {"entries": [{"file": "src/handler.go", "lnum": 42, "why": "entry point"}]}
+   ```
 4. `nvim --server <review_socket> --remote-send '<Cmd>checktime<CR>'`, or the markers
    stay invisible in an open buffer.
 5. **Report** the count by kind, and that `<Leader>ro` walks the order.

@@ -55,7 +55,7 @@ and nothing leaves the machine until an explicit publish.
 ## Size budget
 
 - Phase A's worst path loads SKILL.md **and** CONTRACT.md together: **≤ 29000 chars**
-  for the pair (currently 27538).
+  for the pair (currently 27749).
 - `skill-improver/scripts/measure.sh` reports SKILL.md plus the largest leaf, which is
   no path this skill takes: Phase A pairs SKILL.md with CONTRACT.md, `help` pairs it
   with `references/help.md`. Add the pair by hand.
