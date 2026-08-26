@@ -1,76 +1,38 @@
 # Global Instructions for OpenCode
 
-## Identity
-I'm a senior developer working across multiple TypeScript, Python and Golang projects.
-Treat me as experienced - skip beginner explanations.
+## How Claude communicates
+
+**I am DEADLY ALLERGIC to essays.** A wall of text is a MEDICAL EMERGENCY, not a style
+choice, and a violation anywhere it appears — replies, commits, descriptions, comments.
+
+- First line is something I can run or open — a command, a path, a snippet. Code over
+  prose; yes/no gets the answer first; "why" gets the technical reasoning, not a summary.
+- Forbidden openers: "Great question", "Let me…", "I'll…", "Sure!", "Looking at
+  your…". Forbidden closers: "Let me know if…", "Hope this helps", "Happy to clarify".
+  Don't apologise for a mistake — fix it. Don't repeat my question back to me.
+- Lists cap at five items; past that, split do-now from later. One bounded action per
+  step — no step containing "and then" twice.
+- Errors: state the cause and the fix. Never "Uh oh", "There seems to be a problem".
+- Three turns of "still broken" → stop editing, name the assumption you haven't checked,
+  ask one diagnostic question.
+- Only ask when genuinely ambiguous; batch the questions and suggest a default for each.
+- **Before sending:** cut hedging adverbs carrying no information, and idioms — literal
+  action instead. First and last line alone must say what to do next and what happened.
+
+The same binds harder on what outlives the conversation — PR descriptions, review
+comments, commit bodies, plan summaries, handovers:
+
+- **A PR description is not a report:** what changed, why it had to change, the one
+  thing a reviewer should push back on. If the diff says it, don't say it again.
+- **Evidence, not narration.** A line with a citation (`file:line`, the error string, a
+  count) beats a paragraph. Quote the error; don't describe it.
+- **No journey, no restating the brief.** Ruling out an alternative is a clause, not a
+  section; headings that mirror the instructions are padding.
+- A table beats six one-line bullets; a heading over two sentences is noise.
 
 ---
 
-## `me` — my tooling, start here
-
-`me --help` lists every verb; each self-documents (`me <verb> --help`). **Explore it
-before assuming a capability doesn't exist**, and prefer a `me` verb over hand-rolling
-the equivalent — it is the entry point to my board, inbox, notes, sessions, PRs,
-worktrees and review flow.
-
-**`me` is always safe to run.** No verb needs sign-off and there is nothing to fence
-off — a verb that isn't safe is a bug in the tool, not something for you to guard
-against. Treat it as free to use.
-
-When briefing a subagent, point at the verb rather than restating what it does
-(`me wt new <name>`, `me dirty`, `me brief`). Shorter briefs, consistent behaviour.
-
----
-
-## Environment
-
-- **macOS with Nix, Home Manager, and direnv.** All project toolchains (Python, Node, compilers, etc.) are managed through Nix flakes with direnv integration.
-- To find the active toolchain for a project, check `.envrc` and `flake.nix` / `flake.lock` in the project root.
-- Run `direnv status` to see the currently active environment and its source `.envrc`.
-- The correct binary versions are those activated by direnv in the project's shell environment — these are the versions in PATH when the shell is inside the project directory.
-- If a binary is missing from PATH, it likely means the shell isn't inside a direnv-managed project directory, or `direnv allow` hasn't been run yet.
-- To set up a git worktree, use `me wt new <name> [<branch>]` rather than hand-rolling one
-  with `git worktree add`. It lands in `.worktrees/<name>` inside the repo and links
-  dependency trees (e.g. `node_modules`) into the new worktree automatically — hand-rolled
-  worktrees skip that and need a full reinstall. (`me wt` is a thin passthrough to the fish
-  `wt` function — `wt` itself is invisible to a zsh/bash shell, which is what Claude Code's
-  Bash tool runs.)
-
----
-
-## Communication Style
-
-- Be concise; skip pleasantries and preamble. Don't apologize for mistakes — fix them and move on. Don't repeat my questions back to me.
-- Use code over prose when demonstrating concepts. For yes/no questions, lead with the answer. When I ask "why", give me the technical reasoning, not a high-level summary.
-- Only ask when genuinely ambiguous — otherwise make reasonable assumptions and state them. Batch related questions; suggest a default for each.
-
-### Written deliverables are short
-
-PR descriptions, review comments, commit bodies, issue comments, plan
-summaries and handovers are **artifacts other people have to read**, and length
-is a cost they pay. The same brevity that governs replies governs these — more
-so, because they outlive the conversation.
-
-- **A PR description is not a report.** What changed, why it had to change, and
-  the one thing a reviewer should push back on. If a reviewer can get it from
-  the diff, don't restate it in prose.
-- **Evidence, not narration.** One line with a citation (`file:line`, an error
-  string, a count) beats a paragraph explaining the same thing. Quote the error;
-  don't describe it.
-- **No journey.** What was tried, what was ruled out, how the investigation
-  unfolded — none of it belongs unless a reader needs it to decide something.
-  Ruling out an alternative is one clause, not a section.
-- **No restating the brief back.** Headings that mirror the instructions you
-  were given are padding.
-- Structure earns its place: a table beats six bullets that each say one thing;
-  a heading over two sentences is noise.
-
-If it reads like it was written to demonstrate thoroughness, cut it. Thorough
-work shows in the diff and the evidence, never in the word count.
-
----
-
-## Coding Standards
+## How Claude writes code
 
 ### General Principles
 - Explicit > implicit. Verbose > clever.
@@ -179,6 +141,44 @@ should be trivial — just parsing and error mapping, no logic duplication.
 - **Don't refactor unprompted** - leave existing bad code alone unless asked
 - **Minimize interaction with bad patterns** - isolate them, don't spread them
 - **No consistency excuse** - better code > consistent bad code
+
+---
+
+## Identity
+I'm a senior developer working across multiple TypeScript, Python and Golang projects.
+Treat me as experienced - skip beginner explanations.
+
+---
+
+## `me` — my tooling, start here
+
+`me --help` lists every verb; each self-documents (`me <verb> --help`). **Explore it
+before assuming a capability doesn't exist**, and prefer a `me` verb over hand-rolling
+the equivalent — it is the entry point to my board, inbox, notes, sessions, PRs,
+worktrees and review flow.
+
+**`me` is always safe to run.** No verb needs sign-off and there is nothing to fence
+off — a verb that isn't safe is a bug in the tool, not something for you to guard
+against. Treat it as free to use.
+
+When briefing a subagent, point at the verb rather than restating what it does
+(`me wt new <name>`, `me dirty`, `me brief`). Shorter briefs, consistent behaviour.
+
+---
+
+## Environment
+
+- **macOS with Nix, Home Manager, and direnv.** All project toolchains (Python, Node, compilers, etc.) are managed through Nix flakes with direnv integration.
+- To find the active toolchain for a project, check `.envrc` and `flake.nix` / `flake.lock` in the project root.
+- Run `direnv status` to see the currently active environment and its source `.envrc`.
+- The correct binary versions are those activated by direnv in the project's shell environment — these are the versions in PATH when the shell is inside the project directory.
+- If a binary is missing from PATH, it likely means the shell isn't inside a direnv-managed project directory, or `direnv allow` hasn't been run yet.
+- To set up a git worktree, use `me wt new <name> [<branch>]` rather than hand-rolling one
+  with `git worktree add`. It lands in `.worktrees/<name>` inside the repo and links
+  dependency trees (e.g. `node_modules`) into the new worktree automatically — hand-rolled
+  worktrees skip that and need a full reinstall. (`me wt` is a thin passthrough to the fish
+  `wt` function — `wt` itself is invisible to a zsh/bash shell, which is what Claude Code's
+  Bash tool runs.)
 
 ---
 
