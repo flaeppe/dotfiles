@@ -54,6 +54,10 @@
       "Bash(sudo rm -rf /*)",
       "Bash(kubectl*)",
       "Bash(* kubectl*)"
+    ],
+    "ask": [
+      "Bash(terraform*)",
+      "Bash(* terraform*)"
     ]
   },
   "hooks": {
