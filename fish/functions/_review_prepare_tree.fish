@@ -1,4 +1,5 @@
-# Make a fresh worktree usable as an editor rather than merely a checkout.
+# Make a fresh worktree usable rather than merely checked out: an editor that resolves
+# what it is looking at, and a checkout that accepts a commit.
 #
 #   _review_prepare_tree <main-root> <tree> <role> [<pr>]
 #
@@ -79,6 +80,40 @@ if test -x "$root/.review/setup"; and not test -e "$tree/.review/setup-done"
     else
         echo "$label: WARNING .review/setup failed for the $role worktree"
         echo "             language servers will be missing until it succeeds"
+    end
+end
+
+# The one part of an install that linking a dependency tree cannot stand in for. `prepare` is
+# where a package manager installs git hooks, and hooks are written into the worktree rather
+# than into the tree that was linked, so a fresh worktree has none: the pre-commit hook is
+# named but missing, and git refuses the commit. A worktree that cannot be committed from is
+# not usable, whatever else was prepared for it.
+#
+# Keyed on a dependency tree that was never installed here, which is exactly what the links
+# above leave behind. A repository whose dependencies are absent has no hooks installed
+# anywhere and needs nothing done about it.
+#
+# `npm` rather than whichever package manager the repository uses: yarn and pnpm arrive with
+# the project toolchain, which is not active in this shell, while npm sits next to node on
+# PATH -- and running a script with the local `.bin` ahead of it is the one thing every
+# package manager does identically. `--if-present` is what makes this a no-op wherever there
+# is nothing to prepare.
+#
+# Known ceiling: `prepare` is also the pre-publish build hook, so a repository that compiles
+# there pays that build once per worktree; narrow this to the repositories that install hooks
+# if one ever turns up.
+#
+# Retried like the hook above, and for the same reason: the sentinel is written only on exit 0.
+if test -e "$tree/package.json"; and test -e "$tree/node_modules"; and not test -e "$tree/.review/prepare-done"
+    pushd $tree
+    npm run --if-present --silent prepare
+    set -l prepared $status
+    popd
+    if test $prepared -eq 0
+        touch "$tree/.review/prepare-done"
+    else
+        echo "$label: WARNING prepare failed for the $role worktree"
+        echo "             git hooks are missing, so commits needing one will be refused"
     end
 end
 
