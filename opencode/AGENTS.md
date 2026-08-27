@@ -182,14 +182,6 @@ When briefing a subagent, point at the verb rather than restating what it does
 
 ---
 
-## Language-Specific
-
-### TypeScript
-- Discriminated unions over optional properties.
-- `satisfies` for type validation with inference.
-
----
-
 ## Safety Rules
 
 - Never deploy to production, or remote environments in general.
