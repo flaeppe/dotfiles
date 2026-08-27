@@ -29,11 +29,19 @@ let
   # (single source in opencode/skills/, deployed as ~/.claude/skills/)
   # `commit` is a skill here (loaded on demand when committing, e.g. via the
   # commit-msg wrapper), not an always-rule.
-  sharedSkills = [ "commit" "general" "planning" "docs-expert" "deps-expert" "correlation-expert" ];
+  sharedSkills = [
+    "commit"
+    "general"
+    "planning"
+    "docs-expert"
+    "deps-expert"
+    "correlation-expert"
+    "simplicity-expert"
+  ];
 
   # Claude subagents -- thin wrappers that load the matching skill, dispatchable
   # in their own context via the Agent tool (single source stays in the skill).
-  claudeAgents = [ "docs-expert" "correlation-expert" "deps-expert" ];
+  claudeAgents = [ "docs-expert" "correlation-expert" "deps-expert" "simplicity-expert" ];
 
   claudeAgentEntries = builtins.listToAttrs (map (name: {
     name = ".claude/agents/${name}.md";
@@ -85,6 +93,7 @@ in {
     ".claude/skills/prompt".source = ./skills/prompt;
     ".claude/skills/procedure-expert".source = ./skills/procedure-expert;
     ".claude/skills/defer".source = ./skills/defer;
+    ".claude/skills/challenge".source = ./skills/challenge;
     ".claude/skills/upgrade-risk".source = ./skills/upgrade-risk;
   };
 
