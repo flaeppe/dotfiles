@@ -6,7 +6,6 @@ tools:
   edit: false
   bash: false
   codebase-memory-mcp_*: false
-  github-work_*: false
   pg-aiguide_*: false
   sentry_*: false
 ---

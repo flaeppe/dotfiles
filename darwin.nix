@@ -43,8 +43,6 @@ in {
         set -euo pipefail
         _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
         _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
-        _v="$(_pass dev/github-private-pat)";  [[ -n "$_v" ]] && export GITHUB_PRIVATE_PAT="$_v"
-        _v="$(_pass dev/github-work-pat)";     [[ -n "$_v" ]] && export GITHUB_WORK_PAT="$_v"
         exec "$HOME/.local/bin/claude" "$@"
       '')
       (pkgs.writeShellScriptBin "opencode" ''
@@ -52,8 +50,6 @@ in {
         # Load secrets from pass into environment (skip if missing)
         _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
         _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
-        _v="$(_pass dev/github-private-pat)";  [[ -n "$_v" ]] && export GITHUB_PRIVATE_PAT="$_v"
-        _v="$(_pass dev/github-work-pat)";     [[ -n "$_v" ]] && export GITHUB_WORK_PAT="$_v"
         _superpowers="''${XDG_CONFIG_HOME:-$HOME/.config}/opencode/superpowers"
         if [[ -d "$_superpowers/.git" ]]; then
           ${pkgs.git}/bin/git -C "$_superpowers" pull --ff-only --quiet 2>/dev/null &

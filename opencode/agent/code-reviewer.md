@@ -16,4 +16,3 @@ permission:
 Use these when relevant:
 
 - `codebase-memory-mcp` — Query the code knowledge graph for call chains, dependencies, callers, and structural analysis
-- `github-work` — Read PR details, review comments, check runs, and issue context (read-only token)
