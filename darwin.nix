@@ -61,10 +61,8 @@ in {
         exec "$HOME/.opencode/bin/opencode" "$@"
       '')
     ];
-    # Order matters: the `claude` wrapper above lives in ~/.nix-profile/bin and
-    # execs ~/.local/bin/claude. If ~/.local/bin came first the wrapper would be
-    # shadowed by the binary it wraps, and the `pass` secrets would never load.
-    sessionPath = [ "$HOME/.nix-profile/bin" "$HOME/.local/bin" ];
+  # This doesn't work though hm-session-vars.fish is updated..
+    sessionPath = [ "$HOME/.local/bin" ];
     sessionVariables = {
       EDITOR = "nvim";
       # Set better color when printing folders
