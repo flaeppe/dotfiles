@@ -91,6 +91,7 @@ in {
     ".claude/skills/commit-msg".source = ./skills/commit-msg;
     ".claude/skills/analyze".source = ./skills/analyze;
     ".claude/skills/prompt".source = ./skills/prompt;
+    ".claude/skills/skill-improver".source = ./skills/skill-improver;
     ".claude/skills/procedure-expert".source = ./skills/procedure-expert;
     ".claude/skills/defer".source = ./skills/defer;
     ".claude/skills/challenge".source = ./skills/challenge;
