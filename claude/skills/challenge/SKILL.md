@@ -28,8 +28,8 @@ Steps 1, 3 and 4 are yours. Step 2 is the agent's, and nothing else is.
    ```
    VERDICT    — the expert's one line, verbatim
    ORIGINAL   — the draft from step 1, one line per increment
-   ALTERNATES — <approach> — trades <X> for <Y> — proposed: adopt|reject|note
-                the simplest-thing line always sits here
+   ALTERNATES — <approach> — trades <X> for <Y>, needs first <Z> —
+                proposed: adopt|reject|note. Simplest-thing always sits here.
    KEEP       — what the expert says must not change
    RULED OUT  — investigated and killed, with the evidence — never dropped
    ```

@@ -41,11 +41,13 @@ SIMPLEST THING THAT COULD WORK          — mandatory, exactly one
 
 ALTERNATES (0-3)                        — hard cap 3
   <approach> — trades <X> for <Y>. Right pick when: <condition>.
+  Needs first: <the one-time step that unlocks it>, or "nothing".
 
 KEEP                                    — what in the plan must not change
 
 RULED OUT                               — investigated and not offered
   <approach> — killed by: <the number, path or row count that killed it>.
+  Revived by: <the one-time step that would make it work>, or "nothing".
 ```
 
 ## Rules that make the cap bite
@@ -58,9 +60,10 @@ RULED OUT                               — investigated and not offered
 - **A ruled-out alternate is a result, not a discard.** Everything you
   investigated and did not offer goes in `RULED OUT` with the evidence that
   killed it. The cap of three binds `ALTERNATES` only; `RULED OUT` is uncapped.
-- **"Not available today" is not "not possible".** An empty column, a missing
-  index, a field nobody writes — say what would populate it and what that
-  unlocks. That is an alternate, not a dead end.
+- **A named `Revived by:` means it is not ruled out — move it to `ALTERNATES`
+  and price the step under `Needs first:`.** Only "nothing" keeps a line in
+  `RULED OUT`. An empty column, a missing index or a field nobody writes is a
+  cost, not a verdict; the largest wins tend to sit behind one.
 - **ENDORSE is a first-class answer.** It reads:
   `ENDORSE — <approach>, because <the constraint that rules the alternatives out>.`
   The simplest-thing slot then says *"the plan as written"*, alternates are
