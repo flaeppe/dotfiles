@@ -43,6 +43,9 @@ ALTERNATES (0-3)                        — hard cap 3
   <approach> — trades <X> for <Y>. Right pick when: <condition>.
 
 KEEP                                    — what in the plan must not change
+
+RULED OUT                               — investigated and not offered
+  <approach> — killed by: <the number, path or row count that killed it>.
 ```
 
 ## Rules that make the cap bite
@@ -52,6 +55,12 @@ KEEP                                    — what in the plan must not change
 - An alternate with no stated trade-off is not an alternate. Drop it, do not pad
   to three. Zero alternates is a valid answer.
 - Never propose a dependency you have not confirmed already installed.
+- **A ruled-out alternate is a result, not a discard.** Everything you
+  investigated and did not offer goes in `RULED OUT` with the evidence that
+  killed it. The cap of three binds `ALTERNATES` only; `RULED OUT` is uncapped.
+- **"Not available today" is not "not possible".** An empty column, a missing
+  index, a field nobody writes — say what would populate it and what that
+  unlocks. That is an alternate, not a dead end.
 - **ENDORSE is a first-class answer.** It reads:
   `ENDORSE — <approach>, because <the constraint that rules the alternatives out>.`
   The simplest-thing slot then says *"the plan as written"*, alternates are

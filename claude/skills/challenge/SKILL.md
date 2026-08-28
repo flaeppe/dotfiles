@@ -22,7 +22,7 @@ Steps 1, 3 and 4 are yours. Step 2 is the agent's, and nothing else is.
    your output contract". One agent, not a fan-out; it reads and returns,
    writing nothing. Wait for it.
 
-3. **Present both, decide neither.** Four blocks in the conversation, never
+3. **Present both, decide neither.** Five blocks in the conversation, never
    interleaved:
 
    ```
@@ -31,6 +31,7 @@ Steps 1, 3 and 4 are yours. Step 2 is the agent's, and nothing else is.
    ALTERNATES — <approach> — trades <X> for <Y> — proposed: adopt|reject|note
                 the simplest-thing line always sits here
    KEEP       — what the expert says must not change
+   RULED OUT  — investigated and killed, with the evidence — never dropped
    ```
 
    Proposed dispositions are yours to suggest, never to apply. Fold nothing
@@ -38,7 +39,7 @@ Steps 1, 3 and 4 are yours. Step 2 is the agent's, and nothing else is.
 
 4. **Persist what was chosen.** Fold the adopted items into the plan body.
    Record the rest under one `## Alternatives considered` section, one line
-   each — *approach — trade-off — why not* — so a later session does not
-   re-propose them. Then persist per `planning`'s **File Conventions** —
-   location, shape, `NNN`, header. Those rules live there and are not
-   restated here. Report the path.
+   each — *approach — trade-off — why not* — including every `RULED OUT`
+   line, so a later session does not re-propose them. Then persist per
+   `planning`'s **File Conventions** — location, shape, `NNN`, header. Those
+   rules live there and are not restated here. Report the path.
