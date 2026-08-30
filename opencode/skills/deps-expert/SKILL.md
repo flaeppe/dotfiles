@@ -152,9 +152,6 @@ Analyze names actively:
   belongs in the 3rd-party schema module. `Payment` belongs to the
   domain. `PaymentRecord` belongs to the DB layer. The names tell you
   where they sit.
-- **If you renamed it, where would it move?** Fast diagnostic for
-  misplacement. If the natural rename pulls the item into a different
-  module, the item is in the wrong place now.
 
 ### Bounded Contexts and 3rd-Party Isolation
 
@@ -294,6 +291,41 @@ Detect: rank modules by in-degree. High-in-degree modules that are
 highly concrete (lots of implementation detail, few abstract
 declarations) are structurally wrong.
 
+### 10. Thin Edge / Borrowed Symbol
+
+An import that carries exactly one symbol into a package whose
+vocabulary does not otherwise overlap. The edge itself can be legal and
+acyclic and still be wrong — the symbol has no real home on either side.
+
+Detect: for each import, count distinct symbols used from it and check
+domain-vocabulary overlap between the two packages. Name the crossing
+symbol, not just the edge, and ask whether the symbol's home should be
+a package either end can own without borrowing.
+
+### 11. Ownerless Contract
+
+A port or interface whose error sentinels, result encoding, or
+vocabulary are scattered across packages because no package owns the
+contract itself.
+
+Detect: for each port/interface, check whether its errors, result
+types, and naming vocabulary live in one place or are spread across its
+implementers and callers. When nothing owns it, the corrected shape may
+be a package that does.
+
+### 12. Names Draw the Lines
+
+**If you renamed it, where would it move?** Fast diagnostic for
+misplacement. If the natural rename pulls the item into a different
+module, the item is in the wrong place now. Scope: every
+locally-constructed foreign type, and every domain-naming string
+literal — not only import edges.
+
+Detect: for each locally-constructed type from another domain, and each
+string literal naming a domain/channel/context, ask where a rename
+would place it; a rename that moves it flags the current location as
+wrong.
+
 ---
 
 ## Output Format
@@ -311,10 +343,17 @@ mismatch. Worth fixing but not urgent.
 
 For each finding:
 
-- **The edge** — what depends on what, by name.
+- **The edge** — what depends on what, by name. Name the exact set of
+  symbols crossing the edge; an edge reported without its crossing
+  symbols is incomplete.
 - **The violation** — which rule it breaks, in one sentence.
 - **The corrected shape** — where the item should live, with the name
-  it should have there. Specific enough to act on.
+  it should have there. Specific enough to act on. Permitted moves:
+  move, rename, or relocate the item; **introduce an owner** — a new
+  node that owns a contract nothing currently owns; or **eliminate the
+  shared node** — remove a shared vocabulary item by re-encoding the
+  fact in the signature, when that removes the need for the edge
+  entirely.
 
 In Diff-Scoped mode, also note near-misses — edges the diff almost added
 but didn't — that suggest the author was steered correctly by the
@@ -331,6 +370,8 @@ existing structure.
   concrete: this name, this edge, this module.
 - You do not propose new abstractions to fix coupling unless the
   abstraction resolves a named violation. Adding interfaces "for
-  flexibility" with no current violation is over-engineering.
+  flexibility" with no current violation is over-engineering. An
+  ownerless contract (Rule 11) is a named violation; introducing the
+  package that owns it is a permitted corrected shape.
 - You do not rewrite code. You produce findings and corrected-graph
   recommendations. Refactoring is a separate step.
