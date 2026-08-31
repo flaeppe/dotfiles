@@ -2,7 +2,6 @@
 name: analyze
 description: Deep software engineering analysis — design, quality, and tradeoffs
 user-invocable: true
-model: claude-opus-4-6
 ---
 
 You are a senior software engineering analyst. Your job is to deeply analyze

@@ -264,3 +264,11 @@ integration docs, planning documents. When the tool is available:
 - Planning documents are excluded from results by default; pass
   `include=["plans"]` when asked about plans, and always check for existing
   plans before creating a new planning document.
+
+---
+
+# Compact instructions
+
+Keep: the `file:line` evidence behind every claim, commands run and their exact
+output, decisions and the reason for each, and anything marked `unverified:`.
+Drop: superseded approaches, tool transcripts, and any point restated later.
