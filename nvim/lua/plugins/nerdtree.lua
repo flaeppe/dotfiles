@@ -9,6 +9,16 @@ vim.g.NERDTreeIgnore = {
     "\\.nox",
     "\\.egg-info$",
     "\\.tags",
+    -- Directories that are never the thing you are browsing for, and that cost
+    -- a screen of scrolling each because hidden files are shown below.
+    "node_modules[[dir]]",
+    "\\.git$[[dir]]",
+    "\\.direnv[[dir]]",
+    "\\.worktrees[[dir]]",
+    "\\.ruff_cache[[dir]]",
+    "\\.next[[dir]]",
+    "coverage[[dir]]",
+    "dist[[dir]]",
 }
 -- Show hidden files and folders per default in file browser
 vim.g.NERDTreeShowHidden = 1
