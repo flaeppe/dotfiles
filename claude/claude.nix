@@ -20,7 +20,11 @@ in {
   #   commands/ slash commands
   #
   # `recursive = true` links each file individually instead of the directory, so
-  # hand-installed entries under these paths survive activation.
+  # hand-installed entries under these paths survive activation. Load-bearing, not
+  # tidiness: `sentry cli setup` writes ~/.claude/skills/sentry-cli/ and rewrites it
+  # on every `sentry cli upgrade`. A plain directory source would replace the whole
+  # skills directory and take it with it. Do not adopt such a skill into this repo --
+  # nix would then fight the tool that generates it (see codebase-memory-mcp above).
   home.file = {
     ".claude/CLAUDE.md".source = ./CLAUDE.md;
     ".claude/rules" = {
