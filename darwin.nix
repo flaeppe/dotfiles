@@ -45,17 +45,6 @@ in {
         _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
         exec "$HOME/.local/bin/claude" "$@"
       '')
-      (pkgs.writeShellScriptBin "opencode" ''
-        set -euo pipefail
-        # Load secrets from pass into environment (skip if missing)
-        _pass() { ${pkgs.pass}/bin/pass show "$1" 2>/dev/null; }
-        _v="$(_pass dev/context7-api-key)";    [[ -n "$_v" ]] && export CONTEXT7_API_KEY="$_v"
-        _superpowers="''${XDG_CONFIG_HOME:-$HOME/.config}/opencode/superpowers"
-        if [[ -d "$_superpowers/.git" ]]; then
-          ${pkgs.git}/bin/git -C "$_superpowers" pull --ff-only --quiet 2>/dev/null &
-        fi
-        exec "$HOME/.opencode/bin/opencode" "$@"
-      '')
     ];
   # This doesn't work though hm-session-vars.fish is updated..
     sessionPath = [ "$HOME/.local/bin" ];
@@ -77,13 +66,6 @@ in {
       ptf = "${pkgs.bash}/bin/bash ${./scripts/pass-to-file.sh}";
       passPath = "${pkgs.pass}/bin:${pkgs.coreutils}/bin";
     in {
-      writeOpencodeAuth = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        PATH="${passPath}:$PATH"; export PATH
-        _dir="$HOME/.local/share/opencode"; mkdir -p "$_dir"
-        ${ptf} dev/opencode-auth     "$_dir/auth.json"     600
-        ${ptf} dev/opencode-mcp-auth "$_dir/mcp-auth.json" 600
-      '';
-
       writeSshKeys = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         PATH="${passPath}:$PATH"; export PATH
         mkdir -p "$HOME/.ssh" && chmod 700 "$HOME/.ssh"

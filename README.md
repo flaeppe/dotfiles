@@ -57,6 +57,5 @@ pre-commit run --all-files --hook-stage manual pyright
 ## Secrets
 
 Secrets are managed by [pass](https://www.passwordstore.org/) (GPG-encrypted, git-synced).
-The opencode and claude wrapper scripts read secrets from `pass` at launch. Home Manager
-activation scripts write `~/.sentryclirc` and opencode auth files from `pass` on
-`home-manager switch`.
+The claude wrapper script reads secrets from `pass` at launch. Home Manager
+activation scripts write `~/.sentryclirc` from `pass` on `home-manager switch`.

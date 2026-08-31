@@ -1,101 +1,44 @@
 { pkgs, lib, unstable, ... }:
 let
-  opencode = ../opencode;
-
   # MCP binary from nixpkgs-unstable; tracks the channel on `nix flake update`.
   # Provides only the executable -- the discovery hook + skill are wired below.
   # Do NOT run `codebase-memory-mcp install`/`update`: it mutates ~/.claude
   # (hooks, settings.json, skills) which this flake owns and would revert.
   inherit (unstable) codebase-memory-mcp;
-
-  # Rules shared with OpenCode -- auto-loaded by paths in Claude Code
-  # (single source in opencode/skills/, deployed as ~/.claude/rules/)
-  sharedRules = [
-    "golang"
-    "golang-test"
-    "jest"
-    "nix"
-    "pytest"
-    "python"
-    "test"
-    "typescript"
-    "vitest"
-  ];
-
-  # Always-loaded rules (no paths = loaded in every session, like CLAUDE.md)
-  alwaysRules = [ ];
-
-  # Skills shared with OpenCode -- user-invocable in Claude Code
-  # (single source in opencode/skills/, deployed as ~/.claude/skills/)
-  # `commit` is a skill here (loaded on demand when committing, e.g. via the
-  # commit-msg wrapper), not an always-rule.
-  sharedSkills = [
-    "commit"
-    "general"
-    "planning"
-    "docs-expert"
-    "deps-expert"
-    "correlation-expert"
-    "simplicity-expert"
-  ];
-
-  # Claude subagents -- thin wrappers that load the matching skill, dispatchable
-  # in their own context via the Agent tool (single source stays in the skill).
-  claudeAgents = [ "docs-expert" "correlation-expert" "deps-expert" "simplicity-expert" ];
-
-  claudeAgentEntries = builtins.listToAttrs (map (name: {
-    name = ".claude/agents/${name}.md";
-    value = { source = ./agents + "/${name}.md"; };
-  }) claudeAgents);
-
-  sharedRuleEntries = builtins.listToAttrs (map (name: {
-    name = ".claude/rules/${name}.md";
-    value = { source = "${opencode}/skills/${name}/SKILL.md"; };
-  }) sharedRules);
-
-  alwaysRuleEntries = builtins.listToAttrs (map (name: {
-    name = ".claude/rules/${name}.md";
-    value = { source = "${opencode}/skills/${name}/SKILL.md"; };
-  }) alwaysRules);
-
-  sharedSkillEntries = builtins.listToAttrs (map (name: {
-    name = ".claude/skills/${name}";
-    value = {
-      source = "${opencode}/skills/${name}";
-      recursive = true;
-    };
-  }) sharedSkills);
 in {
   # npx, for `ccusage` (statusline session-spend reporting) -- no first-party
   # `claude usage` CLI exists yet.
   home.packages = [ pkgs.nodejs ];
 
-  home.file = sharedRuleEntries // alwaysRuleEntries // sharedSkillEntries
-    // claudeAgentEntries // {
-    # Global instructions -- shared, single source in opencode/AGENTS.md
-    ".claude/CLAUDE.md".source = "${opencode}/AGENTS.md";
-
-    ".claude/commands/delegate.md".source = ./commands/delegate.md;
-
-    # Claude-specific workflow commands
-    ".claude/skills/explore".source = ./skills/explore;
-    ".claude/skills/pr".source = ./skills/pr;
-    ".claude/skills/pr-playbook".source = ./skills/pr-playbook;
-    ".claude/skills/pr-session".source = ./skills/pr-session;
-    ".claude/skills/fix-pr".source = ./skills/fix-pr;
-    ".claude/skills/research".source = ./skills/research;
-    ".claude/skills/pr-review".source = ./skills/pr-review;
-    ".claude/skills/run-tests".source = ./skills/run-tests;
-    ".claude/skills/codebase-memory".source = ./skills/codebase-memory;
-    ".claude/skills/test-expert".source = ./skills/test-expert;
-    ".claude/skills/commit-msg".source = ./skills/commit-msg;
-    ".claude/skills/analyze".source = ./skills/analyze;
-    ".claude/skills/prompt".source = ./skills/prompt;
-    ".claude/skills/skill-improver".source = ./skills/skill-improver;
-    ".claude/skills/procedure-expert".source = ./skills/procedure-expert;
-    ".claude/skills/defer".source = ./skills/defer;
-    ".claude/skills/challenge".source = ./skills/challenge;
-    ".claude/skills/upgrade-risk".source = ./skills/upgrade-risk;
+  # Each directory maps to one Claude Code loading mechanism, so where a file
+  # lives is the whole decision -- no list to keep in sync:
+  #   rules/    always in context for a session that touches a matching file
+  #             (each carries `paths:` frontmatter; without it a rule loads
+  #             unconditionally, which is what CLAUDE.md is for)
+  #   skills/   loaded only when invoked or when Claude judges it relevant
+  #   agents/   dispatchable in their own context via the Agent tool
+  #   commands/ slash commands
+  #
+  # `recursive = true` links each file individually instead of the directory, so
+  # hand-installed entries under these paths survive activation.
+  home.file = {
+    ".claude/CLAUDE.md".source = ./CLAUDE.md;
+    ".claude/rules" = {
+      source = ./rules;
+      recursive = true;
+    };
+    ".claude/skills" = {
+      source = ./skills;
+      recursive = true;
+    };
+    ".claude/agents" = {
+      source = ./agents;
+      recursive = true;
+    };
+    ".claude/commands" = {
+      source = ./commands;
+      recursive = true;
+    };
   };
 
   # Deploy as writable copy (not symlink) so `claude plugin install` can write

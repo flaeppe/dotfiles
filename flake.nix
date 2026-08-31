@@ -73,7 +73,6 @@
               ./fish/fish.nix
               ./git/git.nix
               ./nvim/nvim.nix
-              ./opencode/opencode.nix
               ./me.nix
             ];
           };

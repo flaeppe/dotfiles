@@ -5,5 +5,5 @@ claude/hooks/git-local-path-guard
 claude/hooks/plan-verified-guard
 git/git.nix
 nvim/lua/plugins/plan.lua
-opencode/skills/docs-expert/
-opencode/skills/planning/
+claude/skills/docs-expert/
+claude/skills/planning/
