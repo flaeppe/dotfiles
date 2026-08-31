@@ -59,6 +59,36 @@ MOTION_CLASSES: Final = {
     "edit": ["o", "O", "i", "a", "c", "d", "x", "p", "u", "<C-R>"],
 }
 
+# The motion classes above describe a source buffer. Inside the file tree they
+# say nothing -- w/b/e have no meaning there, and these are the keys j/k should
+# be losing ground to. Spelled as `keytrans` writes them.
+TREE_KEYS: Final = {
+    "<C-J>": "next sibling",
+    "<C-K>": "previous sibling",
+    "J": "last child",
+    "K": "first child",
+    "p": "parent",
+    "P": "root",
+    "x": "close parent",
+    "X": "close children",
+    "u": "up a directory",
+    "O": "open recursively",
+    "/": "search the tree buffer",
+}
+
+# Consecutive vertical keys in one buffer, broken by any other key or a pause
+# this long, are one journey. Their length is the question a raw j/k total
+# cannot answer: a median of 3 is cursor adjustment, a tail of 300 is a symbol
+# jump that never happened.
+BURST_GAP_MS: Final = 3000
+LONG_BURST: Final = 10
+# The log records no cursor position, so a half-screen jump is priced at a flat
+# line count -- enough that <C-D> does not read as one line. Log the window
+# height alongside the key if the tail ever needs to be exact.
+VERTICAL_LINES: Final = {"<C-D>": 20, "<C-U>": 20, "<C-F>": 40, "<C-B>": 40}
+# Absolute jumps, not travel: they end a burst rather than lengthening one.
+BURST_BREAKERS: Final = {"G", "gg"}
+
 
 def shift_day(date: str, days: int) -> str:
     stamp = datetime.date.fromisoformat(date) + datetime.timedelta(days=days)
@@ -134,6 +164,8 @@ class Window:
     keys_in_filetype: collections.defaultdict[str, collections.Counter[str]]
     # (key, length, median gap ms, filetype)
     runs: list[tuple[str, int, int, str]]
+    # Lines travelled by each uninterrupted run of vertical keys, per filetype.
+    bursts: collections.defaultdict[str, list[int]]
     dates: set[str]
     sessions: int
     cwds: collections.Counter[str]
@@ -146,6 +178,7 @@ class Window:
         self.vertical_by_filetype = collections.Counter()
         self.keys_in_filetype = collections.defaultdict(collections.Counter)
         self.runs = []
+        self.bursts = collections.defaultdict(list)
         self.dates = set()
         self.sessions = 0
         self.cwds = collections.Counter()
@@ -164,6 +197,9 @@ class Window:
         run_key: str | None = None
         run_times: list[int] = []
         run_filetype = ""
+        burst_lines = 0
+        burst_filetype = ""
+        burst_last = 0
         for record in records:
             if "cwd" in record and "k" not in record:
                 cwd = record["cwd"]
@@ -182,12 +218,27 @@ class Window:
             if key in vertical:
                 self.vertical_by_filetype[filetype] += 1
             self.keys_in_filetype[filetype][key] += 1
+            travelling = key in vertical and key not in BURST_BREAKERS
+            broken = (
+                filetype != burst_filetype or record["t"] - burst_last > BURST_GAP_MS
+            )
+            if not travelling or broken:
+                self._close_burst(burst_lines, burst_filetype)
+                burst_lines, burst_filetype = 0, filetype if travelling else ""
+            if travelling:
+                burst_lines += VERTICAL_LINES.get(key, 1)
+                burst_last = record["t"]
             if key == run_key:
                 run_times.append(record["t"])
             else:
                 self._close_run(run_key, run_times, run_filetype)
                 run_key, run_times, run_filetype = key, [record["t"]], filetype
         self._close_run(run_key, run_times, run_filetype)
+        self._close_burst(burst_lines, burst_filetype)
+
+    def _close_burst(self, lines: int, filetype: str) -> None:
+        if lines:
+            self.bursts[filetype].append(lines)
 
     def _close_run(self, key: str | None, times: Sequence[int], filetype: str) -> None:
         if key not in ("j", "k") or len(times) < RUN_MIN:
@@ -209,6 +260,51 @@ class Window:
             self.cmds[form.lstrip(":")] for form in forms if form.startswith(":")
         )
         return keys + cmds
+
+
+def print_bursts(window: Window) -> None:
+    """One journey per row: how far each uninterrupted scroll actually went."""
+    if not window.bursts:
+        return
+    print(
+        f"\nscroll bursts (vertical keys, one buffer, <={BURST_GAP_MS // 1000}s apart):"
+    )
+    header = f"  {'ft':<12} {'bursts':>6} {'lines':>7} {'med':>4} {'p90':>4} {'max':>5}"
+    print(f"{header}  bursts over {LONG_BURST} lines")
+    ranked = sorted(window.bursts.items(), key=lambda kv: -sum(kv[1]))[:6]
+    for filetype, sizes in ranked:
+        sizes = sorted(sizes)
+        count, travelled = len(sizes), sum(sizes)
+        median = sizes[count // 2]
+        p90 = sizes[min(int(count * 0.9), count - 1)]
+        long = [size for size in sizes if size > LONG_BURST]
+        share = 100 * sum(long) / travelled
+        print(
+            f"  {filetype:<12} {count:>6} {travelled:>7} {median:>4} {p90:>4} "
+            f"{sizes[-1]:>5}  {len(long)} carry {sum(long)} lines ({share:.0f}%)"
+        )
+
+
+def print_tree_vocabulary(window: Window) -> None:
+    """Which of the tree's own movements are in the fingers, and which are not."""
+    inside = window.keys_in_filetype.get("nerdtree")
+    if not inside:
+        return
+    walked = inside["j"] + inside["k"]
+    pressed = {key: inside[key] for key in TREE_KEYS if inside[key]}
+    print(f"\nnerdtree ({sum(inside.values())} keys): j/k {walked}, o {inside['o']}")
+    print(
+        "  structural keys pressed:",
+        ", ".join(f"{key} {count} ({TREE_KEYS[key]})" for key, count in pressed.items())
+        or "none",
+    )
+    print(
+        "  never pressed:",
+        ", ".join(
+            f"{key} ({desc})" for key, desc in TREE_KEYS.items() if key not in pressed
+        )
+        or "none",
+    )
 
 
 def print_window(window: Window) -> None:
@@ -235,6 +331,8 @@ def print_window(window: Window) -> None:
 
     vertical = sum(window.keys[k] for k in MOTION_CLASSES["vertical"])
     print(f"\nvertical by filetype: {window.vertical_by_filetype.most_common(10)}")
+    print_bursts(window)
+    print_tree_vocabulary(window)
     in_runs = sum(r[1] for r in window.runs)
     print(f"runs of >={RUN_MIN}: {len(window.runs)}, keys spent in them: {in_runs}")
     if window.runs:
