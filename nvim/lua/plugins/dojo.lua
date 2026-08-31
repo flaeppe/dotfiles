@@ -82,7 +82,7 @@ local ENTRIES = {
     {
         group = "jump",
         keys = "gd",
-        desc = "Definition -- LSP first, ctags fallback, reachable on a Nordic layout",
+        desc = "Definition when grd finds nothing: ctags fallback, and lists ambiguous names",
         added = "2026-07-25",
     },
     {
