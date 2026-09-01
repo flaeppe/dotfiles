@@ -31,9 +31,9 @@ switch "$argv[1]"
         return 1
     case '*'
         # Anything left is either a flag (argparse below owns those, including its own
-        # errors on an unknown one) or a verb nobody defined. Without this, an unhandled
-        # verb reached argparse, which ignores bare words and silently ran the listing --
-        # a typo looked like a successful no-op.
+        # errors on an unknown one) or a verb nobody defined. A bare word is not an error
+        # to argparse -- it is left in $argv and ignored -- so refusing it here is the only
+        # thing standing between a typo and a successful-looking no-op.
         if test -n "$argv[1]"; and not string match -q -- '-*' "$argv[1]"
             echo "wt: unrecognised verb '$argv[1]' -- try `wt new`, `wt rm`, or `wt --help`" >&2
             return 1
