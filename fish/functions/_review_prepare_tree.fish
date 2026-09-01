@@ -33,9 +33,29 @@ set -l LOCAL_CONFIG .envrc .ignore .sqruff .cbmignore postgres-language-server.j
 # Stale if the PR itself changes dependencies -- install into the worktree by hand
 # in that case.
 #
-# Only safe for trees that hold no absolute path back to where they were installed. One
-# that does -- and one that carries the language server itself -- needs `.review/setup`
+# A pnpm/npm/yarn workspace keeps one node_modules per package, not only at the root,
+# so each name here is walked rather than looked up once at $root -- pruned at every
+# match, both because a package's own transitive deps must never be linked
+# individually (only the workspace-package-level tree they hang off) and because
+# descending into them is most of a monorepo's file count for nothing this needs.
+# `.git` and `.worktrees` are pruned too: the former never holds a workspace package,
+# and the latter holds every other worktree of this same repository, which would
+# otherwise be walked once per worktree that happens to exist.
+#
+# Only safe for trees that hold no path back to where they were installed. One that
+# does -- and one that carries the language server itself -- needs `.review/setup`
 # below, which can rewrite it per worktree.
+#
+# Known ceiling: a workspace package's node_modules routinely holds a symlink to a
+# sibling package's own source, by a path relative to that package -- correct when the
+# tree was installed in place, but a *symlinked* node_modules resolves such a link
+# through the real directory it points at, landing back in $root regardless of which
+# worktree asked. First-party code under review can therefore resolve to the main
+# checkout's copy instead of this worktree's, which reads as correct and is not --
+# exactly the trap `.review/setup` exists to fix for a Python virtualenv's absolute
+# import path, just reached by a relative one here. A repository where packages
+# actually import each other this way needs the same kind of hook, run after this
+# function, to repoint those particular links.
 set -l LINK_DIRS node_modules
 
 for name in $LOCAL_CONFIG
@@ -43,9 +63,59 @@ for name in $LOCAL_CONFIG
         cp -R "$root/$name" "$tree/$name"
     end
 end
+
+# A symlink is not a directory, so a `.gitignore` written `node_modules/` (trailing
+# slash, directory-only) does not match the links this loop creates, and `git add -A`
+# would commit one as a mode 120000 blob holding this machine's absolute path -- CI's
+# install then fails with ENOENT descending into a path that only ever existed here. A
+# pattern written `node_modules` (no slash) does ignore it, but this function cannot
+# assume a given repository got that right, and fixing the repository's `.gitignore` is
+# not this function's business.
+#
+# So every link is registered in an exclude file this worktree's own git config points
+# at, set up on first use below. That works regardless of the repository's own
+# `.gitignore`, and reaches only this worktree: not the tracked `.gitignore`, not
+# `$GIT_COMMON_DIR/info/exclude` (shared by every worktree and the main checkout), not
+# a sibling worktree's config. `extensions.worktreeConfig` is the one piece that is
+# repository-wide -- there is nowhere per-worktree to put a flag that turns on
+# per-worktree config -- but it only enables the mechanism; it sets nothing itself, and
+# a sibling worktree that never points its own core.excludesFile stays unaffected.
+set -l wt_exclude
 for name in $LINK_DIRS
-    if test -d "$root/$name"; and not test -e "$tree/$name"
-        ln -s "$root/$name" "$tree/$name"
+    for found in (find "$root" -name .git -prune -o -name .worktrees -prune -o -type d -name "$name" -print -prune)
+        set -l rel (string replace -- "$root/" "" $found)
+        if not test -e "$tree/$rel"
+            ln -s "$found" "$tree/$rel"
+        end
+
+        if test -z "$wt_exclude"
+            git -C $tree config extensions.worktreeConfig true
+            set -l wt_gitdir (git -C $tree rev-parse --path-format=absolute --git-dir)
+            mkdir -p "$wt_gitdir/info"
+            set wt_exclude "$wt_gitdir/info/exclude-links"
+            if not test -e $wt_exclude
+                # core.excludesFile is one file, not a search path -- replacing it
+                # outright would silently drop whatever patterns a repository already
+                # pointed it at locally, so those are folded in first.
+                set -l prior (git -C $tree config --local core.excludesFile)
+                if test -n "$prior"; and test -e "$prior"
+                    cp "$prior" $wt_exclude
+                else
+                    touch $wt_exclude
+                end
+                git -C $tree config --worktree core.excludesFile $wt_exclude
+            end
+        end
+
+        if not grep -qxF "/$rel" $wt_exclude
+            echo "/$rel" >>$wt_exclude
+        end
+        # Verified rather than assumed: a link this function believes it excluded but
+        # git does not is a defect to report at creation time, not one to discover from
+        # a broken CI run days later.
+        if not git -C $tree check-ignore -q -- $rel
+            echo "$label: WARNING $rel is a symlink git does not ignore -- committing it will break CI"
+        end
     end
 end
 mkdir -p "$tree/.review"
