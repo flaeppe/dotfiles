@@ -24,6 +24,20 @@ switch "$argv[1]"
     case rm
         _wt_rm $argv[2..]
         return $status
+    case retire
+        # Real word, wrong command: `review retire` archives a session before dropping its
+        # trees, and a plain worktree has nothing to archive, so the two never merge into one.
+        echo "wt: no 'retire' here -- try `wt rm` (review sessions: `review retire`)" >&2
+        return 1
+    case '*'
+        # Anything left is either a flag (argparse below owns those, including its own
+        # errors on an unknown one) or a verb nobody defined. Without this, an unhandled
+        # verb reached argparse, which ignores bare words and silently ran the listing --
+        # a typo looked like a successful no-op.
+        if test -n "$argv[1]"; and not string match -q -- '-*' "$argv[1]"
+            echo "wt: unrecognised verb '$argv[1]' -- try `wt new`, `wt rm`, or `wt --help`" >&2
+            return 1
+        end
 end
 
 argparse a/all s/size h/help -- $argv
