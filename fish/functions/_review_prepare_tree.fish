@@ -76,17 +76,15 @@ end
 # repository whose own `.gitignore` got the slash wrong without this function needing
 # to know or care where the repository's ignore file lives.
 #
-# Shared rather than per-worktree on purpose, this time: a per-worktree
-# `core.excludesFile` was tried first and reverted, because it replaces the *whole*
-# effective excludes file for that worktree rather than adding to it. Where no
-# `core.excludesFile` is set at all -- the common case -- git still honours a default
-# XDG path (`$XDG_CONFIG_HOME/git/ignore`, typically `~/.config/git/ignore`), and that
-# default is not visible to any `git config` query, only to git itself. Pointing a
-# fresh per-worktree value there silently stopped that default from applying inside
-# the worktree, un-ignoring `.envrc` and every other `LOCAL_CONFIG` entry, and
-# `.review/` below -- the identical failure this function exists to prevent, just for
-# secrets instead of a dependency tree. `$GIT_COMMON_DIR/info/exclude` has no such
-# footgun: it only ever adds patterns, never replaces a file wholesale.
+# Shared, and deliberately not `core.excludesFile`: that setting names a single file
+# and so replaces the whole effective excludes file rather than adding to it. Where it
+# is unset -- the common case -- git still honours a default XDG path
+# (`$XDG_CONFIG_HOME/git/ignore`, typically `~/.config/git/ignore`) that no `git
+# config` query reports, only git itself. Pointing it at a per-worktree file therefore
+# stops that default applying inside the worktree, un-ignoring `.envrc`, every other
+# `LOCAL_CONFIG` entry above and `.review/` below -- committing secrets through the
+# same `git add -A` this guards against. `$GIT_COMMON_DIR/info/exclude` only ever adds
+# patterns, so it carries no such risk.
 set -l common_exclude (git -C $tree rev-parse --path-format=absolute --git-common-dir)/info/exclude
 for name in $LINK_DIRS
     if not grep -qxF "$name" $common_exclude 2>/dev/null
