@@ -67,48 +67,46 @@ end
 # A symlink is not a directory, so a `.gitignore` written `node_modules/` (trailing
 # slash, directory-only) does not match the links this loop creates, and `git add -A`
 # would commit one as a mode 120000 blob holding this machine's absolute path -- CI's
-# install then fails with ENOENT descending into a path that only ever existed here. A
-# pattern written `node_modules` (no slash) does ignore it, but this function cannot
-# assume a given repository got that right, and fixing the repository's `.gitignore` is
-# not this function's business.
+# install then fails with ENOENT descending into a path that only ever existed here.
 #
-# So every link is registered in an exclude file this worktree's own git config points
-# at, set up on first use below. That works regardless of the repository's own
-# `.gitignore`, and reaches only this worktree: not the tracked `.gitignore`, not
-# `$GIT_COMMON_DIR/info/exclude` (shared by every worktree and the main checkout), not
-# a sibling worktree's config. `extensions.worktreeConfig` is the one piece that is
-# repository-wide -- there is nowhere per-worktree to put a flag that turns on
-# per-worktree config -- but it only enables the mechanism; it sets nothing itself, and
-# a sibling worktree that never points its own core.excludesFile stays unaffected.
-set -l wt_exclude
+# Fixed by adding an unslashed line -- `node_modules`, no trailing `/` -- to
+# `$GIT_COMMON_DIR/info/exclude`, which every worktree of this repository and the main
+# checkout already read. Unslashed matches a symlink as well as a directory, at any
+# depth, so it also covers every nested link the walk below creates, and it fixes any
+# repository whose own `.gitignore` got the slash wrong without this function needing
+# to know or care where the repository's ignore file lives.
+#
+# Shared rather than per-worktree on purpose, this time: a per-worktree
+# `core.excludesFile` was tried first and reverted, because it replaces the *whole*
+# effective excludes file for that worktree rather than adding to it. Where no
+# `core.excludesFile` is set at all -- the common case -- git still honours a default
+# XDG path (`$XDG_CONFIG_HOME/git/ignore`, typically `~/.config/git/ignore`), and that
+# default is not visible to any `git config` query, only to git itself. Pointing a
+# fresh per-worktree value there silently stopped that default from applying inside
+# the worktree, un-ignoring `.envrc` and every other `LOCAL_CONFIG` entry, and
+# `.review/` below -- the identical failure this function exists to prevent, just for
+# secrets instead of a dependency tree. `$GIT_COMMON_DIR/info/exclude` has no such
+# footgun: it only ever adds patterns, never replaces a file wholesale.
+set -l common_exclude (git -C $tree rev-parse --path-format=absolute --git-common-dir)/info/exclude
+for name in $LINK_DIRS
+    if not grep -qxF "$name" $common_exclude 2>/dev/null
+        echo "$name" >>$common_exclude
+    end
+end
+
 for name in $LINK_DIRS
     for found in (find "$root" -name .git -prune -o -name .worktrees -prune -o -type d -name "$name" -print -prune)
         set -l rel (string replace -- "$root/" "" $found)
+        set -l parent (dirname "$tree/$rel")
+        if not test -d $parent
+            # The workspace package's own source isn't in this worktree -- untracked
+            # or gitignored there -- so there is nowhere to hang the link. Named
+            # rather than left to a bare `ln: No such file or directory`.
+            echo "$label: WARNING $rel has no parent directory in the $role worktree, skipping that link"
+            continue
+        end
         if not test -e "$tree/$rel"
             ln -s "$found" "$tree/$rel"
-        end
-
-        if test -z "$wt_exclude"
-            git -C $tree config extensions.worktreeConfig true
-            set -l wt_gitdir (git -C $tree rev-parse --path-format=absolute --git-dir)
-            mkdir -p "$wt_gitdir/info"
-            set wt_exclude "$wt_gitdir/info/exclude-links"
-            if not test -e $wt_exclude
-                # core.excludesFile is one file, not a search path -- replacing it
-                # outright would silently drop whatever patterns a repository already
-                # pointed it at locally, so those are folded in first.
-                set -l prior (git -C $tree config --local core.excludesFile)
-                if test -n "$prior"; and test -e "$prior"
-                    cp "$prior" $wt_exclude
-                else
-                    touch $wt_exclude
-                end
-                git -C $tree config --worktree core.excludesFile $wt_exclude
-            end
-        end
-
-        if not grep -qxF "/$rel" $wt_exclude
-            echo "/$rel" >>$wt_exclude
         end
         # Verified rather than assumed: a link this function believes it excluded but
         # git does not is a defect to report at creation time, not one to discover from
