@@ -177,6 +177,10 @@
               ${builtins.readFile ./lua/plugins/pr.lua}
               -- The plan tree as a picker, filtered on what each plan's header says.
               ${builtins.readFile ./lua/plugins/plan.lua}
+              -- Same batch as review/pr/plan: another surface over the plan tree
+              -- and the checkout it annotates, loaded together with them even
+              -- though its own keymaps do not open an fzf-lua picker.
+              ${builtins.readFile ./lua/plugins/notes.lua}
             '';
           }
           # Incremental tag generation

@@ -5,6 +5,7 @@ claude/hooks/git-local-path-guard
 claude/hooks/plan-verified-guard
 git/git.nix
 nvim/lua/plugins/plan.lua
+nvim/lua/plugins/notes.lua
 claude/skills/docs-expert/
 claude/skills/planning/
 gen-sessions.py

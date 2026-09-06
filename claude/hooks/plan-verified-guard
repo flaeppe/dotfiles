@@ -36,6 +36,13 @@ VERIFIED: Final = re.compile(r"^verified:\s*(\d{4}-\d{2}-\d{2})\s*$", re.M)
 REVIEW: Final = re.compile(r"^review:\s*\S", re.M)
 
 
+def is_reasoning_note(path: str) -> bool:
+    """A note under <repo>/reasoning/ -- reasoning is the second path segment
+    under PLAN_ROOT. Not a prefix EXEMPT can express, since <repo> varies."""
+    segments = os.path.relpath(path, PLAN_ROOT).split(os.sep)
+    return len(segments) >= 2 and segments[1] == "reasoning"
+
+
 def edited_text(tool_name: str, tool_input: dict) -> str:
     """Whatever the tool is about to put into the file, as far as it is visible."""
     if tool_name == "Write":
@@ -96,7 +103,7 @@ def main() -> int:
     path = os.path.realpath(tool_input.get("file_path", ""))
     if not path.startswith(PLAN_ROOT + os.sep) or not path.endswith(".md"):
         return 0
-    if path.startswith(EXEMPT):
+    if path.startswith(EXEMPT) or is_reasoning_note(path):
         return 0
 
     today = dt.date.today().isoformat()
