@@ -93,6 +93,9 @@ in {
     install -m 755 ${
       ./hooks/session-end-inbox
     } "$HOME/.claude/hooks/session-end-inbox"
+    install -m 755 ${
+      ./hooks/session-mark
+    } "$HOME/.claude/hooks/session-mark"
   '';
 
   # Status line script (referenced by settings.json statusLine.command)

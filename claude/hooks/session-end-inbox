@@ -1,6 +1,14 @@
 #!/bin/bash
-# SessionEnd -> one inbox line in ME_HOME, via `me hook session-end`.
-# Never blocks a session: an absent binary or any failure exits 0 silently.
-[ -x "$HOME/.local/bin/me" ] || exit 0
-"$HOME/.local/bin/me" hook session-end 2>/dev/null
+# SessionEnd -> one inbox line in ME_HOME, via `me hook session-end`, and
+# clears this session's kitty tab mark so a dead session never leaves one
+# behind. Never blocks a session: an absent binary or any failure exits 0
+# silently.
+payload="$(cat)"
+if [ -x "$HOME/.local/bin/me" ]; then
+  "$HOME/.local/bin/me" hook session-end <<<"$payload" 2>/dev/null
+fi
+sam="${ME_HOME:-$HOME/anyfin/.me}/bin/sam"
+if [ -x "$sam" ]; then
+  (cd "${ME_HOME:-$HOME/anyfin/.me}" && "$sam" session mark clear) <<<"$payload" 2>/dev/null
+fi
 exit 0

@@ -1,0 +1,8 @@
+#!/bin/bash
+# Notification/Stop/UserPromptSubmit -> sam session mark <state>, reflecting
+# a session's state on its kitty tab. Never blocks a turn: an absent binary
+# or any failure exits 0 silently.
+SAM="${ME_HOME:-$HOME/anyfin/.me}/bin/sam"
+[ -x "$SAM" ] || exit 0
+(cd "${ME_HOME:-$HOME/anyfin/.me}" && "$SAM" session mark "$1") 2>/dev/null
+exit 0
