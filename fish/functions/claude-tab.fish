@@ -1,6 +1,5 @@
 # Opens a kitty tab with Claude on the left and the editor on the right, for
-# one directory -- live in the running kitty instance via remote control, or
-# a fresh OS window if none is running.
+# one directory, in the running kitty instance via remote control.
 #
 #   claude-tab            for the current directory
 #   claude-tab <path>
@@ -25,25 +24,19 @@ if test -z "$kitty_socket"
     end
 end
 
-if test -n "$kitty_socket"
-    kitty @ --to $kitty_socket launch --type=tab --tab-title "$title" \
-        --cwd $path fish -i -c $claude_cmd >/dev/null
-    or begin
-        echo "claude-tab: could not open a kitty tab (is remote control allowed?)"
-        return 1
-    end
-    # Belt and suspenders: new tabs already start on the configured default layout
-    # (tall), but that default is unstated here, so pin it rather than assume it.
-    kitty @ --to $kitty_socket goto-layout tall >/dev/null 2>&1
-    kitty @ --to $kitty_socket launch --location=hsplit --cwd $path \
-        fish -i -c $editor_cmd >/dev/null 2>&1
-    return 0
+if test -z "$kitty_socket"
+    echo "claude-tab: no kitty control socket found -- is remote control on?"
+    return 1
 end
 
-# No kitty listening to ask, so a new OS window is the only option left.
-set -l session_file (mktemp -t claude-tab-session)
-printf 'os_window_name %s\nfocus_os_window\n\n' $title >$session_file
-printf 'new_tab %s\nlayout tall\n' $title >>$session_file
-printf 'launch --cwd %s fish -i -c \'%s\'\n' $path $claude_cmd >>$session_file
-printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $path $editor_cmd >>$session_file
-new-session $session_file
+kitty @ --to $kitty_socket launch --type=tab --tab-title "$title" \
+    --cwd $path fish -i -c $claude_cmd >/dev/null
+or begin
+    echo "claude-tab: could not open a kitty tab (is remote control allowed?)"
+    return 1
+end
+# Belt and suspenders: new tabs already start on the configured default layout
+# (tall), but that default is unstated here, so pin it rather than assume it.
+kitty @ --to $kitty_socket goto-layout tall >/dev/null 2>&1
+kitty @ --to $kitty_socket launch --location=hsplit --cwd $path \
+    fish -i -c $editor_cmd >/dev/null 2>&1

@@ -93,13 +93,6 @@
             command man $argv
           '';
         };
-        new-session = {
-          description =
-            "Opens a new, independent Kitty window for a specific session file";
-          body = ''
-            ${builtins.readFile ./functions/new-session.fish}
-          '';
-        };
         claude-tab = {
           description =
             "Opens a Kitty tab with Claude on the left and the editor on the right";
