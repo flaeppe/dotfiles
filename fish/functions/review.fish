@@ -181,18 +181,26 @@ set -l base_env "set -x REVIEW_BASE $merge_base; and set -x REVIEW_BASE_DIR"
 set -l review_launch "$base_env $review_tree; and direnv export fish | source; and nvim -c Review"
 set -l stack_launch "$base_env $stack_tree; and direnv export fish | source; and nvim -c Review"
 
+set -l kitty_socket (_review_kitty_socket)
+if test -z "$kitty_socket"
+    echo "review: no kitty control socket found -- is remote control on?"
+    return 1
+end
+
 # One tab per loop: curating findings and building suggestions are different
 # worktrees, so they need separate cwd, LSP root and tag file rather than one
-# editor straddling both.
-set -l session_file "$review_tree/.review/kitty-session"
-printf 'os_window_name review %s\nfocus_os_window\n\n' $pr >$session_file
-printf 'new_tab review %s\nlayout tall\n' $pr >>$session_file
-printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $review_tree $review_launch >>$session_file
-printf 'launch --location=hsplit --cwd %s\n' $review_tree >>$session_file
-printf 'focus\n\n' >>$session_file
-printf 'new_tab stack %s\nlayout tall\n' $pr >>$session_file
-printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $stack_tree $stack_launch >>$session_file
-printf 'launch --location=hsplit --cwd %s\n' $stack_tree >>$session_file
+# editor straddling both. The editor first in each tab, then a shell beside it,
+# kept out of focus so landing on either tab lands on the editor.
+kitty @ --to $kitty_socket launch --type=tab --tab-title "review $pr" \
+    --cwd $review_tree fish -i -c $review_launch >/dev/null
+or begin
+    echo "review: could not open a kitty tab (is remote control allowed?)"
+    return 1
+end
+kitty @ --to $kitty_socket launch --location=hsplit --dont-take-focus --cwd $review_tree >/dev/null 2>&1
+
+kitty @ --to $kitty_socket launch --type=tab --tab-title "stack $pr" \
+    --cwd $stack_tree fish -i -c $stack_launch >/dev/null
+kitty @ --to $kitty_socket launch --location=hsplit --dont-take-focus --cwd $stack_tree >/dev/null 2>&1
 
 echo "review $pr: $title"
-new-session $session_file

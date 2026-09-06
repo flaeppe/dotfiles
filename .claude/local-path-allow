@@ -8,4 +8,3 @@ nvim/lua/plugins/plan.lua
 nvim/lua/plugins/notes.lua
 claude/skills/docs-expert/
 claude/skills/planning/
-gen-sessions.py

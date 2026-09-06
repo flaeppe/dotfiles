@@ -100,17 +100,7 @@ end
 
 # An editor already listening is the one to reuse -- a second window on the same worktree
 # would fight it over the checkout.
-# The kitty already running, so moving between repositories costs a tab rather than an OS
-# window. Its control socket is per-instance (`listen_on` gets `-<pid>` appended), so the
-# environment's own value is preferred and a lone listening socket is the fallback.
-set -l kitty_socket $KITTY_LISTEN_ON
-if test -z "$kitty_socket"
-    # `find` rather than a glob, which errors in fish when nothing matches.
-    set -l listening (find /tmp -maxdepth 1 -name 'mykitty-*' -type s 2>/dev/null)
-    if test (count $listening) -eq 1
-        set kitty_socket "unix:$listening[1]"
-    end
-end
+set -l kitty_socket (_review_kitty_socket)
 
 if test -S $socket
     if test -n "$pr"
@@ -162,31 +152,19 @@ if test -n "$own_tree"; and test -n "$base_branch"
     end
 end
 
+if test -z "$kitty_socket"
+    echo "review skim: no kitty control socket found -- is remote control on?"
+    return 1
+end
+
 # One tab, unlike a session's two: there is no stack to build here.
-if test -n "$kitty_socket"
-    # The editor first, then a shell beside it. The second launch lands in the tab the
-    # first one created, which kitty has made active by then.
-    kitty @ --to $kitty_socket launch --type=tab --tab-title "$title" \
-        --cwd $tree fish -i -c $launch >/dev/null
-    or begin
-        echo "review skim: could not open a kitty tab (is remote control allowed?)"
-        return 1
-    end
-    kitty @ --to $kitty_socket launch --location=hsplit --cwd $tree >/dev/null 2>&1
-    echo "review skim: $repo — <Leader>hl lists PRs across the org, ctrl-r opens a full session"
-    return 0
+# The editor first, then a shell beside it. The second launch lands in the tab the
+# first one created, which kitty has made active by then.
+kitty @ --to $kitty_socket launch --type=tab --tab-title "$title" \
+    --cwd $tree fish -i -c $launch >/dev/null
+or begin
+    echo "review skim: could not open a kitty tab (is remote control allowed?)"
+    return 1
 end
-
-# No kitty listening to ask, so an OS window is the only option left. The session file
-# stays out of an own worktree, whose git status it would pollute.
-set -l session_file "$tree/.review/kitty-session"
-if test -n "$own_tree"
-    set session_file (mktemp -t kitty-own-session)
-end
-printf 'os_window_name %s\nfocus_os_window\n\n' $title >$session_file
-printf 'new_tab %s\nlayout tall\n' $title >>$session_file
-printf 'launch --location=hsplit --cwd %s fish -i -c \'%s\'\n' $tree $launch >>$session_file
-printf 'launch --location=hsplit --cwd %s\n' $tree >>$session_file
-
+kitty @ --to $kitty_socket launch --location=hsplit --cwd $tree >/dev/null 2>&1
 echo "review skim: $repo — <Leader>hl lists PRs across the org, ctrl-r opens a full session"
-new-session $session_file
