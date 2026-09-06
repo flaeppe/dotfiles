@@ -14,3 +14,9 @@ new_tab
 layout tall
 launch --location=hsplit --cwd ~/.dotfiles
 launch --location=hsplit --cwd ~/.dotfiles
+
+# Tab 3: Claude left, editor right
+new_tab
+layout tall
+launch --cwd ~/.dotfiles fish -i -c 'direnv export fish | source; and claude'
+launch --location=hsplit --cwd ~/.dotfiles fish -i -c 'direnv export fish | source; and nvim -c "OpenTreeAndJump"'

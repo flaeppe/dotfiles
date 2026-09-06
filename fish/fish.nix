@@ -100,6 +100,13 @@
             ${builtins.readFile ./functions/new-session.fish}
           '';
         };
+        claude-tab = {
+          description =
+            "Opens a Kitty tab with Claude on the left and the editor on the right";
+          body = ''
+            ${builtins.readFile ./functions/claude-tab.fish}
+          '';
+        };
         review = {
           description =
             "Sets up a two-worktree review session for a GitHub PR and opens it in Kitty";

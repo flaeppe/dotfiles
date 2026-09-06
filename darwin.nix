@@ -61,6 +61,20 @@ in {
     stateVersion = "25.11";
     # Add configuration for gpg-agent
     file.".gnupg/gpg-agent.conf".source = ./gnupg/gpg-agent.conf;
+    # kitty's cmd+s>{a..z} project jump table. gen-sessions.py runs at kitty
+    # startup via `geninclude`, printing one `map` line per session file it
+    # finds (see gen-sessions.py), so the binding can't go stale against
+    # which files actually exist.
+    file.".config/kitty/gen-sessions.py" = {
+      source = ./gen-sessions.py;
+      executable = true;
+    };
+    # Colours a tab by the project its oldest window's cwd belongs to. Kept out of
+    # tab_title_template itself: that template evaluates in a sandboxed eval() with
+    # no `hash`/`sum` (see safe_builtins in kitty's tab_bar.py), so a stable mapping
+    # from an open-ended, ever-growing set of repos to a small colour palette needs
+    # real Python, not an f-string.
+    file.".config/kitty/tab_bar.py".source = ./tab_bar.py;
 
     activation = let
       ptf = "${pkgs.bash}/bin/bash ${./scripts/pass-to-file.sh}";
@@ -167,7 +181,14 @@ in {
         action_alias =
           "kitty_scrollback_nvim kitten ${pkgs.vimPlugins.kitty-scrollback-nvim}/python/kitty_scrollback_nvim.py";
         font_size = "8.0";
-        include = "project-sessions.conf";
+        geninclude = "gen-sessions.py";
+        # {custom} calls tab_bar.py's draw_title, which colours the tag by project;
+        # {fmt.fg.tab} resets colour before {title} so Claude's own status glyphs
+        # (injected into the OS window title, not this template) render unchanged.
+        tab_title_template = "{custom} {fmt.fg.tab}{title}";
+        # Background tabs stay silent otherwise -- there's no cue that a session
+        # sitting behind the active one produced output while unfocused.
+        tab_activity_symbol = "●";
       };
       keybindings = {
         "cmd+shift+l" = "next_tab";

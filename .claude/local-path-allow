@@ -7,3 +7,4 @@ git/git.nix
 nvim/lua/plugins/plan.lua
 claude/skills/docs-expert/
 claude/skills/planning/
+gen-sessions.py
