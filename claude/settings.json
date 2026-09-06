@@ -7,8 +7,8 @@
     "type": "command",
     "command": "bash ~/.claude/subagent-statusline.sh"
   },
-  "effortLevel": "high",
-  "autoCompactWindow": "300k",
+  "effortLevel": "xhigh",
+  "autoCompactWindow": 400000,
   "tui": "fullscreen",
   "editorMode": "vim",
   "attribution": {
