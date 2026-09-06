@@ -8,10 +8,6 @@ Building locally applies changes immediately to the local environment. This mean
 mistakes are instantly live. However, this shouldn't be a major concern as rolling
 back to a previous Home Manager generation is always available.
 
-## Prerequisites
-
-Load the `nix` skill before making any changes. This is mandatory, no exceptions.
-
 ## Repository Structure
 
 Home Manager symlinks these files into `~/.config/` and `~/.local/` — this repo is the source of truth, not the symlink targets.
