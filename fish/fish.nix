@@ -100,11 +100,26 @@
             ${builtins.readFile ./functions/claude-tab.fish}
           '';
         };
+        tab-picker = {
+          description =
+            "Fuzzy-jump between kitty tabs, or open a new one for an unmatched project";
+          body = ''
+            ${builtins.readFile ./functions/tab-picker.fish}
+          '';
+        };
         review = {
           description =
             "Sets up a two-worktree review session for a GitHub PR and opens it in Kitty";
           body = ''
             ${builtins.readFile ./functions/review.fish}
+          '';
+        };
+        # Shared by `review`, `review skim` and the tab picker: the one place that
+        # discovers the running kitty instance's control socket.
+        _review_kitty_socket = {
+          description = "Prints the running kitty instance's remote-control socket, if any";
+          body = ''
+            ${builtins.readFile ./functions/_review_kitty_socket.fish}
           '';
         };
         # Reached through `review list`, `review retire` and `review skim`, which is the one

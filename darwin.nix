@@ -188,7 +188,9 @@ in {
       keybindings = {
         "cmd+shift+l" = "next_tab";
         "cmd+shift+h" = "previous_tab";
-        "cmd+p" = "select_tab";
+        "cmd+p" =
+          "launch --type=overlay --title picker fish -i -c tab-picker";
+        "cmd+s>c" = "launch --type=tab fish -i -c claude-tab";
         "cmd+t" = "new_tab_with_cwd";
         "cmd+enter" = "new_window_with_cwd";
         # Browse scrollback buffer in nvim. Not ctrl+f: Kitty grabs a binding
