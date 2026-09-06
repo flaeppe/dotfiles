@@ -1,16 +1,8 @@
 # Custom kitty tab-bar hook, loaded from ~/.config/kitty/tab_bar.py.
-# Colours each tab by the project it belongs to, independent of which pane is
-# focused or what that pane's own title says.
+# Spells out the project each tab belongs to and what is running in it,
+# independent of which pane is focused or what that pane's own title says.
 
-import zlib
-
-from kitty.tab_bar import Formatter
-
-# Kanagawa accents (see kitty/kanagawa.conf), skipping red -- kitty prepends
-# the bell/activity indicator in fmt.fg.red, and a project sharing that hue
-# would blend into it -- and skipping the greys, which don't read as colour
-# against the theme's own grey inactive-tab text.
-_PALETTE = ("76946a", "c0a36e", "7e9cd8", "957fb8", "6a9589")
+_MAX_PROJECT_LEN = 12
 
 
 def _project(cwd: str) -> str:
@@ -27,13 +19,16 @@ def _project(cwd: str) -> str:
 
 
 def draw_title(data: dict) -> str:
-    # active_oldest_wd: the cwd of the tab's oldest window, so a tab's colour
-    # doesn't change depending on which split pane last had focus.
-    project = _project(data["tab"].active_oldest_wd)
+    tab = data["tab"]
+    # active_oldest_wd: the tab's oldest window, so the project doesn't change
+    # depending on which split pane last had focus. active_exe: the currently
+    # focused pane's process, which is exactly the thing that should change.
+    project = _project(tab.active_oldest_wd)
     if not project:
         return ""
-    tag = project.lstrip(".")[:4]
-    if not tag:
+    label = project.lstrip(".")[:_MAX_PROJECT_LEN]
+    if not label:
         return ""
-    color = _PALETTE[zlib.crc32(project.encode()) % len(_PALETTE)]
-    return f"{getattr(Formatter.fg, '_' + color)}{tag}"
+    if tab.active_exe:
+        label = f"{label} {tab.active_exe}"
+    return label

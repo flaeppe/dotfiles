@@ -61,11 +61,11 @@ in {
     stateVersion = "25.11";
     # Add configuration for gpg-agent
     file.".gnupg/gpg-agent.conf".source = ./gnupg/gpg-agent.conf;
-    # Colours a tab by the project its oldest window's cwd belongs to. Kept out of
-    # tab_title_template itself: that template evaluates in a sandboxed eval() with
-    # no `hash`/`sum` (see safe_builtins in kitty's tab_bar.py), so a stable mapping
-    # from an open-ended, ever-growing set of repos to a small colour palette needs
-    # real Python, not an f-string.
+    # Spells out each tab's project and what's running in it, from its oldest
+    # window's cwd. Kept out of tab_title_template itself: that template
+    # evaluates in a sandboxed eval() against a fixed set of builtins (see
+    # safe_builtins in kitty's tab_bar.py), so turning an arbitrary cwd into a
+    # project name needs real Python string handling, not an f-string.
     file.".config/kitty/tab_bar.py".source = ./tab_bar.py;
 
     activation = let
@@ -173,9 +173,13 @@ in {
         action_alias =
           "kitty_scrollback_nvim kitten ${pkgs.vimPlugins.kitty-scrollback-nvim}/python/kitty_scrollback_nvim.py";
         font_size = "8.0";
-        # {custom} calls tab_bar.py's draw_title, which colours the tag by project;
-        # {fmt.fg.tab} resets colour before {title} so Claude's own status glyphs
-        # (injected into the OS window title, not this template) render unchanged.
+        # A sidebar row per tab, wide enough to spell out a project name --
+        # the horizontal bar's single sliver never was.
+        tab_bar_edge = "left";
+        # {custom} calls tab_bar.py's draw_title, spelling out the project and
+        # what's running in it; {fmt.fg.tab} resets colour before {title} so
+        # Claude's own status glyphs (injected into the OS window title, not
+        # this template) render unchanged.
         tab_title_template = "{custom} {fmt.fg.tab}{title}";
         # Background tabs stay silent otherwise -- there's no cue that a session
         # sitting behind the active one produced output while unfocused.
