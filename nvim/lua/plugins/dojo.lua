@@ -311,6 +311,44 @@ local ENTRIES = {
     -- Markdown
     { group = "markdown", keys = "<Leader>mp", desc = "Toggle live markdown preview", added = "2026-07-20" },
 
+    -- Kitty: bound in the terminal, not in nvim -- see run=false below. The
+    -- keylog cannot see these presses at all, so usage renders blank, not "·".
+    {
+        group = "kitty",
+        keys = "cmd+p",
+        desc = "Jump to any tab by project, process or a substring; no match opens a new one there",
+        added = "2026-09-06",
+        run = false,
+    },
+    {
+        group = "kitty",
+        keys = "cmd+s>c",
+        desc = "Open a Claude + editor tab for this directory",
+        added = "2026-09-06",
+        run = false,
+    },
+    {
+        group = "kitty",
+        keys = "cmd+s>l",
+        desc = "Pick a file:line from what's on screen, opens at that line in nvim",
+        added = "2026-09-06",
+        run = false,
+    },
+    {
+        group = "kitty",
+        keys = "kitty_mod+m",
+        desc = "Toggle a standing highlight for ERROR/FAIL/panic in this window's scrollback",
+        added = "2026-09-06",
+        run = false,
+    },
+    {
+        group = "kitty",
+        keys = "kitty_mod+[  kitty_mod+]",
+        desc = "Jump to the previous / next highlighted line",
+        added = "2026-09-06",
+        run = false,
+    },
+
     -- The training loop itself
     { group = "dojo", keys = ":KeylogStatus", desc = "Where the keystroke log is, and how big", added = "2026-07-25" },
     {
@@ -375,8 +413,15 @@ local function render(review, unused_only)
     end
     for _, entry in ipairs(ENTRIES) do
         local used = counts[entry.keys]
-        if not (unused_only and used and used > 0) then
-            local usage = review and (used and used > 0 and string.format("%5d", used) or "    ·") or "     "
+        local unobservable = entry.group == "kitty"
+        local skip = unused_only and (unobservable or (used and used > 0))
+        if not skip then
+            local usage
+            if unobservable then
+                usage = "     "
+            else
+                usage = review and (used and used > 0 and string.format("%5d", used) or "    ·") or "     "
+            end
             local line = string.format(
                 "%-10s  %-" .. width .. "s  %s %4s  %s",
                 entry.group,

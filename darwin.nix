@@ -67,6 +67,9 @@ in {
     # safe_builtins in kitty's tab_bar.py), so turning an arbitrary cwd into a
     # project name needs real Python string handling, not an f-string.
     file.".config/kitty/tab_bar.py".source = ./tab_bar.py;
+    # What clicking a path does: a source file opens in nvim, a .log tails
+    # live, rather than falling through to the system opener.
+    file.".config/kitty/open-actions.conf".source = ./open-actions.conf;
 
     activation = let
       ptf = "${pkgs.bash}/bin/bash ${./scripts/pass-to-file.sh}";
@@ -184,6 +187,17 @@ in {
         # Background tabs stay silent otherwise -- there's no cue that a session
         # sitting behind the active one produced output while unfocused.
         tab_activity_symbol = "●";
+        # An ordinary shell command (build, test run) finishing unfocused, past
+        # 10s. Fires on OSC 133 shell completion, so it never sees a Claude
+        # session -- that is one continuous foreground process with no such
+        # signal.
+        notify_on_cmd_finish = "invisible 10.0";
+        mark1_foreground = "black";
+        mark1_background = "red";
+        mark2_foreground = "black";
+        mark2_background = "yellow";
+        mark3_foreground = "white";
+        mark3_background = "magenta";
       };
       keybindings = {
         "cmd+shift+l" = "next_tab";
@@ -191,6 +205,10 @@ in {
         "cmd+p" =
           "launch --type=overlay --title picker fish -i -c tab-picker";
         "cmd+s>c" = "launch --type=tab fish -i -c claude-tab";
+        "cmd+s>l" = "kitten hints --type=linenum --linenum-action=tab nvim +{line} {path}";
+        "kitty_mod+m" = ''toggle_marker iregex 1 \bERROR\b|\bFATAL\b 2 \bFAIL\b 3 \bpanic\b'';
+        "kitty_mod+[" = "scroll_to_mark prev";
+        "kitty_mod+]" = "scroll_to_mark next";
         "cmd+t" = "new_tab_with_cwd";
         "cmd+enter" = "new_window_with_cwd";
         # Browse scrollback buffer in nvim. Not ctrl+f: Kitty grabs a binding
