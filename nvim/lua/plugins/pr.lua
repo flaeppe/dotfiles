@@ -15,6 +15,7 @@
 --   <Leader>hD             how big is this? -- every changed file, side by side
 --   <Leader>hd, ¨h, åh     one file against the base, then hunk by hunk
 --   :DiffBase <ref>        diff against a named ref instead (no argument resets it)
+--   <Leader>hb             what does the author say this is? -- the loaded PR's description
 --   <Leader>hW             how big is this, in another worktree? -- picked by branch
 --   <Leader>hw             cd to a worktree, picked from a list
 --
@@ -82,8 +83,17 @@ local function skim_file(root)
     return (root or worktree_root() or "") .. "/.review/skim.json"
 end
 
-local function skim_state(root)
-    local file = io.open(skim_file(root), "r")
+--- The `.review/` state the three PR surfaces record, as one table rather than one local
+--- per accessor.
+---
+--- Deliberately a table: every lua file in this configuration is concatenated into a
+--- single chunk, so top-level locals all share one function scope and Lua caps that at
+--- 200. The count sits close enough to the ceiling that a handful of new ones stops the
+--- whole configuration loading, and `nix build` cannot catch it -- it never runs the lua.
+local state = {}
+
+function state.read(path)
+    local file = io.open(path, "r")
     if not file then
         return nil
     end
@@ -91,6 +101,53 @@ local function skim_state(root)
     file:close()
     local ok, decoded = pcall(vim.json.decode, raw)
     return ok and decoded or nil
+end
+
+--- Which PR an ordinary worktree is reading. The skim surface and a review session both
+--- record one already; this covers the case neither does, so all three can answer the
+--- same question. Alongside them rather than in a cache directory: `.review/` is ignored,
+--- one directory answers "which PR is this", and nothing here can be committed.
+function state.loaded_file(root)
+    return (root or worktree_root() or "") .. "/.review/loaded.json"
+end
+
+function state.write_loaded(root, loaded)
+    vim.fn.mkdir(vim.fs.dirname(state.loaded_file(root)), "p")
+    local file = io.open(state.loaded_file(root), "w")
+    if not file then
+        return
+    end
+    file:write(vim.json.encode(loaded))
+    file:close()
+end
+
+--- The pull request this worktree is reading, as `{ repo = , number = }`, or nil.
+---
+--- Three surfaces record one, and they are tried most-specific first: a review session
+--- pins a worktree to a PR for its whole life, a skim surface moves from PR to PR, and an
+--- ordinary worktree only knows what was last loaded into it. A session's record outranks
+--- the others because its worktree cannot hold a different PR than the one it was built
+--- for.
+function state.current_pr(root)
+    -- Paths rather than decoded states: an absent file decodes to nil, and a nil early in
+    -- a table constructor ends the iteration rather than being skipped over. Reading
+    -- lazily also stops at the first surface that answers.
+    local files = {
+        (root or "") .. "/.review/session.json",
+        skim_file(root),
+        state.loaded_file(root),
+    }
+    for _, path in ipairs(files) do
+        local recorded = state.read(path)
+        if recorded and recorded.pr and recorded.repo then
+            return { repo = recorded.repo, number = tonumber(recorded.pr) }
+        end
+    end
+    return nil
+end
+
+local function skim_state(root)
+    return state.read(skim_file(root))
 end
 
 local function write_skim_state(root, state)
@@ -128,6 +185,11 @@ end
 -- Forward-declared: PR.load renders it below, but the function body needs `resolve_base`,
 -- defined further down once the worktree it is about is in scope.
 local render_diff_tag
+
+-- Forward-declared for the same reason: PR.load caches a description, and the cache lives
+-- with the listing that first needed it.
+local write_body
+local body_path
 
 -- Loading a PR ------------------------------------------------------------
 
@@ -176,6 +238,7 @@ function PR.load(input)
             skim.pr = nil
             write_skim_state(root, skim)
         end
+        os.remove(state.loaded_file(root))
         render_diff_tag()
         vim.notify("PR: base back to the index")
         return nil
@@ -186,8 +249,17 @@ function PR.load(input)
         return warn(("expected a PR number or a pull-request URL, got %q"):format(input))
     end
 
-    local raw, code, stderr =
-        capture({ "gh", "pr", "view", number, "--json", "title,headRefOid,baseRefName,headRefName" }, root)
+    -- The description fields ride along rather than costing a second request later: every
+    -- PR loaded by any path is cached from that moment, so reading its body is a local
+    -- file open instead of a round trip.
+    local raw, code, stderr = capture({
+        "gh",
+        "pr",
+        "view",
+        number,
+        "--json",
+        "title,headRefOid,baseRefName,headRefName,body,url,author,updatedAt,isDraft",
+    }, root)
     if code ~= 0 then
         return warn(("gh could not read PR #%s in %s -- %s"):format(number, root, stderr))
     end
@@ -258,6 +330,8 @@ function PR.load(input)
         return warn(("no merge base between %s and the head of #%s"):format(target, number))
     end
 
+    local repo_name = vim.fs.basename(main_root(root) or root)
+
     local changed = capture({ "git", "diff", "--name-only", base, "HEAD" }, root)
     local count = #vim.split(changed, "\n", { trimempty = true })
 
@@ -267,7 +341,17 @@ function PR.load(input)
         skim.title = pr.title
         skim.base = base
         write_skim_state(root, skim)
+    else
+        -- An ordinary worktree keeps no record of its own, so nothing else could answer
+        -- which PR is on screen -- not the statusline, and not the description key.
+        state.write_loaded(root, { repo = repo_name, pr = tonumber(number), title = pr.title })
     end
+
+    -- The cache is keyed on both, and `gh pr view` reports neither: the repository is this
+    -- checkout's own, and the number is the one that was asked for.
+    pr.repository = { name = repo_name }
+    pr.number = tonumber(number)
+    write_body(pr)
 
     -- All three, always together: the sign column and the surfaces over the change read
     -- different variables, and one of them left behind is a panel describing the PR that
@@ -631,13 +715,13 @@ local BODY_DIR = vim.fn.stdpath("cache") .. "/pr-bodies"
 
 --- Repository names carry `-` and `.`, so the number is separated by a run that cannot
 --- appear in either half.
-local function body_path(repo, number)
+body_path = function(repo, number)
     return ("%s/%s__%s.md"):format(BODY_DIR, repo:gsub("[^%w._-]", "_"), number)
 end
 
 --- The description as the preview will render it: what the list cannot show -- author,
 --- age, a link -- above the body itself.
-local function write_body(pr)
+write_body = function(pr)
     local when = (pr.updatedAt or ""):match("^(%d+-%d+-%d+)") or "?"
     local head = {
         "# " .. (pr.title or "(no title)"),
@@ -659,6 +743,7 @@ local function write_body(pr)
     if not body or vim.trim(body) == "" then
         body = "*No description.*"
     end
+    vim.fn.mkdir(BODY_DIR, "p")
     local file = io.open(body_path(pr.repository.name, pr.number), "w")
     if not file then
         return
@@ -996,6 +1081,116 @@ function PR.list(force)
     })
 end
 
+-- Reading the description ------------------------------------------------
+--
+-- Wrapped in a block so its helpers cost no top-level local: see `state` above for why
+-- this file counts them.
+do
+    --- Whether the cached description can still be trusted, against two independent gates.
+    ---
+    --- A head commit newer than the file is the real signal: an author who pushes has
+    --- almost always rewritten the body in the same breath, and the check is local, since
+    --- the head is fetched in every surface that can name a PR.
+    ---
+    --- It cannot stand alone. A description edited without a push -- a checklist ticked, a
+    --- review answered in the body -- bumps no commit, so that gate alone would call the
+    --- cache current for as long as the editor stayed open. The age gate bounds that.
+    ---
+    --- `updatedAt` is the true answer and is deliberately not used: reading it costs the
+    --- very request being decided about.
+    local MAX_BODY_AGE = 60 * 60
+
+    local function body_is_current(path, root)
+        local stat = vim.uv.fs_stat(path)
+        if not stat then
+            return false
+        end
+        local cached_at = stat.mtime.sec
+        if os.time() - cached_at > MAX_BODY_AGE then
+            return false
+        end
+        -- Bound to one name first: `capture` also returns the exit code, and passed
+        -- straight through it would arrive as `tonumber`'s base.
+        local committed = capture({ "git", "log", "-1", "--format=%ct", "HEAD" }, root)
+        local committed_at = tonumber(committed)
+        return not (committed_at and committed_at > cached_at)
+    end
+
+    --- Re-read a PR's description from GitHub and cache it. Returns true on success.
+    local function fetch_body(repo, number, root)
+        -- No `--repo`: gh resolves it from `root`, and that is always the right answer.
+        -- All three surfaces record a PR belonging to the worktree recording it -- a PR in
+        -- another repository is handed to that clone's own surface rather than read here.
+        -- The recorded name is for keying the cache, which wants the bare one anyway.
+        local raw, code, stderr = capture({
+            "gh",
+            "pr",
+            "view",
+            tostring(number),
+            "--json",
+            "title,body,url,author,updatedAt,isDraft",
+        }, root)
+        if code ~= 0 then
+            warn(("gh could not read the description of #%s -- %s"):format(number, stderr))
+            return false
+        end
+        local ok, pr = pcall(vim.json.decode, raw)
+        if not ok then
+            warn(("could not parse the description of #%s"):format(number))
+            return false
+        end
+        -- `--repo` takes an owner-qualified name while the cache is keyed on the bare one,
+        -- so the response's own repository name is what the file is written under.
+        pr.repository = pr.repository or { name = repo }
+        pr.number = number
+        write_body(pr)
+        return true
+    end
+
+    --- The description of the PR this worktree is reading, in a scratch buffer.
+    ---
+    --- A scratch buffer rather than the cache file itself: `gf`, folds and yanking all
+    --- work either way, but an accidental write cannot corrupt the cache and the buffer
+    --- list shows which PR this is instead of a mangled cache path.
+    function PR.body(force)
+        local root = worktree_root()
+        if not root then
+            return warn("not inside a git worktree")
+        end
+        local current = state.current_pr(root)
+        if not current then
+            return warn("no PR is loaded here -- `:PrDiff <pr>` or pick one with `:PrList` first")
+        end
+
+        local path = body_path(current.repo, current.number)
+        if force or not body_is_current(path, root) then
+            vim.notify(("PR: reading the description of #%s"):format(current.number))
+            -- A failed fetch with nothing cached opens nothing: an empty buffer is
+            -- indistinguishable from a PR whose description is genuinely empty, and the
+            -- cache's own "no description" sentinel would state that as fact.
+            if not fetch_body(current.repo, current.number, root) and vim.uv.fs_stat(path) == nil then
+                return
+            end
+        end
+
+        local file = io.open(path, "r")
+        if not file then
+            return warn(("no description cached for #%s"):format(current.number))
+        end
+        local lines = vim.split(file:read("*a"), "\n", { plain = true })
+        file:close()
+
+        local bufnr = vim.api.nvim_create_buf(true, true)
+        vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+        vim.api.nvim_buf_set_name(bufnr, ("pr://%s#%s"):format(current.repo, current.number))
+        vim.bo[bufnr].filetype = "markdown"
+        vim.bo[bufnr].buftype = "nofile"
+        vim.bo[bufnr].bufhidden = "wipe"
+        vim.bo[bufnr].modifiable = false
+        vim.api.nvim_win_set_buf(0, bufnr)
+    end
+end
+
 -- Bindings ----------------------------------------------------------------
 
 vim.keymap.set("n", "<Leader>hl", function()
@@ -1003,6 +1198,9 @@ vim.keymap.set("n", "<Leader>hl", function()
 end, { desc = "Pull requests across the org" })
 vim.keymap.set("n", "<Leader>hD", PR.panel, { desc = "Every changed file against the base, side by side" })
 vim.keymap.set("n", "<Leader>hf", PR.files, { desc = "Fuzzy find the changed files" })
+vim.keymap.set("n", "<Leader>hb", function()
+    PR.body(false)
+end, { desc = "Read the loaded PR's description" })
 vim.keymap.set("n", "<Leader>hW", PR.worktree_panel, { desc = "Every changed file in another worktree, side by side" })
 -- `git_worktree_cd` is already what "change nvim's cwd to another worktree" is --
 -- window-local, so an excursion into someone else's checkout does not move any other
@@ -1028,6 +1226,12 @@ end, {
     nargs = "?",
     desc = "Sign a PR's changes in the files (number, URL, or 'off')",
 })
+
+-- `:PrBody!` forces a re-read, for when the freshness gates were wrong -- the same role
+-- `!` plays for `:PrList`.
+vim.api.nvim_create_user_command("PrBody", function(opts)
+    PR.body(opts.bang)
+end, { bang = true, desc = "Read the loaded PR's description (! re-reads it)" })
 
 --- Refs to complete `:DiffBase` against -- branches, remote branches and tags, the same
 --- three namespaces `git checkout` completes, so nothing here needs guessing at the

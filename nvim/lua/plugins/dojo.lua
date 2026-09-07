@@ -280,7 +280,7 @@ local ENTRIES = {
     {
         group = "hunk",
         keys = "<Leader>hl",
-        desc = "What is there to review? Every open PR in the org, description beside it (ctrl-r: session, ctrl-l: reload)",
+        desc = "Which PR should I read? Picks from every open PR in the org, each one's description in the preview (ctrl-r: session, ctrl-l: reload)",
         added = "2026-08-10",
     },
     {
@@ -288,6 +288,12 @@ local ENTRIES = {
         keys = ":PrDiff",
         desc = "Read one named PR as hunks -- paste a number or URL ('off' to stop)",
         added = "2026-08-10",
+    },
+    {
+        group = "hunk",
+        keys = "<Leader>hb",
+        desc = "What does the author say this is? The loaded PR's own description, not the picker's preview (:PrBody! re-reads it)",
+        added = "2026-09-07",
     },
     {
         group = "hunk",
