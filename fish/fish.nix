@@ -93,13 +93,6 @@
             command man $argv
           '';
         };
-        claude-tab = {
-          description =
-            "Opens a Kitty tab with Claude on the left and the editor on the right";
-          body = ''
-            ${builtins.readFile ./functions/claude-tab.fish}
-          '';
-        };
         tab-picker = {
           description =
             "Fuzzy-jump between kitty tabs, or open a new one for an unmatched project";
