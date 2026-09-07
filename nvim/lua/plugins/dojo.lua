@@ -492,11 +492,10 @@ vim.api.nvim_create_user_command("Dojo", function()
     open(false)
 end, { desc = "Keybindings, usage and current drills" })
 
--- Start page. Deferred rather than run straight from VimEnter because `-c`
--- commands execute after VimEnter: a session that opens a tree and splits (see
--- the kitty session for this repo) would otherwise get the Dojo on top of it.
--- By the time this runs the window count reveals whether anything else claimed
--- the startup.
+-- Start page. `-c` commands run before VimEnter fires, but another plugin's
+-- own VimEnter hook can still open windows first depending on load order.
+-- Scheduling one tick past VimEnter runs this after all of them regardless,
+-- so the window count reflects whatever claimed the startup.
 vim.api.nvim_create_autocmd("VimEnter", {
     callback = function()
         vim.schedule(function()
