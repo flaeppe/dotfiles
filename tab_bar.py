@@ -32,28 +32,47 @@ _MAX_LABEL_LEN = 12
 _STATE_GLYPH = "● "
 _STATE_VAR = "claude_state"
 
-# Dark tints only: the bar's one text colour (#dcd7ba) has to read on every
-# entry, so nothing here gets close to it in brightness. No red -- kitty's
-# own bell/activity indicator owns that. Index 0 is the pre-010 default
-# background, kept so a tab in no checkout at all looks unchanged.
-# _ACTIVE holds the same hues, one step brighter, so the focused tab still
-# reads as focused once colour stops being state's channel.
+# Every tint is paired with the foreground kitty draws on it -- _GROUP with
+# inactive_tab_foreground, _ACTIVE with active_tab_foreground (both in
+# darwin.nix) -- and each pair is checked to at least 4.5:1, so no hue can
+# make a label unreadable. Contrast comes from luminance, so hue and
+# saturation are free: twelve hues at 27 degrees, high chroma, spanning
+# 25-322 to stay clear of the red kitty's bell owns. Twelve rather than six
+# because crc32 over ~68 repositories collides often enough at six that
+# concurrently open tabs shared a tint.
 _GROUP_PALETTE: tuple[int, ...] = (
-    0x2A2A37,  # slate
-    0x223249,  # blue
-    0x26332B,  # green
-    0x332A3D,  # purple
-    0x3A2E28,  # brown
-    0x22333A,  # teal
+    0x4D260A,
+    0x373007,
+    0x273607,
+    0x133807,
+    0x073812,
+    0x073727,
+    0x07363C,
+    0x0C2F5E,
+    0x15139B,
+    0x420F7D,
+    0x560B5C,
+    0x5E0C3F,
 )
 _ACTIVE_PALETTE: tuple[int, ...] = (
-    0x3A3A4A,
-    0x2F4666,
-    0x35473A,
-    0x453A52,
-    0x4D3F36,
-    0x2F4750,
+    0x93450E,
+    0x685C0A,
+    0x47640A,
+    0x21690A,
+    0x0B6A1F,
+    0x0A6849,
+    0x0B6470,
+    0x1259B5,
+    0x403EEC,
+    0x7917E8,
+    0x9D11AA,
+    0xAC1174,
 )
+
+# A tab in no checkout at all is not a repository that happens to hash to
+# index 0, so it gets its own neutral pair rather than borrowing one.
+_NO_CHECKOUT = 0x2A2A37
+_NO_CHECKOUT_ACTIVE = 0x4A4A60
 
 
 # One entry per distinct working directory this kitty process has drawn a tab
@@ -117,9 +136,9 @@ def _checkout(cwd: str) -> tuple[str, str]:
 
 
 def _group_color(repository: str, is_active: bool) -> int:
-    palette = _ACTIVE_PALETTE if is_active else _GROUP_PALETTE
     if not repository:
-        return palette[0]
+        return _NO_CHECKOUT_ACTIVE if is_active else _NO_CHECKOUT
+    palette = _ACTIVE_PALETTE if is_active else _GROUP_PALETTE
     return palette[zlib.crc32(repository.encode()) % len(palette)]
 
 

@@ -193,11 +193,18 @@ in {
         # session -- that is one continuous foreground process with no such
         # signal.
         notify_on_cmd_finish = "invisible 10.0";
-        # One text colour everywhere; the background carries tab state
-        # (active/inactive, session-mark tint) instead of a second foreground.
-        active_tab_foreground = "#dcd7ba";
-        inactive_tab_foreground = "#dcd7ba";
-        active_tab_background = "#2A2A37";
+        # Focus is signalled twice, because one channel alone is faint at a
+        # glance: the background steps up a palette entry (tab_bar.py) and
+        # the text steps up with it. Each foreground is contrast-checked
+        # against the palette it is drawn on -- inactive on _GROUP_PALETTE,
+        # active on _ACTIVE_PALETTE -- so changing one means rechecking both.
+        active_tab_foreground = "#f2efe4";
+        inactive_tab_foreground = "#9c978a";
+        # Only reached if tab_bar.py's draw_tab raises, when kitty falls back
+        # to its own renderer; both are set so that path stays legible and
+        # keeps focus the brighter of the two.
+        active_tab_background = "#4a4a60";
+        inactive_tab_background = "#2a2a37";
         mark1_foreground = "black";
         mark1_background = "red";
         mark2_foreground = "black";
