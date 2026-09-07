@@ -176,14 +176,10 @@ in {
         action_alias =
           "kitty_scrollback_nvim kitten ${pkgs.vimPlugins.kitty-scrollback-nvim}/python/kitty_scrollback_nvim.py";
         font_size = "8.0";
-        # A sidebar row per tab, wide enough to spell out a project name --
-        # the horizontal bar's single sliver never was.
-        tab_bar_edge = "left";
-        # {custom} calls tab_bar.py's draw_title, spelling out the project and
-        # what's running in it; {fmt.fg.tab} resets colour before {title} so
-        # Claude's own status glyphs (injected into the OS window title, not
-        # this template) render unchanged.
-        tab_title_template = "{custom} {fmt.fg.tab}{title}";
+        # {custom} calls tab_bar.py's draw_title to render the tab label; it is
+        # the template's only field so no window's title, overlay included,
+        # can replace it.
+        tab_title_template = "{custom}";
         # Background tabs stay silent otherwise -- there's no cue that a session
         # sitting behind the active one produced output while unfocused.
         tab_activity_symbol = "●";
@@ -202,13 +198,10 @@ in {
       keybindings = {
         "cmd+shift+l" = "next_tab";
         "cmd+shift+h" = "previous_tab";
-        "cmd+p" =
-          "launch --type=overlay --title picker fish -i -c tab-picker";
-        "cmd+s>c" = "launch --type=tab fish -i -c claude-tab";
-        "cmd+s>l" = "kitten hints --type=linenum --linenum-action=tab nvim +{line} {path}";
+        "cmd+p" = "launch --type=overlay fish -i -c tab-picker";
         "kitty_mod+m" = ''toggle_marker iregex 1 \bERROR\b|\bFATAL\b 2 \bFAIL\b 3 \bpanic\b'';
-        "kitty_mod+[" = "scroll_to_mark prev";
-        "kitty_mod+]" = "scroll_to_mark next";
+        "kitty_mod+b" = "scroll_to_mark prev";
+        "kitty_mod+n" = "scroll_to_mark next";
         "cmd+t" = "new_tab_with_cwd";
         "cmd+enter" = "new_window_with_cwd";
         # Browse scrollback buffer in nvim. Not ctrl+f: Kitty grabs a binding

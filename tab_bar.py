@@ -20,15 +20,15 @@ def _project(cwd: str) -> str:
 
 def draw_title(data: dict) -> str:
     tab = data["tab"]
-    # active_oldest_wd: the tab's oldest window, so the project doesn't change
-    # depending on which split pane last had focus. active_exe: the currently
-    # focused pane's process, which is exactly the thing that should change.
+    # Both project and running process come from the tab's oldest window, so
+    # the label does not change depending on which pane has focus -- an
+    # overlay on top of a split included.
     project = _project(tab.active_oldest_wd)
     if not project:
         return ""
     label = project.lstrip(".")[:_MAX_PROJECT_LEN]
     if not label:
         return ""
-    if tab.active_exe:
-        label = f"{label} {tab.active_exe}"
+    if tab.active_oldest_exe:
+        label = f"{label} {tab.active_oldest_exe}"
     return label
