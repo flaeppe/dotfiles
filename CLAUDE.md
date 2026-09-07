@@ -63,16 +63,45 @@ Secrets are managed via `pass` and written to disk during `home-manager switch` 
 Nix files are formatted by hand — `flake.nix` defines no `formatter` output, so
 `nix fmt` does not work in this repo. `nix flake check` currently fails on
 `packages.homeConfigurations` not being a derivation (`flake.nix:63`), independent
-of any change; the build below is the real gate.
+of any change; see Testing below for what to run instead.
 
 ## Testing
 
-There is no explicit test framework. This is a configuration repository — testing
-means verifying that the Home Manager configuration builds successfully:
+There is no explicit test framework. This is a configuration repository, so
+testing means the configuration evaluates, and then that what it produced
+actually starts.
 
 ```bash
-nix run home-manager -- switch --flake .
+# 1. evaluates and builds. Name the darwin target: `.#homeConfigurations.arch`
+#    is a different machine and fails for unrelated reasons.
+nix build '.#homeConfigurations."petter.friberg".activationPackage' --no-link
 ```
+
+**A successful build does not mean the configuration works.** The build never
+runs anything it produced, so no interpreter error can reach it. For neovim that
+gap is not theoretical: `programs.neovim` concatenates every lua file into one
+`init.lua`, so all top-level `local`s across the whole configuration share a
+single function scope, and Lua caps that at 200. Past it, every one of them
+fails to load with `E5112: main function has more than 200 local variables` and
+neovim starts bare — while the build reports success.
+
+So any change under `nvim/` also needs the artifact loaded:
+
+```bash
+# 2. the real gate for anything under nvim/ -- prints nothing on success
+OUT=$(nix build '.#homeConfigurations."petter.friberg".activationPackage' \
+        --no-link --print-out-paths)
+nvim --headless -u "$(readlink -f "$OUT/home-files/.config/nvim/init.lua")" +qa
+```
+
+Count before adding one: `grep -cE '^local ' <built init.lua>` against the cap
+of 200. Where a change needs new top-level names, group them into one table or
+scope them inside the function that uses them — `local M = {}` costs one slot
+whatever it holds.
+
+Applying it is a separate step, and a single global slot: `nix run home-manager
+-- switch --flake .` deploys the working tree as it finds it, so it is not
+something to run while another session is editing the repository.
 
 ## Safety
 
