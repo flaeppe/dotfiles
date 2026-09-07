@@ -296,6 +296,24 @@ local ENTRIES = {
         desc = "Jump straight to a changed file, fuzzily -- no path to remember (ctrl-q: all of them)",
         added = "2026-08-10",
     },
+    {
+        group = "hunk",
+        keys = ":DiffBase",
+        desc = "Diff against a named ref instead of the automatic merge base (no argument resets it)",
+        added = "2026-09-07",
+    },
+    {
+        group = "hunk",
+        keys = "<Leader>hW",
+        desc = "Every changed file in another worktree, side by side -- picked by branch, nothing checked out",
+        added = "2026-09-07",
+    },
+    {
+        group = "hunk",
+        keys = "<Leader>hw",
+        desc = "cd to a worktree, picked from a list",
+        added = "2026-09-07",
+    },
     { group = "hunk", keys = "¨h  åh", desc = "Next / previous changed hunk", added = "2026-07-26", run = false },
     {
         group = "review",

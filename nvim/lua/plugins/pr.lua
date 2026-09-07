@@ -14,10 +14,15 @@
 --   <Leader>hf             which changed file? -- fuzzy, diff in the preview
 --   <Leader>hD             how big is this? -- every changed file, side by side
 --   <Leader>hd, ¨h, åh     one file against the base, then hunk by hunk
+--   :DiffBase <ref>        diff against a named ref instead (no argument resets it)
+--   <Leader>hW             how big is this, in another worktree? -- picked by branch
+--   <Leader>hw             cd to a worktree, picked from a list
 --
 -- The two surfaces over the change work without a PR loaded at all: with no base named
 -- they fall back to the merge base with the default branch, so `nvim` in an ordinary
 -- checkout answers "what has this branch changed" with the same keys. See `pr_base`.
+-- What the base currently is stays visible without running any of the above -- see
+-- `render_diff_tag`.
 --
 -- Loading a PR fails silently when done by hand, which is what most of this file is
 -- about. The working tree has to sit at the PR's head, or the signs describe whatever
@@ -107,6 +112,7 @@ end
 -- rendered value would stack tags on every refresh. review.lua does the same for a
 -- session's roles, and the two never both apply -- the skim worktree has no session.
 vim.api.nvim_set_hl(0, "PrTag", { link = "DiagnosticInfo", default = true })
+vim.api.nvim_set_hl(0, "PrTagWarn", { link = "DiagnosticError", default = true })
 
 local statusline_base = nil
 
@@ -118,6 +124,10 @@ local function render_pr_tag(state)
     end
     vim.opt.statusline = string.format("%%#PrTag# SKIM · #%s %%* ", state.pr) .. statusline_base
 end
+
+-- Forward-declared: PR.load renders it below, but the function body needs `resolve_base`,
+-- defined further down once the worktree it is about is in scope.
+local render_diff_tag
 
 -- Loading a PR ------------------------------------------------------------
 
@@ -136,6 +146,16 @@ local function wipe_file_buffers()
     end
 end
 
+--- Back to the automatic merge base: shared by `:PrDiff off` and `:DiffBase` with no
+--- argument, the two doors out of an explicitly named base.
+local function reset_diff_base()
+    require("gitsigns").reset_base(true)
+    -- Cleared rather than left standing: with it set, the surfaces would keep
+    -- answering with a base the sign column has already stopped signing against.
+    vim.env.REVIEW_BASE = nil
+    vim.env.REVIEW_BASE_DIR = nil
+end
+
 --- Put this worktree at a PR's head and sign its changes against the merge base.
 ---
 --- On the skim surface the checkout is detached at a ref of our own, so no local branch
@@ -150,17 +170,13 @@ function PR.load(input)
     end
 
     if input:match("^%s*off%s*$") then
-        require("gitsigns").reset_base(true)
-        -- Cleared rather than left standing: with it set, the surfaces would keep
-        -- answering with a PR the sign column has already stopped signing.
-        vim.env.REVIEW_BASE = nil
-        vim.env.REVIEW_BASE_DIR = nil
+        reset_diff_base()
         local skim = skim_state(root)
         if skim then
             skim.pr = nil
             write_skim_state(root, skim)
-            render_pr_tag(skim)
         end
+        render_diff_tag()
         vim.notify("PR: base back to the index")
         return nil
     end
@@ -251,7 +267,6 @@ function PR.load(input)
         skim.title = pr.title
         skim.base = base
         write_skim_state(root, skim)
-        render_pr_tag(skim)
     end
 
     -- All three, always together: the sign column and the surfaces over the change read
@@ -262,6 +277,7 @@ function PR.load(input)
     require("gitsigns").change_base(base, true)
     vim.env.REVIEW_BASE = base
     vim.env.REVIEW_BASE_DIR = root
+    render_diff_tag()
     -- The checkout rewrote files under any buffer still open on them.
     vim.cmd("checktime")
 
@@ -304,9 +320,21 @@ end
 ---
 --- Only then the base gitsigns is signing against, which is the answer while a PR is
 --- loaded in a repository with no reachable default branch at all.
-local function pr_base()
-    local root = worktree_root()
-
+---
+--- Takes the worktree explicitly rather than resolving its own -- a picker over another
+--- worktree (the file panel for someone else's checkout, an agent's) needs this same
+--- order applied to a directory that is not the one the current buffer sits in.
+---
+--- No side effects: never warns, never touches the environment. A passive caller (the
+--- statusline tag, a picker listing several worktrees at once) runs this on every
+--- refresh, and a notification firing on every one of those for the unremarkable case of
+--- "nothing loaded" would be noise, not signal. `pr_base` below adds the warning back for
+--- the keys that act on the answer immediately, where silence would look like "nothing
+--- changed" rather than "no base could be found".
+---
+--- Returns the target alongside the base, so a caller that displays the answer can say
+--- what it resolved against rather than a bare commit.
+local function resolve_base(root)
     -- An environment variable is inherited by every descendant process, so a base minted
     -- for one worktree reaches an editor started from a `:terminal` in another one -- and
     -- there the commit still resolves, out of the same object database, so the wrong
@@ -318,7 +346,7 @@ local function pr_base()
     if vim.env.REVIEW_BASE and vim.env.REVIEW_BASE ~= "" then
         local minted_for = vim.env.REVIEW_BASE_DIR
         if minted_for == nil or minted_for == "" or minted_for == root then
-            return vim.env.REVIEW_BASE
+            return vim.env.REVIEW_BASE, nil
         end
     end
 
@@ -334,16 +362,56 @@ local function pr_base()
         for _, target in ipairs({ "origin/HEAD", "origin/main", "origin/master" }) do
             local base, code = capture({ "git", "merge-base", "HEAD", target }, root)
             if code == 0 and base ~= "" then
-                return base
+                -- "origin/HEAD" is a symbolic ref, not a branch -- displaying it literally
+                -- would read as "diffed against itself". Resolve what it points to instead.
+                if target == "origin/HEAD" then
+                    local resolved = capture({ "git", "symbolic-ref", "--short", "refs/remotes/origin/HEAD" }, root)
+                    target = resolved ~= "" and resolved or target
+                end
+                return base, target
             end
         end
     end
 
-    local loaded = require("gitsigns.config").config.base
-    if loaded then
-        return loaded
+    return require("gitsigns.config").config.base, nil
+end
+
+--- `resolve_base` for the current worktree, warning when nothing at all resolves -- the
+--- interactive keys need that: pressed expecting a diff, silence there reads as "nothing
+--- changed" rather than "no base could be found".
+local function pr_base()
+    local root = worktree_root()
+    local base = resolve_base(root)
+    if not base then
+        warn("no base is set -- run `:PrDiff <pr>` or pick one with `:PrList` first")
     end
-    warn("no base is set -- run `:PrDiff <pr>` or pick one with `:PrList` first")
+    return base
+end
+
+--- The base made visible without running anything -- a loaded PR already has
+--- `render_pr_tag`; this covers the ordinary case, no PR and no review session, where the
+--- base is whatever `resolve_base` would answer right now. Distinguishes "resolved" from
+--- "nothing resolves" rather than looking like no tag at all, which would read as "the
+--- diff means nothing" when it actually means "no base is set".
+render_diff_tag = function()
+    local root = worktree_root()
+    if not root then
+        render_pr_tag(nil)
+        return
+    end
+    local skim = skim_state(root)
+    if skim and skim.pr then
+        render_pr_tag(skim)
+        return
+    end
+    statusline_base = statusline_base or vim.o.statusline
+    local base, label = resolve_base(root)
+    if not base then
+        vim.opt.statusline = "%#PrTagWarn# no base %* " .. statusline_base
+        return
+    end
+    vim.opt.statusline = string.format("%%#PrTag# vs %s@%s %%* ", (label or "base"):gsub("^origin/", ""), base:sub(1, 7))
+        .. statusline_base
 end
 
 --- Every changed file with its status, side by side -- the same panel a session gets
@@ -384,6 +452,85 @@ function PR.files()
             actions = { ["ctrl-q"] = false },
         })
     end
+end
+
+-- Another worktree's change ------------------------------------------------
+--
+-- The panel above answers "what has this branch changed" for the worktree the current
+-- buffer sits in. An agent, or a second `me wt`, works in a different one -- same
+-- question, asked of a directory that is not this one. `-C{path}` is diffview's own way
+-- to point at another git top-level, so nothing here checks anything out or touches a
+-- buffer outside the one the panel opens.
+
+--- One row per `git worktree list --porcelain` block. Porcelain over the human-readable
+--- form because a worktree path can contain spaces and the human form has no delimiter.
+local function list_worktrees(root)
+    local raw = capture({ "git", "worktree", "list", "--porcelain" }, root)
+    local trees, current = {}, nil
+    for line in (raw .. "\n"):gmatch("(.-)\n") do
+        if line == "" then
+            current = nil
+        else
+            local key, value = line:match("^(%S+)%s*(.*)$")
+            if key == "worktree" then
+                current = { path = value }
+                table.insert(trees, current)
+            elseif current and key == "branch" then
+                current.branch = value:gsub("^refs/heads/", "")
+            elseif current and key == "HEAD" then
+                current.head = value
+            end
+        end
+    end
+    return trees
+end
+
+--- Every changed file in another worktree, side by side -- picked by branch, not the
+--- path, since an agent's worktree name (`agent-<hash>`) says nothing on its own.
+--- Resolved and shown against *that* worktree's own base, never the current one's: the
+--- default branch, the merge base, and whether a review session has already named one
+--- can all differ per worktree, and silently answering with the wrong one is the failure
+--- this whole feature exists to fix.
+function PR.worktree_panel()
+    local root = worktree_root()
+    if not root then
+        return warn("not inside a git worktree")
+    end
+    local trees = list_worktrees(root)
+    if #trees == 0 then
+        return warn("no worktrees found")
+    end
+    local rows = vim.tbl_map(function(t)
+        return string.format("%s\t%s", t.path, t.branch or ("detached @" .. t.head:sub(1, 7)))
+    end, trees)
+    fzf.fzf_exec(rows, {
+        prompt = "worktree diff> ",
+        preview = "git -C {1} log --color --oneline -20",
+        fzf_opts = {
+            ["--no-multi"] = true,
+            ["--delimiter"] = "\t",
+            ["--with-nth"] = "2..",
+        },
+        actions = {
+            ["default"] = function(selected)
+                local path = selected and selected[1] and selected[1]:match("^([^\t]+)")
+                if not path then
+                    return
+                end
+                if vim.fn.isdirectory(path) == 0 then
+                    return warn(("%s no longer exists -- `git worktree prune`?"):format(path))
+                end
+                local base, label = resolve_base(path)
+                if not base then
+                    return warn(("no base resolvable for %s"):format(path))
+                end
+                vim.notify(
+                    ("worktree diff: %s vs %s@%s"):format(path, (label or "base"):gsub("^origin/", ""), base:sub(1, 7))
+                )
+                vim.cmd(("DiffviewOpen -C%s %s..HEAD"):format(vim.fn.fnameescape(path), base))
+            end,
+        },
+    })
 end
 
 -- The PR list -------------------------------------------------------------
@@ -856,6 +1003,13 @@ vim.keymap.set("n", "<Leader>hl", function()
 end, { desc = "Pull requests across the org" })
 vim.keymap.set("n", "<Leader>hD", PR.panel, { desc = "Every changed file against the base, side by side" })
 vim.keymap.set("n", "<Leader>hf", PR.files, { desc = "Fuzzy find the changed files" })
+vim.keymap.set("n", "<Leader>hW", PR.worktree_panel, { desc = "Every changed file in another worktree, side by side" })
+-- `git_worktree_cd` is already what "change nvim's cwd to another worktree" is --
+-- window-local, so an excursion into someone else's checkout does not move any other
+-- split or tab out from under itself.
+vim.keymap.set("n", "<Leader>hw", function()
+    fzf.git_worktrees({ scope = "local" })
+end, { desc = "cd to a worktree" })
 
 -- `:PrList!` skips the cache, for the same reason ctrl-l exists inside the picker.
 vim.api.nvim_create_user_command("PrList", function(opts)
@@ -875,20 +1029,77 @@ end, {
     desc = "Sign a PR's changes in the files (number, URL, or 'off')",
 })
 
+--- Refs to complete `:DiffBase` against -- branches, remote branches and tags, the same
+--- three namespaces `git checkout` completes, so nothing here needs guessing at the
+--- shape of a name he would actually type.
+local function ref_candidates(root)
+    local raw = capture(
+        { "git", "for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes", "refs/tags" },
+        root
+    )
+    return vim.split(raw, "\n", { trimempty = true })
+end
+
+vim.api.nvim_create_user_command("DiffBase", function(opts)
+    local root = worktree_root()
+    if not root then
+        return warn("not inside a git worktree")
+    end
+    if opts.args == "" then
+        reset_diff_base()
+        render_diff_tag()
+        vim.notify("PR: base back to the automatic merge base")
+        return
+    end
+    local sha, code, stderr = capture({ "git", "rev-parse", "--verify", opts.args .. "^{commit}" }, root)
+    if code ~= 0 or sha == "" then
+        return warn(("%q does not resolve to a commit -- %s"):format(opts.args, stderr))
+    end
+    require("gitsigns").change_base(sha, true)
+    vim.env.REVIEW_BASE = sha
+    vim.env.REVIEW_BASE_DIR = root
+    render_diff_tag()
+    vim.notify(("PR: base set to %s (%s)"):format(opts.args, sha:sub(1, 7)))
+end, {
+    nargs = "?",
+    complete = function(arglead)
+        local root = worktree_root()
+        if not root then
+            return {}
+        end
+        local refs = ref_candidates(root)
+        if arglead == "" then
+            return refs
+        end
+        return vim.tbl_filter(function(ref)
+            return ref:lower():find(arglead:lower(), 1, true) ~= nil
+        end, refs)
+    end,
+    desc = "Diff against <ref> instead of the automatic merge base (no argument resets it)",
+})
+
 -- Restore the position on the skim surface: the detached checkout survives closing the
--- editor but the sign comparison does not, so without this the files look unchanged.
+-- editor but the sign comparison does not, so without this the files look unchanged. Also
+-- where the fallback tag first renders -- ask 3 (what am I diffing against) has to be
+-- answered before any key is pressed, not after.
 vim.api.nvim_create_autocmd("VimEnter", {
     callback = function()
         vim.schedule(function()
             local root = worktree_root()
             local state = skim_state(root)
-            if not (state and state.pr and state.base) then
-                return
+            if state and state.pr and state.base then
+                require("gitsigns").change_base(state.base, true)
+                vim.env.REVIEW_BASE = state.base
+                vim.env.REVIEW_BASE_DIR = root
             end
-            require("gitsigns").change_base(state.base, true)
-            vim.env.REVIEW_BASE = state.base
-            vim.env.REVIEW_BASE_DIR = root
-            render_pr_tag(state)
+            render_diff_tag()
         end)
     end,
+})
+
+-- The base can change without any of the keys above being pressed -- a branch switch in
+-- a terminal outside nvim, most often -- and refocusing this window is the same signal
+-- review.lua's own session tag already refreshes on.
+vim.api.nvim_create_autocmd("FocusGained", {
+    callback = render_diff_tag,
 })
