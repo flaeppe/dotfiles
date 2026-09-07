@@ -209,6 +209,14 @@
             ${builtins.readFile ./functions/_wt_age.fish}
           '';
         };
+        # Named the way the tab bar names a checkout, so a row in the picker and
+        # a label in the bar read the same for the same directory.
+        _tab_checkout = {
+          description = "Prints the repository, and worktree, a directory's checkout belongs to";
+          body = ''
+            ${builtins.readFile ./functions/_tab_checkout.fish}
+          '';
+        };
         # Shared by `review <pr>` and `review skim`: both must prepare a worktree
         # identically, or a language server works in one surface and not the next.
         _review_prepare_tree = {

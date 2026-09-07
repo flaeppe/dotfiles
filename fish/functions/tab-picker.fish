@@ -1,4 +1,4 @@
-# Fuzzy-jump between kitty tabs by project, running process and MRU order.
+# Fuzzy-jump between kitty tabs by checkout, running process and MRU order.
 # No match -> the typed text is a project name, resolved via `sam scopes
 # --paths`, and a new tab opens there.
 #
@@ -11,15 +11,11 @@ if test -z "$socket"
     return 1
 end
 
+# The working directory comes out raw: turning one into a checkout name means
+# walking up to a `.git`, which git does and jq cannot. `claude_state` is read
+# across every window rather than only the active pane, so the marker survives
+# an overlay or a split it was not set on -- the same rule the tab bar applies.
 set -l jq_filter '
-  def project_of(cwd):
-    (cwd // "") | rtrimstr("/") | split("/") as $parts
-    | ($parts | index("anyfin")) as $ai
-    | if $ai != null and ($ai + 1) < ($parts | length) then $parts[$ai + 1]
-      elif ($parts | index(".dotfiles")) != null then ".dotfiles"
-      else ($parts[-1] // "")
-      end;
-
   [.[].tabs[]]
   | map(
       (.windows | min_by(.created_at)) as $oldest
@@ -27,16 +23,37 @@ set -l jq_filter '
       | {
           id: .id,
           mru: ($active.last_focused_at // 0),
-          project: (project_of($oldest.cwd) | ltrimstr(".") | .[0:12]),
+          cwd: ($oldest.cwd // ""),
           running: (.title // ""),
-          state: ($active.user_vars.state // "")
+          state: ([.windows[].user_vars.claude_state | select(. != null and . != "")] | first // "")
         }
     )
   | sort_by(-.mru)
   | .[]
-  | [(.id | tostring), .project, .running, .state] | @tsv
+  | [(.id | tostring), .cwd, .running, .state] | @tsv
 '
-set -l rows (kitty @ --to $socket ls | jq -r $jq_filter)
+set -l raw (kitty @ --to $socket ls | jq -r $jq_filter)
+
+# One git call per distinct directory, memoised across tabs that share one --
+# several tabs in the same checkout is the normal case, not the exception.
+set -l seen_dirs
+set -l seen_labels
+set -l rows
+for row in $raw
+    set -l f (string split \t -- $row)
+    set -l label
+    set -l idx (contains -i -- "$f[2]" $seen_dirs)
+    if test -n "$idx"
+        set label $seen_labels[$idx]
+    else
+        set label (_tab_checkout "$f[2]")
+        set -a seen_dirs "$f[2]"
+        set -a seen_labels "$label"
+    end
+    # Quoted: a directory in no repository yields an empty label, and an
+    # unquoted empty variable would drop the column rather than blank it.
+    set -a rows (string join \t -- "$f[1]" "$label" "$f[3]" "$f[4]")
+end
 
 set -l picked (printf '%s\n' $rows | fzf --delimiter \t --with-nth=2.. --print-query --prompt 'tab> ')
 switch $status

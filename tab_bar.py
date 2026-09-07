@@ -1,16 +1,24 @@
 # Custom kitty tab-bar hook, loaded from ~/.config/kitty/tab_bar.py.
-# Renders each tab's name (or, absent one, the project it belongs to and
-# what is running in it) and, when marked, a state glyph -- independent of
-# which pane is focused or what that pane's own title says. draw_tab tints
-# each tab's background by project, so the bar groups tabs at a glance
-# without reading any of them -- this needs tab_bar_style set to "custom"
-# (draw_title alone does not).
+# Renders each tab's name (or, absent one, the checkout it sits in and what is
+# running there) and, when marked, a state glyph -- independent of which pane
+# is focused or what that pane's own title says. draw_tab tints each tab's
+# background by repository, so the bar groups tabs at a glance without reading
+# any of them -- this needs tab_bar_style set to "custom" (draw_title alone
+# does not).
 
+import os
 import zlib
 from typing import Any
 
 from kitty.fast_data_types import Screen, get_boss
-from kitty.tab_bar import DrawData, ExtraData, TabBarData, as_rgb, draw_tab_with_fade
+from kitty.tab_bar import (
+    DrawData,
+    ExtraData,
+    TabAccessor,
+    TabBarData,
+    as_rgb,
+    draw_tab_with_fade,
+)
 
 _MAX_LABEL_LEN = 12
 
@@ -27,7 +35,7 @@ _STATE_VAR = "claude_state"
 # Dark tints only: the bar's one text colour (#dcd7ba) has to read on every
 # entry, so nothing here gets close to it in brightness. No red -- kitty's
 # own bell/activity indicator owns that. Index 0 is the pre-010 default
-# background, kept so an unrecognised (empty-project) tab looks unchanged.
+# background, kept so a tab in no checkout at all looks unchanged.
 # _ACTIVE holds the same hues, one step brighter, so the focused tab still
 # reads as focused once colour stops being state's channel.
 _GROUP_PALETTE: tuple[int, ...] = (
@@ -48,24 +56,71 @@ _ACTIVE_PALETTE: tuple[int, ...] = (
 )
 
 
-def _project(cwd: str) -> str:
-    if not cwd:
+# One entry per distinct working directory this kitty process has drawn a tab
+# for, which is a handful. Keyed on the directory because resolving one walks
+# the filesystem, and the tab bar redraws far more often than a tab moves.
+# Ceiling: a directory that becomes a checkout after being cached as "not one"
+# keeps the old answer for the life of the process; clear this dict if that
+# ever matters.
+_CHECKOUT_CACHE: dict[str, tuple[str, str]] = {}
+
+# What a linked worktree's `.git` file points at. The segment before it names
+# the repository, wherever the worktree itself happens to sit.
+_WORKTREE_MARKER = "/.git/worktrees/"
+
+
+def _read_repository(git_file: str) -> str:
+    """The repository a linked worktree's `.git` file belongs to, or ""."""
+    try:
+        with open(git_file) as handle:
+            gitdir = handle.read(4096)
+    except OSError:
         return ""
-    parts = cwd.rstrip("/").split("/")
-    if "anyfin" in parts:
-        i = parts.index("anyfin")
-        if i + 1 < len(parts):
-            return parts[i + 1]
-    if ".dotfiles" in parts:
-        return ".dotfiles"
-    return parts[-1] if parts else ""
+    gitdir = gitdir.partition("gitdir:")[2].strip()
+    repository, marker, _ = gitdir.partition(_WORKTREE_MARKER)
+    return os.path.basename(repository) if marker else ""
 
 
-def _group_color(project: str, is_active: bool) -> int:
+def _checkout(cwd: str) -> tuple[str, str]:
+    """The repository name and worktree name of the checkout holding `cwd`.
+
+    The worktree name is "" for a repository's own checkout, and both are ""
+    when `cwd` sits in no checkout at all.
+    """
+    if not cwd:
+        return "", ""
+    cached = _CHECKOUT_CACHE.get(cwd)
+    if cached is not None:
+        return cached
+
+    resolved = "", ""
+    directory = os.path.abspath(cwd)
+    while True:
+        git = os.path.join(directory, ".git")
+        # A repository's own checkout carries a directory; every linked
+        # worktree carries a file naming where its real one lives.
+        if os.path.isdir(git):
+            resolved = os.path.basename(directory), ""
+            break
+        if os.path.isfile(git):
+            repository = _read_repository(git)
+            name = os.path.basename(directory)
+            resolved = (repository or name), ("" if repository == name else name)
+            break
+        parent = os.path.dirname(directory)
+        if parent == directory:
+            break
+        directory = parent
+
+    _CHECKOUT_CACHE[cwd] = resolved
+    return resolved
+
+
+def _group_color(repository: str, is_active: bool) -> int:
     palette = _ACTIVE_PALETTE if is_active else _GROUP_PALETTE
-    if not project:
+    if not repository:
         return palette[0]
-    return palette[zlib.crc32(project.encode()) % len(palette)]
+    return palette[zlib.crc32(repository.encode()) % len(palette)]
 
 
 # _tab_name and _tab_state both reach past TabBarData/TabAccessor into
@@ -112,15 +167,18 @@ def draw_title(data: dict[str, Any]) -> str:
     if name:
         return prefix + name[:_MAX_LABEL_LEN]
 
-    # Both project and running process come from the tab's oldest window, so
+    # Both checkout and running process come from the tab's oldest window, so
     # the label does not change depending on which pane has focus -- an
     # overlay on top of a split included.
-    project = _project(tab.active_oldest_wd)
-    if not project:
-        return prefix
-    label = project.lstrip(".")[:_MAX_LABEL_LEN]
+    repository, worktree = _checkout(tab.active_oldest_wd)
+    label = repository.lstrip(".")[:_MAX_LABEL_LEN]
     if not label:
         return prefix
+    if worktree:
+        # The worktree is what distinguishes this tab from the repository's
+        # other checkouts, so it keeps its own budget rather than sharing the
+        # repository's and being truncated away.
+        label = f"{label}/{worktree[:_MAX_LABEL_LEN]}"
     if tab.active_oldest_exe:
         label = f"{label} {tab.active_oldest_exe}"
     return prefix + label
@@ -136,8 +194,13 @@ def draw_tab(
     is_last: bool,
     extra_data: ExtraData,
 ) -> int:
-    project = _project(tab.active_oldest_wd)
-    screen.cursor.bg = as_rgb(_group_color(project, tab.is_active))
+    # `tab` here is a TabBarData, which carries no working directory at all --
+    # only the title template is handed a TabAccessor. Building one from the
+    # tab id is what gives this function the same view the label has; reading
+    # the field off `tab` raises, and kitty answers that by silently drawing
+    # the tab uncoloured.
+    repository, _ = _checkout(TabAccessor(tab.tab_id).active_oldest_wd)
+    screen.cursor.bg = as_rgb(_group_color(repository, tab.is_active))
     return draw_tab_with_fade(
         draw_data, screen, tab, before, max_tab_length, index, is_last, extra_data
     )
