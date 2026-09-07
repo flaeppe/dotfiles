@@ -180,9 +180,14 @@ in {
         # the template's only field so no window's title, overlay included,
         # can replace it.
         tab_title_template = "{custom}";
-        # Background tabs stay silent otherwise -- there's no cue that a session
-        # sitting behind the active one produced output while unfocused.
-        tab_activity_symbol = "●";
+        # draw_tab also lives in tab_bar.py, tinting each tab's background by
+        # project -- only reachable when the style is "custom".
+        tab_bar_style = "custom";
+        # tab_bar.py's own state glyph is the only "wants attention" signal
+        # now -- kitty's generic dot fired on any output in an unfocused tab
+        # and couldn't tell "grinding" from "wants you", so it only
+        # duplicated that signal. Revert to "●" to bring it back.
+        tab_activity_symbol = "";
         # An ordinary shell command (build, test run) finishing unfocused, past
         # 10s. Fires on OSC 133 shell completion, so it never sees a Claude
         # session -- that is one continuous foreground process with no such
