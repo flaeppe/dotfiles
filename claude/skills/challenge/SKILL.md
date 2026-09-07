@@ -26,6 +26,8 @@ Steps 1, 3 and 4 are yours. Step 2 is the agent's, and nothing else is.
    interleaved:
 
    ```
+   RECOMMEND  — one line: the path you would take, and the single thing
+                most likely to change that call
    VERDICT    — the expert's one line, verbatim
    ORIGINAL   — the draft from step 1, one line per increment
    ALTERNATES — <approach> — trades <X> for <Y>, needs first <Z> —
@@ -34,8 +36,18 @@ Steps 1, 3 and 4 are yours. Step 2 is the agent's, and nothing else is.
    RULED OUT  — investigated and killed, with the evidence — never dropped
    ```
 
-   Proposed dispositions are yours to suggest, never to apply. Fold nothing
-   in, write nothing. **Stop here and wait for the call.**
+   `RECOMMEND` comes first and is not optional. The four blocks under it are
+   parallel lists, and a reader handed only those has to reconcile them by
+   hand to answer "so what do we do" — which is the one question the whole
+   step exists to serve. One line, naming a path. Never a summary of the
+   options, never "it depends": if two paths are genuinely tied, say that in
+   the line and name what would break the tie.
+
+   Recommending is not deciding. The blocks below stay in full — the
+   `ALTERNATES` and `RULED OUT` detail is the durable record and survives
+   into step 4 regardless of what gets picked. Proposed dispositions are
+   yours to suggest, never to apply. Fold nothing in, write nothing.
+   **Stop here and wait for the call.**
 
 4. **Persist what was chosen.** Fold the adopted items into the plan body.
    Record the rest under one `## Alternatives considered` section, one line
