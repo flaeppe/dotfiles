@@ -271,7 +271,12 @@ local ENTRIES = {
     { group = "hunk", keys = "<Leader>hs", desc = "Accept this hunk (again to un-accept)", added = "2026-07-26" },
     { group = "hunk", keys = "<Leader>hu", desc = "Throw this hunk away", added = "2026-07-26" },
     { group = "hunk", keys = "<Leader>hp", desc = "What exactly changed here?", added = "2026-07-26" },
-    { group = "hunk", keys = "<Leader>hd", desc = "This whole file against the base", added = "2026-07-26" },
+    {
+        group = "hunk",
+        keys = "<Leader>hd",
+        desc = "This file's staged vs unstaged changes -- a different question from hD's branch-base diff",
+        added = "2026-07-26",
+    },
     {
         group = "hunk",
         keys = "<Leader>hl",
@@ -311,7 +316,7 @@ local ENTRIES = {
     {
         group = "hunk",
         keys = "<Leader>hw",
-        desc = "cd to a worktree, picked from a list",
+        desc = "cd to a worktree, picked from a list -- open buffers keep diffing their own worktree until you open a file there",
         added = "2026-09-07",
     },
     { group = "hunk", keys = "¨h  åh", desc = "Next / previous changed hunk", added = "2026-07-26", run = false },
