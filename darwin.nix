@@ -188,6 +188,11 @@ in {
         # session -- that is one continuous foreground process with no such
         # signal.
         notify_on_cmd_finish = "invisible 10.0";
+        # One text colour everywhere; the background carries tab state
+        # (active/inactive, session-mark tint) instead of a second foreground.
+        active_tab_foreground = "#dcd7ba";
+        inactive_tab_foreground = "#dcd7ba";
+        active_tab_background = "#2A2A37";
         mark1_foreground = "black";
         mark1_background = "red";
         mark2_foreground = "black";
@@ -200,8 +205,8 @@ in {
         "cmd+shift+h" = "previous_tab";
         "cmd+p" = "launch --type=overlay fish -i -c tab-picker";
         "kitty_mod+m" = ''toggle_marker iregex 1 \bERROR\b|\bFATAL\b 2 \bFAIL\b 3 \bpanic\b'';
-        "kitty_mod+b" = "scroll_to_mark prev";
-        "kitty_mod+n" = "scroll_to_mark next";
+        "kitty_mod+j" = "scroll_to_mark next";
+        "kitty_mod+k" = "scroll_to_mark prev";
         "cmd+t" = "new_tab_with_cwd";
         "cmd+enter" = "new_window_with_cwd";
         # Browse scrollback buffer in nvim. Not ctrl+f: Kitty grabs a binding

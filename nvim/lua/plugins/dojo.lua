@@ -329,7 +329,7 @@ local ENTRIES = {
     },
     {
         group = "kitty",
-        keys = "kitty_mod+b  kitty_mod+n",
+        keys = "kitty_mod+k  kitty_mod+j",
         desc = "Jump to the previous / next highlighted line",
         added = "2026-09-07",
         run = false,
@@ -477,6 +477,12 @@ end, { desc = "Keybindings, usage and current drills" })
 vim.api.nvim_create_autocmd("VimEnter", {
     callback = function()
         vim.schedule(function()
+            -- kitty-scrollback.nvim starts nvim with this same signature and
+            -- fills the buffer only later; opening the picker here would beat
+            -- it to a jobstart on the same buffer. Mirrors keylog.lua's guard.
+            if vim.env.KITTY_SCROLLBACK_NVIM == "true" then
+                return
+            end
             local untouched = vim.fn.argc() == 0
                 and #vim.api.nvim_list_wins() == 1
                 and vim.api.nvim_buf_get_name(0) == ""
