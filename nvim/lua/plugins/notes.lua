@@ -685,15 +685,23 @@ function M.write(bufnr)
         pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
     end)
 
-    rebuild_index()
-    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-        if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buftype == "" then
-            apply_indicators(buf)
-        end
-    end
-
     if candidate_id and queue_decide(candidate_id, "kept", path) then
         vim.notify("Notes: " .. candidate_id .. " marked kept", vim.log.levels.INFO)
+    end
+
+    -- Presentation, not state: a failure here must not cost the queue decision
+    -- above, which already landed. Worst case is stale signs until the next
+    -- BufRead re-triggers `ensure_index`.
+    local refreshed, refresh_err = pcall(function()
+        rebuild_index()
+        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+            if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].buftype == "" then
+                apply_indicators(buf)
+            end
+        end
+    end)
+    if not refreshed then
+        vim.notify("Notes: indicator refresh failed (signs may be stale): " .. tostring(refresh_err), vim.log.levels.WARN)
     end
 end
 
@@ -1027,7 +1035,7 @@ apply_indicators = function(bufnr)
             lnum = 1
         elseif root then
             local node = descend_chain(bufnr, root, allowed, entry.chain)
-            lnum = node and (select(1, node:start()) + 1) or nil
+            lnum = node and (node:start() + 1) or nil
         end
         if lnum then
             local end_lnum = entry.span and (lnum + entry.span - 1) or lnum
