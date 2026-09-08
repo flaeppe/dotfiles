@@ -625,7 +625,7 @@ function M.write(bufnr)
         table.insert(section, "ref: " .. ref.token)
     end
     table.insert(section, at_line or "at:")
-    if source_line then
+    if source_line and vim.trim(source_line:match("^source:%s*(.*)$") or "") ~= "" then
         table.insert(section, source_line)
     end
     table.insert(section, captured_line)
@@ -709,8 +709,9 @@ end
 
 --- Open a compose buffer prefilled from a `reasoning-queue next --json`
 --- candidate: one `ref:` per entry in `candidate.refs` (or the placeholder
---- when it is empty), `at:`, `source:`, `captured:` = the candidate's own
---- date, `strength:` blank, then its body. The heading reuses `parse_ref` +
+--- when it is empty), `at:`, `source:` (omitted when the candidate has none),
+--- `captured:` = the candidate's own date, `strength:` blank, then its body.
+--- The heading reuses `parse_ref` +
 --- `heading_part` rather than the candidate's `title`,
 --- which is only a fallback for the refs-empty case (there is no ref to
 --- derive a heading from). Same acwrite/bufhidden pattern as `M.capture`.
@@ -752,7 +753,9 @@ local function open_candidate_buffer(candidate, args)
         table.insert(lines, PLACEHOLDER_REF)
     end
     table.insert(lines, "at: " .. table.concat(candidate.at or {}, ", "))
-    table.insert(lines, "source: " .. (candidate.source or ""))
+    if candidate.source and vim.trim(candidate.source) ~= "" then
+        table.insert(lines, "source: " .. candidate.source)
+    end
     table.insert(lines, "captured: " .. (candidate.captured or os.date("%Y-%m-%d")))
     table.insert(lines, "strength: ")
     table.insert(lines, "")
