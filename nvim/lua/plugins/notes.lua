@@ -263,16 +263,23 @@ local compose = nil
 --- needs a reference chosen by hand before `:wq` will write it.
 local PLACEHOLDER_REF = "ref: <fill in a reference>"
 
+--- One namespace for the note-authoring aids below, deliberately: nvim.nix
+--- concatenates every plugin file into a single `init.lua`, and Lua's limit of
+--- 200 locals per function applies to that whole chunk -- so file-scope locals
+--- here are spent against every other fragment's. Grouping holds this file's
+--- share at one.
+local authoring = {}
+
 --- Everything from this line down is a reference card, not note content.
 --- Borrowed from a commit template for the same reason: the fields worth
 --- filling are not memorable, and a card in the buffer is the only place a
 --- reminder is read at the moment it is needed.
-local CUTLINE = "# ---------------------- >8 ----------------------"
+authoring.CUTLINE = "# ---------------------- >8 ----------------------"
 
 --- The trait vocabulary, as `{ term, meaning }` pairs, read from the closed
 --- term list itself so the card cannot drift from what `me reasoning` will
 --- accept. An unreadable list yields none and the card omits that section.
-local function vocabulary_terms()
+function authoring.vocabulary_terms()
     local path = notes_root() .. "/_cross/reasoning/traits/vocabulary"
     if vim.fn.filereadable(path) == 0 then
         return {}
@@ -290,10 +297,10 @@ end
 --- The reference card: the cut line, then what may go in `tags:` and the
 --- traits that exist. Every line is a comment, so a card left untouched is
 --- inert even if something downstream ever reads past the cut.
-local function cheatsheet_lines()
+function authoring.cheatsheet_lines()
     local out = {
         "",
-        CUTLINE,
+        authoring.CUTLINE,
         "# Everything below this line is ignored.",
         "#",
         "# tags: one line, comma-separated. Three kinds, and they are not",
@@ -306,7 +313,7 @@ local function cheatsheet_lines()
         "#",
         "# strength: how sure you are, in your own words. Blank is dropped.",
     }
-    local terms = vocabulary_terms()
+    local terms = authoring.vocabulary_terms()
     if #terms > 0 then
         table.insert(out, "#")
         table.insert(out, "# traits that exist:")
@@ -444,7 +451,7 @@ function M.capture()
         "",
     }
     local body_lnum = #lines
-    vim.list_extend(lines, cheatsheet_lines())
+    vim.list_extend(lines, authoring.cheatsheet_lines())
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.bo[bufnr].modified = false
 
@@ -552,9 +559,9 @@ end
 --- on the file, then the author's own. A bare vocabulary term is prefixed to
 --- `trait:<term>`, because a trait written into `tags:` unprefixed collides
 --- with the facet space the indexers read and is refused downstream.
-local function normalise_tags(typed, existing)
+function authoring.normalise_tags(typed, existing)
     local vocabulary = {}
-    for _, entry in ipairs(vocabulary_terms()) do
+    for _, entry in ipairs(authoring.vocabulary_terms()) do
         vocabulary[entry.term] = true
     end
     local seen, out = {}, {}
@@ -583,20 +590,20 @@ end
 
 --- Rewrite (or insert) the `tags:` line of a frontmatter block, keeping every
 --- other line untouched.
-local function with_tags(frontmatter_lines, typed)
+function authoring.with_tags(frontmatter_lines, typed)
     local out = {}
     local replaced = false
     for _, line in ipairs(frontmatter_lines) do
         local existing = line:match("^tags:%s*(.*)$")
         if existing then
-            table.insert(out, "tags: " .. table.concat(normalise_tags(typed, existing), ", "))
+            table.insert(out, "tags: " .. table.concat(authoring.normalise_tags(typed, existing), ", "))
             replaced = true
         else
             table.insert(out, line)
         end
     end
     if not replaced then
-        table.insert(out, "tags: " .. table.concat(normalise_tags(typed, nil), ", "))
+        table.insert(out, "tags: " .. table.concat(authoring.normalise_tags(typed, nil), ", "))
     end
     return out
 end
@@ -609,7 +616,7 @@ end
 local function parse_compose(bufnr)
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     for i, line in ipairs(lines) do
-        if line == CUTLINE then
+        if line == authoring.CUTLINE then
             lines = vim.list_slice(lines, 1, i - 1)
             break
         end
@@ -777,7 +784,7 @@ function M.write(bufnr)
         local services = services_union(nil, refs)
         out = {
             "---",
-            "tags: " .. table.concat(normalise_tags(typed_tags, nil), ", "),
+            "tags: " .. table.concat(authoring.normalise_tags(typed_tags, nil), ", "),
             "repo: " .. home.repo,
             "path: " .. home.relpath,
             "services: [" .. table.concat(services, ", ") .. "]",
@@ -804,7 +811,7 @@ function M.write(bufnr)
         end
         local services = services_union(table.concat(existing, "\n"), refs)
         out = { "---" }
-        vim.list_extend(out, with_tags(with_services(frontmatter, services), typed_tags))
+        vim.list_extend(out, authoring.with_tags(with_services(frontmatter, services), typed_tags))
         table.insert(out, "---")
         vim.list_extend(out, rest)
         table.insert(out, "")
@@ -897,7 +904,7 @@ local function open_candidate_buffer(candidate, args)
     table.insert(lines, "")
     vim.list_extend(lines, vim.split(candidate.body or "", "\n", { plain = true }))
     local body_end_lnum = #lines
-    vim.list_extend(lines, cheatsheet_lines())
+    vim.list_extend(lines, authoring.cheatsheet_lines())
 
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.bo[bufnr].modified = false
