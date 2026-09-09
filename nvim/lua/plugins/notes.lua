@@ -294,6 +294,32 @@ function authoring.vocabulary_terms()
     return terms
 end
 
+--- The `repo:` and `service:` values already in use across the notes corpus,
+--- as two sorted lists. Enumerating them is what keeps the facet space from
+--- growing a near-duplicate: a facet is exact-match, so `service:seb` and
+--- `service:seb-camt` are two vendors as far as any index is concerned.
+--- Harvested rather than declared -- unlike traits there is no closed list, so
+--- what exists is the only available answer.
+function authoring.facets_in_use()
+    local out, seen = { repo = {}, service = {} }, {}
+    -- Only `tags:` lines, never the file body: prose that documents the
+    -- convention contains placeholders (`repo:<name>`, `repo:X`) which would
+    -- enter the list as though they were facets someone chose.
+    local text = run({ "grep", "-rh", "--include=*.md", "-E", "^tags:", notes_root() })
+    for line in text:gmatch("[^\n]+") do
+        for kind, value in line:gmatch("(%a+):([A-Za-z0-9_.-]+)") do
+            local token = kind .. ":" .. value
+            if out[kind] and not seen[token] then
+                seen[token] = true
+                table.insert(out[kind], value)
+            end
+        end
+    end
+    table.sort(out.repo)
+    table.sort(out.service)
+    return out
+end
+
 --- The reference card: the cut line, then what may go in `tags:` and the
 --- traits that exist. Every line is a comment, so a card left untouched is
 --- inert even if something downstream ever reads past the cut.
@@ -313,6 +339,17 @@ function authoring.cheatsheet_lines()
         "#",
         "# strength: how sure you are, in your own words. Blank is dropped.",
     }
+    local facets = authoring.facets_in_use()
+    if #facets.repo > 0 or #facets.service > 0 then
+        table.insert(out, "#")
+        table.insert(out, "# already in use -- reuse rather than coin a variant:")
+        if #facets.repo > 0 then
+            table.insert(out, "#   repo:     " .. table.concat(facets.repo, ", "))
+        end
+        if #facets.service > 0 then
+            table.insert(out, "#   service:  " .. table.concat(facets.service, ", "))
+        end
+    end
     local terms = authoring.vocabulary_terms()
     if #terms > 0 then
         table.insert(out, "#")
