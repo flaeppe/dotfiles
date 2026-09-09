@@ -97,7 +97,9 @@ controllers, resolvers, and schema definitions are glue — they are not where
 logic belongs. Unless explicitly told otherwise, design systems so that:
 
 1. **Business logic exists as a plain language-level API** — functions and classes
-   that can be called without any protocol awareness. This is the source of truth.
+   that can be called without any protocol awareness, and reachable from a CLI or
+   a test with nothing stood in for (e.g. dependency injection). This is the
+   source of truth.
 2. **Boundary layers do exactly two things:**
    - Parse foreign data (request bodies, messages, events) into the types the
      business logic expects.

@@ -263,6 +263,68 @@ local compose = nil
 --- needs a reference chosen by hand before `:wq` will write it.
 local PLACEHOLDER_REF = "ref: <fill in a reference>"
 
+--- Everything from this line down is a reference card, not note content.
+--- Borrowed from a commit template for the same reason: the fields worth
+--- filling are not memorable, and a card in the buffer is the only place a
+--- reminder is read at the moment it is needed.
+local CUTLINE = "# ---------------------- >8 ----------------------"
+
+--- The trait vocabulary, as `{ term, meaning }` pairs, read from the closed
+--- term list itself so the card cannot drift from what `me reasoning` will
+--- accept. An unreadable list yields none and the card omits that section.
+local function vocabulary_terms()
+    local path = notes_root() .. "/_cross/reasoning/traits/vocabulary"
+    if vim.fn.filereadable(path) == 0 then
+        return {}
+    end
+    local terms = {}
+    for _, line in ipairs(vim.fn.readfile(path)) do
+        local term, meaning = line:match("^([%w][%w%-]*)%s+(.+)$")
+        if term then
+            table.insert(terms, { term = term, meaning = vim.trim(meaning) })
+        end
+    end
+    return terms
+end
+
+--- The reference card: the cut line, then what may go in `tags:` and the
+--- traits that exist. Every line is a comment, so a card left untouched is
+--- inert even if something downstream ever reads past the cut.
+local function cheatsheet_lines()
+    local out = {
+        "",
+        CUTLINE,
+        "# Everything below this line is ignored.",
+        "#",
+        "# tags: one line, comma-separated. Three kinds, and they are not",
+        "# interchangeable:",
+        "#   repo:<name>       which checkout      e.g. repo:api",
+        "#   service:<vendor>  which third party   e.g. service:fourthline",
+        "#   trait:<term>      what the file is    e.g. trait:business-logic",
+        "# A bare trait term is prefixed on write, so `business-logic` is fine",
+        "# to type. `reasoning` is added for you.",
+        "#",
+        "# strength: how sure you are, in your own words. Blank is dropped.",
+    }
+    local terms = vocabulary_terms()
+    if #terms > 0 then
+        table.insert(out, "#")
+        table.insert(out, "# traits that exist:")
+        local width = 0
+        for _, entry in ipairs(terms) do
+            width = math.max(width, #entry.term)
+        end
+        for _, entry in ipairs(terms) do
+            local meaning = entry.meaning
+            if #meaning > 74 - width then
+                meaning = meaning:sub(1, 71 - width) .. "..."
+            end
+            table.insert(out, ("#   %-" .. width .. "s  %s"):format(entry.term, meaning))
+        end
+    end
+    return out
+end
+
 --- `+n` for a visual selection, cursor left at its top. Returns a count
 --- instead of a preformatted `+n` string since the ref grammar formats it.
 local function selected_span()
@@ -378,8 +440,11 @@ function M.capture()
         "at: " .. ref.repo .. "@" .. ref.sha,
         "captured: " .. os.date("%Y-%m-%d"),
         "strength: ",
+        "tags: ",
         "",
     }
+    local body_lnum = #lines
+    vim.list_extend(lines, cheatsheet_lines())
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.bo[bufnr].modified = false
 
@@ -402,7 +467,7 @@ function M.capture()
 
     vim.cmd("botright split")
     vim.api.nvim_win_set_buf(0, bufnr)
-    vim.api.nvim_win_set_cursor(0, { #lines, 0 })
+    vim.api.nvim_win_set_cursor(0, { body_lnum, 0 })
     vim.cmd.startinsert({ bang = true })
 end
 
@@ -483,6 +548,59 @@ local function with_services(frontmatter_lines, services)
     return out
 end
 
+--- The frontmatter `tags:` list: `reasoning` first, then whatever is already
+--- on the file, then the author's own. A bare vocabulary term is prefixed to
+--- `trait:<term>`, because a trait written into `tags:` unprefixed collides
+--- with the facet space the indexers read and is refused downstream.
+local function normalise_tags(typed, existing)
+    local vocabulary = {}
+    for _, entry in ipairs(vocabulary_terms()) do
+        vocabulary[entry.term] = true
+    end
+    local seen, out = {}, {}
+    local function add(tag)
+        tag = vim.trim(tag)
+        if tag == "" then
+            return
+        end
+        if vocabulary[tag] then
+            tag = "trait:" .. tag
+        end
+        if not seen[tag] then
+            seen[tag] = true
+            table.insert(out, tag)
+        end
+    end
+    add("reasoning")
+    for tag in (existing or ""):gmatch("[^,]+") do
+        add(tag)
+    end
+    for tag in (typed or ""):gmatch("[^,]+") do
+        add(tag)
+    end
+    return out
+end
+
+--- Rewrite (or insert) the `tags:` line of a frontmatter block, keeping every
+--- other line untouched.
+local function with_tags(frontmatter_lines, typed)
+    local out = {}
+    local replaced = false
+    for _, line in ipairs(frontmatter_lines) do
+        local existing = line:match("^tags:%s*(.*)$")
+        if existing then
+            table.insert(out, "tags: " .. table.concat(normalise_tags(typed, existing), ", "))
+            replaced = true
+        else
+            table.insert(out, line)
+        end
+    end
+    if not replaced then
+        table.insert(out, "tags: " .. table.concat(normalise_tags(typed, nil), ", "))
+    end
+    return out
+end
+
 --- Parse the compose buffer into its parts: the parsed `ref:` lines (capture
 --- order), the literal `at:` line, the literal `source:` line (nil unless
 --- the candidate had one), the literal `captured:` line, the literal
@@ -490,7 +608,14 @@ end
 --- drop), and the body -- everything after the first blank line.
 local function parse_compose(bufnr)
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-    local refs, at_line, source_line, captured_line, strength_line = {}, nil, nil, nil, nil
+    for i, line in ipairs(lines) do
+        if line == CUTLINE then
+            lines = vim.list_slice(lines, 1, i - 1)
+            break
+        end
+    end
+    local refs, at_line, source_line, captured_line, strength_line, tags_line =
+        {}, nil, nil, nil, nil, nil
     local blank_lnum = nil
     for i, line in ipairs(lines) do
         if line:match("^ref:%s*") then
@@ -506,6 +631,8 @@ local function parse_compose(bufnr)
             captured_line = line
         elseif line:match("^strength:%s*") then
             strength_line = line
+        elseif line:match("^tags:%s*") then
+            tags_line = line
         elseif line == "" and not blank_lnum then
             blank_lnum = i
         end
@@ -520,7 +647,13 @@ local function parse_compose(bufnr)
     while #body > 0 and body[#body] == "" do
         table.remove(body)
     end
-    return refs, at_line, source_line, captured_line or ("captured: " .. os.date("%Y-%m-%d")), strength_line, body
+    return refs,
+        at_line,
+        source_line,
+        captured_line or ("captured: " .. os.date("%Y-%m-%d")),
+        strength_line,
+        tags_line,
+        body
 end
 
 --- Notify and raise, so a refusal inside the BufWriteCmd callback actually
@@ -587,7 +720,9 @@ end
 --- (`<Leader>nc`) buffer has no candidate to drop, so an empty body there is
 --- just another refusal.
 function M.write(bufnr)
-    local refs, at_line, source_line, captured_line, strength_line, body = parse_compose(bufnr)
+    local refs, at_line, source_line, captured_line, strength_line, tags_line, body =
+        parse_compose(bufnr)
+    local typed_tags = tags_line and tags_line:match("^tags:%s*(.*)$") or ""
     local candidate_id = vim.b[bufnr].reasoning_candidate_id
 
     if body_is_blank(body) then
@@ -642,7 +777,7 @@ function M.write(bufnr)
         local services = services_union(nil, refs)
         out = {
             "---",
-            "tags: reasoning",
+            "tags: " .. table.concat(normalise_tags(typed_tags, nil), ", "),
             "repo: " .. home.repo,
             "path: " .. home.relpath,
             "services: [" .. table.concat(services, ", ") .. "]",
@@ -669,7 +804,7 @@ function M.write(bufnr)
         end
         local services = services_union(table.concat(existing, "\n"), refs)
         out = { "---" }
-        vim.list_extend(out, with_services(frontmatter, services))
+        vim.list_extend(out, with_tags(with_services(frontmatter, services), typed_tags))
         table.insert(out, "---")
         vim.list_extend(out, rest)
         table.insert(out, "")
@@ -758,8 +893,11 @@ local function open_candidate_buffer(candidate, args)
     end
     table.insert(lines, "captured: " .. (candidate.captured or os.date("%Y-%m-%d")))
     table.insert(lines, "strength: ")
+    table.insert(lines, "tags: ")
     table.insert(lines, "")
     vim.list_extend(lines, vim.split(candidate.body or "", "\n", { plain = true }))
+    local body_end_lnum = #lines
+    vim.list_extend(lines, cheatsheet_lines())
 
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
     vim.bo[bufnr].modified = false
@@ -786,7 +924,7 @@ local function open_candidate_buffer(candidate, args)
 
     vim.cmd("botright split")
     vim.api.nvim_win_set_buf(0, bufnr)
-    vim.api.nvim_win_set_cursor(0, { #lines, 0 })
+    vim.api.nvim_win_set_cursor(0, { body_end_lnum, 0 })
 end
 
 --- A bare single token with no leading dash is the legacy `:NoteNext <feed>`
