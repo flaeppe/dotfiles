@@ -59,3 +59,5 @@ pre-commit run --all-files --hook-stage manual pyright
 Secrets are managed by [pass](https://www.passwordstore.org/) (GPG-encrypted, git-synced).
 The claude wrapper script reads secrets from `pass` at launch. Home Manager
 activation scripts write `~/.sentryclirc` from `pass` on `home-manager switch`.
+
+[Codex development configuration](docs/codex.md) — profile, shared conventions, hooks, and compatibility limits.

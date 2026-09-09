@@ -41,6 +41,7 @@
         modules = [
           ./arch.nix
           ./claude/claude.nix
+          ./codex/codex.nix
           ./fish/fish.nix
           ./git/git.nix
           ./i3/i3.nix
@@ -70,6 +71,7 @@
             modules = [
               ./darwin.nix
               ./claude/claude.nix
+              ./codex/codex.nix
               ./fish/fish.nix
               ./git/git.nix
               ./nvim/nvim.nix
