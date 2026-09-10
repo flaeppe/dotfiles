@@ -47,6 +47,9 @@ in {
     mkdir -p "$HOME/.codex/hooks"
     install -m 755 ${
       ../claude/hooks/gcloud-command-gate
+    } "$HOME/.codex/hooks/gcloud-command-gate-shared"
+    install -m 755 ${
+      ./hooks/gcloud-command-gate.py
     } "$HOME/.codex/hooks/gcloud-command-gate"
     install -m 755 ${
       ../claude/hooks/git-local-path-guard
