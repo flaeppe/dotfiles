@@ -1,6 +1,6 @@
-# Two background timers for the `me` CLI.
+# Background timers for the `me` CLI, plus the Codex quota-window poke.
 #
-# The binary is installed to ~/.local/bin by its own build, not by
+# The `me` binary is installed to ~/.local/bin by its own build, not by
 # home-manager, so these agents name it by path rather than by store path.
 # Nothing else here depends on it: if the file is absent the jobs no-op every
 # 15 minutes instead of failing at build time.
@@ -10,11 +10,14 @@ let
   me = "${config.home.homeDirectory}/.local/bin/me";
 
   # launchd gives a job a bare-bones PATH (/usr/bin:/bin:/usr/sbin:/sbin) and
-  # inherits nothing from an interactive shell. Both jobs run gh, fish and git
-  # by bare name: git survives on macOS's /usr/bin/git, gh exists only in the
-  # nix profile and is otherwise "not found in $PATH".
+  # inherits nothing from an interactive shell. The `me`/`prs` jobs run gh,
+  # fish and git by bare name: git survives on macOS's /usr/bin/git, gh
+  # exists only in the nix profile and is otherwise "not found in $PATH".
+  # ~/.local/bin carries `codex` and `me` themselves, needed by name inside
+  # codex-daily-poke.sh's own subprocess (`sam usage codex` shells out to
+  # `codex app-server` by bare name).
   launchdPath =
-    "${config.home.homeDirectory}/.nix-profile/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+    "${config.home.homeDirectory}/.local/bin:${config.home.homeDirectory}/.nix-profile/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 in {
   # Fires unconditionally; the command throttles itself on wall-clock hour and
   # a persisted timestamp, so most invocations are a cheap no-op. It also
@@ -40,6 +43,40 @@ in {
     config = {
       ProgramArguments = [ me "pulse" ];
       StartInterval = 900; # 15 minutes
+      RunAtLoad = false;
+      EnvironmentVariables.PATH = launchdPath;
+    };
+  };
+
+  # Fires one cheap real Codex turn at 07:00 so the day's ~5h quota windows
+  # land at roughly 07-12-17-22 instead of wherever the day's first
+  # incidental Codex use happens to fall (Petter, 2026-09-10; see
+  # ~/.plan/me/quota-calibration.md). A window activates only on a real
+  # completed turn, never on a quota read, so this has to be an actual turn,
+  # not a status check. codex-daily-poke.sh checks the turn's own exit code
+  # and then asserts the primary window really did land ~5h out; either
+  # failure goes through `me note`, the channel `me brief`/`me pulse` surface
+  # -- see the script for why (inbox/hook-errors.log is where the PR sweep's
+  # failures go silent).
+  #
+  # StartCalendarInterval, not StartInterval: a fixed 07:00, not "every N
+  # seconds". If the machine is asleep at 07:00, launchd runs it on wake
+  # (coalesced into one run, not one per missed interval -- man
+  # launchd.plist); if the machine is off at 07:00, it runs at next
+  # boot/login instead, which can land after Petter's own first Codex use
+  # of the day and miss the alignment that run was for.
+  launchd.agents.codex-daily-poke = lib.mkIf pkgs.stdenv.isDarwin {
+    enable = true;
+    config = {
+      ProgramArguments = [
+        "${pkgs.bash}/bin/bash"
+        "${./scripts/codex-daily-poke.sh}"
+        "${./scripts/codex-primary-window-check.py}"
+      ];
+      StartCalendarInterval = [{
+        Hour = 7;
+        Minute = 0;
+      }];
       RunAtLoad = false;
       EnvironmentVariables.PATH = launchdPath;
     };
