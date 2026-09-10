@@ -61,7 +61,7 @@ local ANSI = {
 }
 
 -- Substring matching rather than fzf's default fuzzy, which scatters a query's characters
--- across the whole row: fuzzy `@api` also matches a row reading `@anyfin-platform .ticket`,
+-- across the whole row: fuzzy `@api` also matches a row reading `@internal-platform .ticket`,
 -- and fuzzy `=?` matches every `=draft` that also carries a `?review`, so the facet counts
 -- come out wrong in the direction that is hardest to notice -- too many rows, all of them
 -- plausible. Fuzzy is still a keystroke away: under `--exact`, fzf reads a leading `'` as

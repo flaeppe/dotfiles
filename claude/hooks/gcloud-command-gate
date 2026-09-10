@@ -1,31 +1,11 @@
 #!/usr/bin/python3
-"""Claude Code PreToolUse gate for `gcloud`: any `gcloud logging` call is
-denied outright and redirected to `af log`, the read-only Cloud Logging
-CLI; every other gcloud command needs approval, same as before.
+"""Claude Code PreToolUse gate for `gcloud`.
 
-`gcloud logging` used to get a narrow read-only allowlist here, parsed out of
-the shell command line -- fragile by construction, since a call nested inside
-another command's argument (`bash -c "gcloud logging read ..."`) escapes a
-parser working off word position. `af` sidesteps the whole class of
-problem: it is physically incapable of writes, so it can be allowlisted
-wholesale (see ~/.dotfiles/claude/settings.json) instead of gated
-command-by-command.
-
-Answers with a permissionDecision so the verdict holds in every permission mode,
-including the ones where a classifier would otherwise decide. Only a command
-that invokes gcloud gets a verdict: text that merely carries the name, such as a
-commit message or a grep pattern, gets none.
-
-Composition does not soften the verdict. A real logging call practically never
-arrives bare -- it comes wrapped in `timeout`, piped into `head`, chained behind
-something else -- so the call is denied wherever on the line it sits, and the
-denial covers the line entire, siblings included. The redirect stays accurate
-about why the line was refused, and re-issuing a sibling on its own costs
-nothing, where an `ask` would let the retired call through on one approval.
-
-Shebang is an absolute path, not `env python3`: this hook fires from whatever
-project directory the Bash tool is in, and a project's own direnv/flake shell
-can shadow the global `python3` on PATH with an older interpreter version.
+Input: a PreToolUse payload on stdin for a Bash tool call. Any `gcloud
+logging` invocation on the command line -- including inside pipes, `timeout`,
+or another wrapper -- is denied with a redirect to `af log`; every other
+gcloud invocation gets an `ask` verdict. Non-gcloud commands and non-Bash
+tool calls get no verdict.
 """
 
 from __future__ import annotations

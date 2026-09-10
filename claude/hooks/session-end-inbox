@@ -7,8 +7,8 @@ payload="$(cat)"
 if [ -x "$HOME/.local/bin/me" ]; then
   "$HOME/.local/bin/me" hook session-end <<<"$payload" 2>/dev/null
 fi
-sam="${ME_HOME:-$HOME/anyfin/.me}/bin/sam"
-if [ -x "$sam" ]; then
-  (cd "${ME_HOME:-$HOME/anyfin/.me}" && "$sam" session mark clear) <<<"$payload" 2>/dev/null
+sam="$ME_HOME/bin/sam"
+if [ -n "$ME_HOME" ] && [ -x "$sam" ]; then
+  (cd "$ME_HOME" && "$sam" session mark clear) <<<"$payload" 2>/dev/null
 fi
 exit 0

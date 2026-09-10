@@ -72,9 +72,6 @@ if test -z "$query"
 end
 
 set -l sam_home $ME_HOME
-if test -z "$sam_home"
-    set sam_home "$HOME/anyfin/.me"
-end
 set -l sam_bin "$sam_home/bin/sam"
 if not test -x $sam_bin
     echo "tab-picker: sam is not installed, cannot resolve '$query' as a project"

@@ -16,7 +16,9 @@ set -uo pipefail
 WINDOW_CHECK="$1"
 
 CODEX="$HOME/.local/bin/codex"
-SAM_DIR="$HOME/anyfin/.me"
+# launchd gives this job a bare environment (no ME_HOME) -- fall back to the
+# machine-local file fish also reads, since neither is committed to the repo.
+SAM_DIR="${ME_HOME:-$(cat "$HOME/.config/me-home" 2>/dev/null || true)}"
 ME="$HOME/.local/bin/me"
 
 note() {
