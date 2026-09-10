@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Blocks a commit whose message matches a term in the machine-local
+# denylist. Silently allows everything when the denylist file is absent.
+set -euo pipefail
+
+DENYLIST="$HOME/.config/git-banned-words"
+[ -f "$DENYLIST" ] || exit 0
+
+pattern="$(grep -v '^#' "$DENYLIST" | grep -v '^$' | paste -sd'|' -)"
+[ -n "$pattern" ] || exit 0
+
+if grep -Eiq "$pattern" "$1"; then
+  echo "commit blocked: commit message matches a denylisted term ($DENYLIST)" >&2
+  exit 1
+fi

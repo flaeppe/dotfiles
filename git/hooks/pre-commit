@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Blocks a commit whose staged diff (added/removed lines only, not context)
+# matches a term in the machine-local denylist. Silently allows everything
+# when the denylist file is absent, so a fresh machine is never blocked by a
+# file that was never created.
+set -euo pipefail
+
+DENYLIST="$HOME/.config/git-banned-words"
+[ -f "$DENYLIST" ] || exit 0
+
+pattern="$(grep -v '^#' "$DENYLIST" | grep -v '^$' | paste -sd'|' -)"
+[ -n "$pattern" ] || exit 0
+
+if git diff --cached -U0 | grep -E '^[+-]' | grep -v '^+++\|^---' | grep -Eiq "$pattern"; then
+  echo "commit blocked: staged diff matches a denylisted term ($DENYLIST)" >&2
+  exit 1
+fi

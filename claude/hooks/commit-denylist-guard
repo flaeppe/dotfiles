@@ -1,0 +1,116 @@
+#!/usr/bin/python3
+"""Claude Code PreToolUse gate for `git commit`.
+
+Input: a PreToolUse payload on stdin for a Bash tool call. Denies any `git
+commit` invocation whose command line matches a term in the machine-local
+denylist file; every other command gets no verdict.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+from typing import Final
+
+import shellwords
+
+DENYLIST_PATH: Final = os.path.expanduser("~/.config/git-banned-words")
+
+# git accepts these global flags before the subcommand; only the
+# separate-value form needs listing, `--flag=x` is a single word.
+GLOBAL_FLAGS_WITH_VALUE: Final = frozenset(
+    ("-C", "-c", "--git-dir", "--work-tree", "--namespace")
+)
+
+
+def is_git(word: str | None) -> bool:
+    if not word:
+        return False
+    return word == "git" or word.endswith("/git")
+
+
+def git_invocations(words: list[str]) -> list[list[str]]:
+    invocations: list[list[str]] = []
+    for segment in shellwords.sub_commands(words):
+        command, index = shellwords.leading_command(segment)
+        if is_git(command):
+            invocations.append(segment[index:])
+    return invocations
+
+
+def command_path(words: list[str]) -> list[str]:
+    path: list[str] = []
+    index = 0
+    while index < len(words):
+        word = words[index]
+        if word.startswith("-"):
+            index += 2 if word in GLOBAL_FLAGS_WITH_VALUE else 1
+            continue
+        path.append(word)
+        index += 1
+    return path
+
+
+def is_commit_invocation(invocation: list[str]) -> bool:
+    path = command_path(invocation[1:])
+    return bool(path) and path[0] == "commit"
+
+
+def load_pattern() -> re.Pattern[str] | None:
+    if not os.path.exists(DENYLIST_PATH):
+        return None
+    terms = [
+        term
+        for line in open(DENYLIST_PATH)
+        if (term := line.strip()) and not term.startswith("#")
+    ]
+    if not terms:
+        return None
+    return re.compile("|".join(re.escape(term) for term in terms), re.IGNORECASE)
+
+
+def decide(decision: str, reason: str) -> None:
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": decision,
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
+
+
+def main() -> None:
+    payload = json.load(sys.stdin)
+    if payload.get("tool_name") != "Bash":
+        return
+
+    command = payload.get("tool_input", {}).get("command", "")
+    if "git" not in command:
+        return
+
+    invocations = git_invocations(shellwords.words_of(command))
+    if not any(is_commit_invocation(invocation) for invocation in invocations):
+        return
+
+    pattern = load_pattern()
+    if pattern is None:
+        return
+    if pattern.search(command):
+        decide(
+            "deny",
+            "commit blocked: command matches a machine-local denylist term "
+            f"({DENYLIST_PATH}) -- remove it and retry",
+        )
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception:
+        sys.exit(0)

@@ -1,4 +1,4 @@
-{ lib, isWork ? false, ... }:
+{ pkgs, lib, isWork ? false, ... }:
 {
   # Work-only configuration and signing must not leak into a personal machine.
   xdg.configFile = lib.optionalAttrs isWork {
@@ -61,6 +61,14 @@
           '';
         };
 
+      };
+
+      # Denylisted terms live in a machine-local file (~/.config/git-banned-words,
+      # never committed): a list of them checked into this repo would be the leak
+      # it exists to catch, in a new shape. Absent that file, both hooks no-op.
+      hooks = {
+        pre-commit = pkgs.writeShellScript "pre-commit" (builtins.readFile ./hooks/pre-commit);
+        commit-msg = pkgs.writeShellScript "commit-msg" (builtins.readFile ./hooks/commit-msg);
       };
 
       ignores = [

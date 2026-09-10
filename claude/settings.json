@@ -82,6 +82,10 @@
           {
             "type": "command",
             "command": "env -u DEVELOPER_DIR ~/.claude/hooks/git-local-path-guard"
+          },
+          {
+            "type": "command",
+            "command": "env -u DEVELOPER_DIR ~/.claude/hooks/commit-denylist-guard"
           }
         ]
       },
