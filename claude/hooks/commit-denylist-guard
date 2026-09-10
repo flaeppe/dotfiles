@@ -3,7 +3,10 @@
 
 Input: a PreToolUse payload on stdin for a Bash tool call. Denies any `git
 commit` invocation whose command line matches a term in the machine-local
-denylist file; every other command gets no verdict.
+denylist file, but only when the command's working directory is inside a
+repo explicitly opted in there via a `repo:<absolute path>` line. Every
+other command, and every commit in a repo not on that list, gets no
+verdict.
 """
 
 from __future__ import annotations
@@ -11,6 +14,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
 from typing import Final
 
@@ -58,17 +62,37 @@ def is_commit_invocation(invocation: list[str]) -> bool:
     return bool(path) and path[0] == "commit"
 
 
-def load_pattern() -> re.Pattern[str] | None:
+def load_config() -> tuple[re.Pattern[str] | None, frozenset[str]]:
     if not os.path.exists(DENYLIST_PATH):
+        return None, frozenset()
+    terms: list[str] = []
+    repos: list[str] = []
+    for line in open(DENYLIST_PATH):
+        entry = line.strip()
+        if not entry or entry.startswith("#"):
+            continue
+        if entry.startswith("repo:"):
+            repos.append(os.path.realpath(entry.removeprefix("repo:")))
+        else:
+            terms.append(entry)
+    pattern = (
+        re.compile("|".join(re.escape(term) for term in terms), re.IGNORECASE)
+        if terms
+        else None
+    )
+    return pattern, frozenset(repos)
+
+
+def repo_toplevel(cwd: str) -> str | None:
+    result = subprocess.run(
+        ["git", "-C", cwd, "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
         return None
-    terms = [
-        term
-        for line in open(DENYLIST_PATH)
-        if (term := line.strip()) and not term.startswith("#")
-    ]
-    if not terms:
-        return None
-    return re.compile("|".join(re.escape(term) for term in terms), re.IGNORECASE)
+    return os.path.realpath(result.stdout.strip())
 
 
 def decide(decision: str, reason: str) -> None:
@@ -98,9 +122,14 @@ def main() -> None:
     if not any(is_commit_invocation(invocation) for invocation in invocations):
         return
 
-    pattern = load_pattern()
-    if pattern is None:
+    pattern, enforced_repos = load_config()
+    if pattern is None or not enforced_repos:
         return
+
+    toplevel = repo_toplevel(payload.get("cwd") or os.getcwd())
+    if toplevel is None or toplevel not in enforced_repos:
+        return
+
     if pattern.search(command):
         decide(
             "deny",
