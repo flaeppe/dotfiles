@@ -22,8 +22,26 @@ Three things, in this order, and nothing else:
 3. **The one thing a reviewer should push back on** — the risky call, the
    assumption you'd defend. If there honestly isn't one, write nothing.
 
-**Default under 10 lines.** Length tracks the change, never how long the work
-took — a 4-file diff does not earn 200 lines.
+**Hard ceiling: 10 lines, and the body must be SMALLER THAN THE DIFF.** Not a
+default, not a target — a gate. Length tracks the change, never how long the
+work took.
+
+Check it before `gh pr create`, and state both numbers when reporting the PR:
+
+```sh
+wc -l < body.md                        # must be <= 10
+wc -c < body.md                        # must be < the diff's byte count
+git diff origin/<base>...HEAD | wc -c
+```
+
+If either fails, cut. Do not justify the length. The commonest overrun is a body
+that argues for the change — the diff plus one `file:line` already does that.
+
+**A body larger than its own diff is the failure this gate exists to catch.**
+Observed: a 58-line body on a `+58/-4` diff, carrying five headings, a
+`## Testing` section and a "findings from building it" section — every one of
+them already forbidden below. The rules were present; nothing checked them, so
+add the check rather than re-reading the rules.
 
 Two that hit it, both one file:
 
@@ -51,6 +69,16 @@ Two that hit it, both one file:
 - **A file-by-file walk of the diff.**
 - **The journey, or the brief restated.** Only the landed approach exists, and
   ruling out an alternative is a clause, not a section.
+- **`## Summary` as an opener.** The body IS the summary. A heading that labels
+  the body costs a line and says nothing.
+- **What you learned while building it.** Real findings go to `me note` or the
+  plan file, where they outlive the PR — not the description, where they double
+  its length and reach only whoever reviews this diff. This is the pressure that
+  produces long bodies: the work felt substantial and the body is the nearest
+  place to say so. Put it somewhere it lasts instead.
+- **A section arguing the change is safe** — "what this is not", "why this is
+  not a fallback". If a reviewer could misread the diff that way, one clause
+  prevents it; a heading invites the argument.
 
 Breaking changes and migration steps are content, not a section: put them in the
 first two sentences. A table beats six one-line bullets.
