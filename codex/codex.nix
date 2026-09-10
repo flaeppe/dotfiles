@@ -72,8 +72,8 @@ in {
       ./hooks/patch-adapter.py
     } "$HOME/.codex/hooks/patch-adapter.py"
 
-    # Sentry CLI deploys its dynamic skill set into existing agent roots. Keep
-    # this root writable; upgrades create and remove the skill directories.
+    # Sentry CLI detects existing agent roots and owns their dynamic skill set.
+    # Keep this root writable so upgrades add and remove skill directories.
     mkdir -p "$HOME/.agents/skills"
   '';
 }
