@@ -27,7 +27,6 @@ let
   };
 in {
   home.file = {
-    ".codex/development.config.toml".source = ./development.config.toml;
     ".codex/AGENTS.md".source = pkgs.writeText "codex-AGENTS.md"
       (builtins.readFile ../claude/CLAUDE.md + "\n" + builtins.readFile ./AGENTS.md);
     ".codex/hooks.json".source =
@@ -73,8 +72,8 @@ in {
       ./hooks/patch-adapter.py
     } "$HOME/.codex/hooks/patch-adapter.py"
 
-    # The Sentry CLI rewrites this skill in place during upgrades. Share its
-    # writable Claude installation so Codex always loads the current version.
-    ln -sfn "$HOME/.claude/skills/sentry-cli" "$HOME/.codex/skills/sentry-cli"
+    # Sentry CLI deploys its dynamic skill set into existing agent roots. Keep
+    # this root writable; upgrades create and remove the skill directories.
+    mkdir -p "$HOME/.agents/skills"
   '';
 }

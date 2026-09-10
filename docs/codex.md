@@ -1,16 +1,11 @@
-# Codex development configuration
-
-```sh
-codex --profile development
-codex exec --profile development "Describe the requested change"
-```
+# Codex configuration
 
 ## Global default
 
 The intended global mode is:
 
 ```toml
-approval_policy = "never"
+approval_policy = "on-request"
 sandbox_mode = "workspace-write"
 ```
 
@@ -18,29 +13,24 @@ The durable runtime location is the user-maintained `~/.codex/config.toml`.
 [global-defaults.toml](../codex/global-defaults.toml) is the version-controlled
 stanza to merge manually at top level. Home Manager does not deploy or merge
 this file. Preserve existing trust entries and other runtime settings.
+Machine-specific writable roots belong only in the local runtime file.
 
 Sandbox denials return as failures without an escalation approval prompt.
 Directory and hook trust remain separate user decisions. These defaults apply
 without selecting a profile, subject to higher-precedence project/CLI settings
 and managed requirements. The development profile does not override them.
 
-## Development profile
+## Home Manager integration
 
-Home Manager links `~/.codex/development.config.toml`, global `AGENTS.md`, hooks,
-and skills. `~/.codex/config.toml` remains a regular writable file for runtime
-settings and trust decisions. The profile deliberately leaves model and
-permissions selection to the caller. Bare `codex` loads global instructions,
-skills, and hooks, but does **not** select the development profile.
+Home Manager links global `AGENTS.md`, hooks, and skills.
+`~/.codex/config.toml` remains a regular writable file for runtime
+settings and trust decisions. Bare `codex` loads global instructions, skills,
+and hooks.
 
 After activation, open `/hooks` in Codex, inspect each command, and trust the
 ones you want to run. New or changed definitions require review again. No trust
 bypass is configured. The trust dialog offers **Continue without trusting**;
 that leaves the hooks inactive.
-
-To use these settings without selecting a profile, manually copy the contents
-of [development.config.toml](../codex/development.config.toml) into the matching
-sections of your writable `~/.codex/config.toml`. Do not replace the whole file
-or duplicate an existing `[tui]` table.
 
 ## Instructions and skills
 
@@ -103,7 +93,7 @@ review requires an approval policy that produces eligible requests, such as
 For an explicitly selected session:
 
 ```sh
-codex --profile development --approve-for-me
+codex --approve-for-me
 ```
 
 The corresponding configuration is:
