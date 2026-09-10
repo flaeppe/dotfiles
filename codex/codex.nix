@@ -72,5 +72,9 @@ in {
     install -m 755 ${
       ./hooks/patch-adapter.py
     } "$HOME/.codex/hooks/patch-adapter.py"
+
+    # The Sentry CLI rewrites this skill in place during upgrades. Share its
+    # writable Claude installation so Codex always loads the current version.
+    ln -sfn "$HOME/.claude/skills/sentry-cli" "$HOME/.codex/skills/sentry-cli"
   '';
 }
