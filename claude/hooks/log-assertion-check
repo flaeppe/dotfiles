@@ -1,0 +1,147 @@
+#!/usr/bin/python3
+"""Flags test assertions whose subject is a captured-log collection.
+
+Two invocation modes, same detection logic:
+  log-assertion-check <file>...   -- CLI: check these paths' staged content,
+                                      print findings, exit 1 if any (for the
+                                      git pre-commit hook).
+  (no args, a PreToolUse payload on stdin) -- Claude Code hook: on a `git
+                                      commit` Bash invocation, check that
+                                      commit's staged *.{test,spec}.{ts,tsx,
+                                      js,jsx} files and deny if any match.
+
+Heuristic, not a parser: a test that captures emitted log lines into an
+array (`(line) => sink.push(line)`) and later asserts on that array's
+content (`expect(sink...)`, `sink.join(...)`) gets flagged. Testing the
+logger itself -- record shape, field presence, level mapping, redaction --
+is not this shape and is not flagged; a genuine case that still trips this
+is a human call, which the deny message defers to rather than trying to
+carve out automatically.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import subprocess
+import sys
+from typing import Final
+
+import shellwords
+
+TEST_FILE: Final = re.compile(r"\.(test|spec)\.(ts|tsx|js|jsx)$")
+SINK_DEF: Final = re.compile(r"=>\s*([A-Za-z_$][\w$]*)\.push\(")
+
+RULE_NOTE: Final = (
+    "test asserts on a captured-log collection (claude/rules/test.md: no log "
+    "assertions -- assert the business logic outcome instead). If this is "
+    "actually testing the logger itself (field presence, level mapping, "
+    "redaction), that is a legitimate exception: commit past this by hand."
+)
+
+
+def find_violations(text: str) -> list[int]:
+    sinks = set(SINK_DEF.findall(text))
+    if not sinks:
+        return []
+    lines = text.splitlines()
+    hits: set[int] = set()
+    for name in sinks:
+        pattern = re.compile(
+            rf"expect\(\s*{re.escape(name)}\b|\b{re.escape(name)}\.join\("
+        )
+        for lineno, line in enumerate(lines, start=1):
+            if pattern.search(line):
+                hits.add(lineno)
+    return sorted(hits)
+
+
+def staged_content(path: str) -> str:
+    result = subprocess.run(
+        ["git", "show", f":{path}"], capture_output=True, text=True, check=False
+    )
+    return result.stdout
+
+
+def findings_for(paths: list[str]) -> list[str]:
+    findings = []
+    for path in paths:
+        if not TEST_FILE.search(path):
+            continue
+        for lineno in find_violations(staged_content(path)):
+            findings.append(f"{path}:{lineno}")
+    return findings
+
+
+def cli(paths: list[str]) -> int:
+    findings = findings_for(paths)
+    if not findings:
+        return 0
+    print(RULE_NOTE, file=sys.stderr)
+    for finding in findings:
+        print(f"  {finding}", file=sys.stderr)
+    return 1
+
+
+def is_git(word: str | None) -> bool:
+    if not word:
+        return False
+    return word == "git" or word.endswith("/git")
+
+
+def is_commit_command(command: str) -> bool:
+    for segment in shellwords.sub_commands(shellwords.words_of(command)):
+        word, index = shellwords.leading_command(segment)
+        if not is_git(word):
+            continue
+        rest = [w for w in segment[index + 1 :] if not w.startswith("-")]
+        if rest and rest[0] == "commit":
+            return True
+    return False
+
+
+def staged_test_files() -> list[str]:
+    out = subprocess.run(
+        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
+        capture_output=True,
+        text=True,
+        check=False,
+    ).stdout.splitlines()
+    return [path for path in out if TEST_FILE.search(path)]
+
+
+def decide(reason: str) -> None:
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
+
+
+def pretooluse() -> None:
+    payload = json.load(sys.stdin)
+    if payload.get("tool_name") != "Bash":
+        return
+    command = payload.get("tool_input", {}).get("command", "")
+    if "git" not in command or "commit" not in command:
+        return
+    if not is_commit_command(command):
+        return
+    findings = findings_for(staged_test_files())
+    if findings:
+        decide(f"{RULE_NOTE} ({', '.join(findings)})")
+
+
+if __name__ == "__main__":
+    try:
+        if len(sys.argv) > 1:
+            sys.exit(cli(sys.argv[1:]))
+        pretooluse()
+    except Exception:
+        sys.exit(0)

@@ -79,6 +79,9 @@ in {
       ./hooks/commit-denylist-guard
     } "$HOME/.claude/hooks/commit-denylist-guard"
     install -m 755 ${
+      ./hooks/log-assertion-check
+    } "$HOME/.claude/hooks/log-assertion-check"
+    install -m 755 ${
       ./hooks/git-local-path-guard
     } "$HOME/.claude/hooks/git-local-path-guard"
     install -m 755 ${

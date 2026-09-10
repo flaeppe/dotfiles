@@ -15,3 +15,14 @@ if git diff --cached -U0 | grep -E '^[+-]' | grep -v '^+++\|^---' | grep -Eiq "$
   echo "commit blocked: staged diff matches a denylisted term ($DENYLIST)" >&2
   exit 1
 fi
+
+# No log assertions in test files (claude/rules/test.md) -- checked here too
+# so an agent's Bash commit and a human's `git commit` get the same gate.
+mapfile -d '' -t test_files < <(
+  git diff --cached --name-only --diff-filter=ACM -z -- \
+    '*.test.ts' '*.test.tsx' '*.test.js' '*.test.jsx' \
+    '*.spec.ts' '*.spec.tsx' '*.spec.js' '*.spec.jsx'
+)
+if [ "${#test_files[@]}" -gt 0 ]; then
+  python3 "$HOME/.claude/hooks/log-assertion-check" "${test_files[@]}" || exit 1
+fi
