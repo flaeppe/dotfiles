@@ -72,7 +72,7 @@ Codex's explicit-only policy belongs in `agents/openai.yaml` as
 
 | Existing behavior | Codex integration |
 |---|---|
-| Shell guards | Shared `gcloud-command-gate` and `git-local-path-guard` run unchanged; Codex presents shell calls as `Bash` with `tool_input.command`. |
+| Shell guards | `git-local-path-guard` runs unchanged. `gcloud-command-gate` is adapted to Codex's root blocking verdict; Codex rejects the shared guard's `ask` verdict. Codex presents shell calls as `Bash` with `tool_input.command`. |
 | Edit guards | `patch-adapter.py` maps every patch path, move target, and introduced line to the three shared guards. Deletions also receive protected-path checks. |
 | Formatting | The adapter runs the shared formatter and converts its stale-file warning into Codex `PostToolUse` context. |
 | Graph augmentation and startup reminder | Not enabled. Shell searches are not Claude `Grep`/`Glob` payloads, and this profile does not register the graph MCP server. The existing reminder script is payload-compatible, but enabling it alone would request unavailable tools. |
