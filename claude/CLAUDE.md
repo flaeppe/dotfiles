@@ -263,9 +263,9 @@ integration docs, planning documents. When the tool is available:
   and our documented reality together.
 - Results are chunks with metadata; read the file at `path` when the chunk
   isn't enough. Files on disk are the source of truth.
-- Planning documents are excluded from results by default; pass
-  `include=["plans"]` when asked about plans, and always check for existing
-  plans before creating a new planning document.
+- kb holds the planning documents and returns them by default -- no flag
+  needed. Always check for an existing plan before creating a new planning
+  document.
 
 ---
 
