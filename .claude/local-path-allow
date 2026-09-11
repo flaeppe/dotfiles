@@ -3,6 +3,8 @@
 # paths the guard looks for, so spelling them out here is the point.
 claude/hooks/git-local-path-guard
 claude/hooks/plan-verified-guard
+claude/hooks/plan-check-guard
+claude/hooks/test_plan_check_guard.py
 git/git.nix
 nvim/lua/plugins/plan.lua
 nvim/lua/plugins/notes.lua

@@ -1,0 +1,154 @@
+#!/usr/bin/python3
+"""Claude Code PreToolUse guard: a plan file may not leave Draft status
+without a runnable (CHECK: <command>) under a "## Done when" heading.
+
+A plan-tracking tool's own write-time gate (`me plans check-file`) states
+this rule correctly and it is enforced nowhere on its own -- the tool's
+pre-commit hook that used to call it was removed because it hooked a
+periodic committer that stages every writer's work, so one off-spec file
+stopped the whole tree's history. The fix is not "no gate", it is "hook the
+writer" -- the same shape as plan-verified-guard, a PreToolUse guard on
+Edit/Write/MultiEdit that sees the one session actually making the write.
+
+This does not reimplement the status/done-when scan: it reconstructs the
+file's content as it will read after the write, and asks `me plans
+check-file` -- the same parser the tracking tool's own lint and archive
+verbs already share -- for its real verdict. Two parsers drifting apart is
+worse than one command running twice.
+
+Denies with exit 2 so the reason reaches Claude. Any internal failure, or
+`me` itself being unavailable, exits 0 -- a broken guard must never wedge a
+session.
+
+Shebang is an absolute path, not `env python3` -- see git-local-path-guard
+for why.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from typing import Final
+
+# Escape hatch: set to any value to disable the rule for a session.
+DISABLE: Final = "CLAUDE_SKIP_PLAN_CHECK_GUARD"
+
+EDIT_TOOLS: Final = ("Edit", "Write", "MultiEdit")
+PLAN_ROOT: Final = os.path.expanduser("~/.plan")
+# Working data that lives in the tree but is not a plan: sweep artifacts,
+# audit output, backups. The done-when requirement means nothing on those.
+EXEMPT: Final = (os.path.join(PLAN_ROOT, "_private") + os.sep,)
+
+
+def is_reasoning_note(path: str) -> bool:
+    """A note under <repo>/reasoning/ -- reasoning is the second path segment
+    under PLAN_ROOT. Not a prefix EXEMPT can express, since <repo> varies."""
+    segments = os.path.relpath(path, PLAN_ROOT).split(os.sep)
+    return len(segments) >= 2 and segments[1] == "reasoning"
+
+
+def resultant_content(tool_name: str, tool_input: dict, path: str) -> str | None:
+    """The file's bytes as they will read once this write lands, as far as
+    that is visible from the tool call alone. None when the current content
+    cannot be read (Edit/MultiEdit only -- Write always carries the whole
+    file)."""
+    if tool_name == "Write":
+        return tool_input.get("content", "")
+    try:
+        with open(path) as fh:
+            text = fh.read()
+    except OSError:
+        return None
+    edits = [tool_input] if tool_name == "Edit" else tool_input.get("edits", [])
+    for edit in edits:
+        old = edit.get("old_string", "")
+        new = edit.get("new_string", "")
+        if not old:
+            continue
+        if edit.get("replace_all"):
+            text = text.replace(old, new)
+        else:
+            text = text.replace(old, new, 1)
+    return text
+
+
+def me_binary() -> str | None:
+    return shutil.which("me") or (
+        os.path.expanduser("~/.local/bin/me")
+        if os.path.exists(os.path.expanduser("~/.local/bin/me"))
+        else None
+    )
+
+
+def violations(me_bin: str, content: str, display: str) -> list[str] | None:
+    """The gate's violation lines for content-as-it-will-be, or None when the
+    check itself could not be run (missing binary, usage error, timeout) --
+    callers must treat None as "allow", never as a violation."""
+    fd, tmp_path = tempfile.mkstemp(suffix=".md")
+    try:
+        with os.fdopen(fd, "w") as tmp:
+            tmp.write(content)
+        result = subprocess.run(
+            [me_bin, "plans", "check-file", tmp_path, "--display", display],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    finally:
+        os.unlink(tmp_path)
+
+    if result.returncode == 0:
+        return []
+    if result.returncode == 1:
+        return [line for line in result.stdout.splitlines() if line]
+    return None  # usage error (2) or anything unexpected -- fail open
+
+
+def main() -> int:
+    if os.environ.get(DISABLE):
+        return 0
+
+    payload = json.load(sys.stdin)
+    tool_name = payload.get("tool_name")
+    if tool_name not in EDIT_TOOLS:
+        return 0
+
+    tool_input = payload.get("tool_input", {})
+    path = os.path.realpath(tool_input.get("file_path", ""))
+    if not path.startswith(PLAN_ROOT + os.sep) or not path.endswith(".md"):
+        return 0
+    if path.startswith(EXEMPT) or is_reasoning_note(path):
+        return 0
+
+    me_bin = me_binary()
+    if me_bin is None:
+        return 0
+
+    content = resultant_content(tool_name, tool_input, path)
+    if content is None:
+        return 0
+
+    display = os.path.relpath(path, PLAN_ROOT)
+    found = violations(me_bin, content, display)
+    if not found:
+        return 0
+
+    print(
+        "BLOCKED: %s\n%s\n\nSet %s=1 to override for this session."
+        % (display, "\n".join(found), DISABLE),
+        file=sys.stderr,
+    )
+    return 2
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit(0)

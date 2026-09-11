@@ -91,6 +91,9 @@ in {
       ./hooks/plan-verified-guard
     } "$HOME/.claude/hooks/plan-verified-guard"
     install -m 755 ${
+      ./hooks/plan-check-guard
+    } "$HOME/.claude/hooks/plan-check-guard"
+    install -m 755 ${
       ./hooks/edit-content-guard
     } "$HOME/.claude/hooks/edit-content-guard"
     install -m 755 ${
