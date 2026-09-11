@@ -47,6 +47,18 @@ date: 2026-09-11
 # test
 """
 
+IN_PROGRESS_FENCED_CHECK = """---
+status: In Progress
+date: 2026-09-11
+---
+# test
+
+## Done when
+```
+(CHECK: true)
+```
+"""
+
 
 class PlanCheckGuardTest(unittest.TestCase):
     def setUp(self):
@@ -83,6 +95,14 @@ class PlanCheckGuardTest(unittest.TestCase):
         result = self.write_result("foo/001-plan.md", IN_PROGRESS_NO_CHECK)
         self.assertEqual(result.returncode, 2)
         self.assertIn("BLOCKED", result.stderr)
+        self.assertNotIn("code fence", result.stderr)
+
+    def test_denies_a_fenced_check_with_a_message_naming_the_fence(self):
+        result = self.write_result("foo/007-plan.md", IN_PROGRESS_FENCED_CHECK)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("BLOCKED", result.stderr)
+        self.assertIn("inside a code fence", result.stderr)
+        self.assertIn("unfence it", result.stderr)
 
     def test_allows_in_progress_with_a_check(self):
         result = self.write_result("foo/002-plan.md", IN_PROGRESS_WITH_CHECK)

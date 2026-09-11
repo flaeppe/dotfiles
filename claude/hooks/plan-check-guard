@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -74,6 +75,45 @@ def resultant_content(tool_name: str, tool_input: dict, path: str) -> str | None
         else:
             text = text.replace(old, new, 1)
     return text
+
+
+_DONE_WHEN_RE: Final = re.compile(r"(?i)done when")
+
+
+def _heading(line: str) -> tuple[str, int] | None:
+    """Mirrors the tracking CLI's own heading parser (an ATX heading with no
+    leading whitespace): the text and level, or None when line isn't one."""
+    rest = line.lstrip("#")
+    level = len(line) - len(rest)
+    if level == 0 or not rest.startswith(" "):
+        return None
+    return rest.strip(), level
+
+
+def fenced_check_present(content: str) -> bool:
+    """Whether a `(CHECK:` token sits under a "## Done when" heading but
+    inside a fenced code block. The check-file scanner this guard defers to
+    skips fenced content by design (a marker inside a fence is quoted, not
+    live), so if check-file already found none and this finds one anyway,
+    that check exists on the page and does nothing -- a different mistake
+    from writing no check at all, and worth a different sentence."""
+    done_when_level = 0
+    in_fence = False
+    for line in content.split("\n"):
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        heading = _heading(line)
+        if heading is not None:
+            text, level = heading
+            if _DONE_WHEN_RE.search(text):
+                done_when_level = level
+            elif done_when_level and level <= done_when_level:
+                done_when_level = 0
+            continue
+        if done_when_level and in_fence and "(CHECK:" in line:
+            return True
+    return False
 
 
 def me_binary() -> str | None:
@@ -139,9 +179,17 @@ def main() -> int:
     if not found:
         return 0
 
+    message_lines = list(found)
+    if fenced_check_present(content):
+        message_lines.append(
+            "a (CHECK: ...) is present but inside a code fence -- fenced "
+            "markers are quoted rather than run; unfence it so `me plans "
+            "check-file` (and `me check`) can see it."
+        )
+
     print(
         "BLOCKED: %s\n%s\n\nSet %s=1 to override for this session."
-        % (display, "\n".join(found), DISABLE),
+        % (display, "\n".join(message_lines), DISABLE),
         file=sys.stderr,
     )
     return 2
