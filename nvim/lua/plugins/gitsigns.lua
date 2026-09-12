@@ -97,3 +97,14 @@ map("<Leader>hd", function()
     end
     gitsigns.diffthis()
 end, "Diff this file against the base, or close that diff")
+
+-- `q` as well, which is what every other window here that opens to be read rather than
+-- edited closes on. Bound when the scratch buffer appears rather than after the call that
+-- opens it, because `diffthis` returns before the window exists -- and bound *through*
+-- the toggle above, so the two can never come to mean different things.
+vim.api.nvim_create_autocmd("BufWinEnter", {
+    pattern = "gitsigns://*",
+    callback = function(args)
+        vim.keymap.set("n", "q", "<Leader>hd", { buffer = args.buf, remap = true, desc = "Close the diff" })
+    end,
+})

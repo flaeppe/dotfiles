@@ -148,7 +148,9 @@ if test -n "$own_tree"; and test -n "$base_branch"
     git -C $tree fetch -q origin $base_branch 2>/dev/null
     set -l review_base (git -C $tree merge-base HEAD "origin/$base_branch" 2>/dev/null)
     if test -n "$review_base"
-        set launch "set -x REVIEW_BASE $review_base; and set -x REVIEW_BASE_DIR $tree; and $launch"
+        # REVIEW_BASE_LABEL is what the editor's base indicator reads: a commit cannot say
+        # which branch it was the merge base with, and the name is already known here.
+        set launch "set -x REVIEW_BASE $review_base; and set -x REVIEW_BASE_DIR $tree; and set -x REVIEW_BASE_LABEL $base_branch; and $launch"
     end
 end
 

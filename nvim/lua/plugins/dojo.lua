@@ -274,7 +274,7 @@ local ENTRIES = {
     {
         group = "hunk",
         keys = "<Leader>hd",
-        desc = "This file's staged vs unstaged changes -- a different question from hD's branch-base diff",
+        desc = "This file's staged vs unstaged changes -- a different question from hD's branch-base diff (q or hd again closes it)",
         added = "2026-07-26",
     },
     {
@@ -298,7 +298,7 @@ local ENTRIES = {
     {
         group = "hunk",
         keys = "<Leader>hD",
-        desc = "How big is this? Every changed file against the base -- the loaded PR's, or the branch's",
+        desc = "How big is this? Every changed file against the base -- your own branch includes what is still uncommitted, a loaded PR does not",
         added = "2026-08-10",
     },
     {
@@ -310,19 +310,13 @@ local ENTRIES = {
     {
         group = "hunk",
         keys = ":DiffBase",
-        desc = "Diff against a named ref instead of the automatic merge base (no argument resets it)",
-        added = "2026-09-07",
-    },
-    {
-        group = "hunk",
-        keys = "<Leader>hW",
-        desc = "Every changed file in another worktree, side by side -- picked by branch, nothing checked out",
+        desc = "Sign the files against a ref -- bare, it signs against the base already on the statusline ('off' for the index)",
         added = "2026-09-07",
     },
     {
         group = "hunk",
         keys = "<Leader>hw",
-        desc = "cd to a worktree, picked from a list -- open buffers keep diffing their own worktree until you open a file there",
+        desc = "Move to another worktree, picked by branch -- the diff keys follow you there, so hD next answers about it",
         added = "2026-09-07",
     },
     { group = "hunk", keys = "¨h  åh", desc = "Next / previous changed hunk", added = "2026-07-26", run = false },
