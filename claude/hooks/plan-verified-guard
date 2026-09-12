@@ -8,6 +8,15 @@ not, and nothing catches it because nothing is checkable. Whether a status is
 can. `verified:` is that claim, and this refuses the write when the claim is
 not renewed.
 
+Also refuses the other half of the same lie (plan-tree-hygiene/009): a write
+that stamps `verified: <today>` while the body still carries the
+`> **UNVERIFIED**` taint banner (`me plans taint`) asserts freshness and doubt
+in the same file. This hook can't rewrite the content to remove the banner
+for the writer -- a `PreToolUse` guard only ever allows or denies -- so it
+makes the writer do it, which is the one shape of this rule that is actually
+checkable: the banner must come off in the same edit that claims the file was
+looked at.
+
 Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0 --
 a broken guard must never wedge a session.
 
@@ -34,6 +43,9 @@ EXEMPT: Final = (os.path.join(PLAN_ROOT, "_private") + os.sep,)
 
 VERIFIED: Final = re.compile(r"^verified:\s*(\d{4}-\d{2}-\d{2})\s*$", re.M)
 REVIEW: Final = re.compile(r"^review:\s*\S", re.M)
+# Mirrors tools/me/cmd/me/plans_taint.go's taintBannerRe byte for byte --
+# the em dash is U+2014, not a hyphen.
+BANNER: Final = re.compile(r"^> \*\*UNVERIFIED\*\* — .+\. Resolve before relying on this file\.$", re.M)
 
 
 def is_reasoning_note(path: str) -> bool:
@@ -65,6 +77,76 @@ def frontmatter(path: str) -> str:
         return ""
     end = text.find("\n---\n", 4)
     return text[4:end] if end != -1 else ""
+
+
+def apply_edit(current: str, old: str, new: str, replace_all: bool) -> str | None:
+    """One Edit-shaped replacement applied to current, or None when it can't
+    be applied (an empty or absent old_string) -- callers must treat None as
+    "cannot determine the result", never as evidence either way."""
+    if not old or old not in current:
+        return None
+    if replace_all:
+        return current.replace(old, new)
+    return current.replace(old, new, 1)
+
+
+def resulting_text(tool_name: str, tool_input: dict, path: str) -> str | None:
+    """The full file content this write would produce, or None when it can't
+    be safely determined. Write hands over the whole file already; Edit and
+    MultiEdit only carry a diff, so this reads the current file and replays
+    the same replacement(s) the tool is about to make."""
+    if tool_name == "Write":
+        return tool_input.get("content", "")
+
+    try:
+        with open(path) as fh:
+            current = fh.read()
+    except OSError:
+        return None
+
+    if tool_name == "Edit":
+        return apply_edit(current, tool_input.get("old_string", ""),
+                           tool_input.get("new_string", ""), tool_input.get("replace_all", False))
+
+    if tool_name == "MultiEdit":
+        text = current
+        for edit in tool_input.get("edits", []):
+            text = apply_edit(text, edit.get("old_string", ""), edit.get("new_string", ""),
+                               edit.get("replace_all", False))
+            if text is None:
+                return None
+        return text
+
+    return None
+
+
+def frontmatter_of(text: str) -> str:
+    """Same slice as frontmatter(path), for content not yet on disk."""
+    if not text.startswith("---\n"):
+        return ""
+    end = text.find("\n---\n", 4)
+    return text[4:end] if end != -1 else ""
+
+
+def banner_contradiction(path: str, tool_name: str, tool_input: dict, today: str) -> str | None:
+    """Why this write asserts freshness and doubt at once, or None. Only
+    fires when the resulting file would claim `verified: <today>` while its
+    body still carries the taint banner -- a write that neither restamps nor
+    is tainted has nothing to contradict."""
+    text = resulting_text(tool_name, tool_input, path)
+    if text is None:
+        return None
+    verified = VERIFIED.search(frontmatter_of(text))
+    if not verified or verified.group(1) != today:
+        return None
+    if not BANNER.search(text):
+        return None
+    return (
+        "this edit stamps `verified: %s` but the body still carries the\n"
+        "`> **UNVERIFIED**` taint banner. Remove the banner in the same edit --\n"
+        "a write can't claim the plan was looked at and still be in doubt."
+        % today
+    )
 
 
 def stale(path: str, incoming: str, today: str) -> str | None:
@@ -108,6 +190,8 @@ def main() -> int:
 
     today = dt.date.today().isoformat()
     reason = stale(path, edited_text(tool_name, tool_input), today)
+    if reason is None:
+        reason = banner_contradiction(path, tool_name, tool_input, today)
     if reason is None:
         return 0
 
