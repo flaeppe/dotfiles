@@ -86,6 +86,30 @@ To see the state of a whole effort without opening every file:
 It reads frontmatter only, so pointing it at the whole tree is cheap. `--stale`
 lists what has gone unverified and exits non-zero, so it works as a check.
 
+### Checks
+
+`me plans verify` runs every `(CHECK: <command>)` line in a plan, so a check
+answers the claim it sits on — usually a Done-when item.
+
+**A check must print its answer and exit 0 in both states.** A non-zero exit is
+classed "could not run", so a `grep -c` asserting a string will exist can only
+ever say yes or unrunnable — never "not yet".
+
+```
+file content   awk '/mark_a/{a++} /mark_b/{b++} END{print "a="a+0" b="b+0}' /abs/path
+a PR's state   gh pr view 367 --repo owner/repo --json state -q .state
+on a git ref   no good shape — check the PR that puts the content there
+```
+
+| how it lies | |
+| --- | --- |
+| no shell | a pipe or `&&` makes it unrunnable — one process only |
+| no expansion | `~` and `$HOME` both fail; absolute paths only |
+| no baseline | a count on a string already on the base branch reports done before the work starts |
+| wrong target | `gh pr list --search "<title>"` matched an unrelated merged PR. Address a PR by number |
+
+The awk shape fixes the first two. Picking markers new to the work is yours.
+
 ### File Lifecycle
 
 - **Never delete or rewrite old files** — they are the trace
@@ -111,13 +135,9 @@ Investigate the problem space. Document:
 - Risks, dependencies, ordering constraints
 - A deployment/execution order rationale
 
-This is the "imagine the finished work" step. Write it as if you're looking
-at the completed change with everything done — every file touched, every
-behavior changed. The 001 file is the master reference; all subsequent
-files build on it.
-
-End 001 with a section that previews the incremental sequence and the
-rationale for that ordering.
+Write it as if looking at the completed change — every file touched, every
+behavior changed. 001 is the master reference. End it with a preview of the
+incremental sequence and why that order.
 
 ### Phase 2: Incremental Extraction → 002, 003, … (single-file mode: a checklist in the one document)
 
@@ -149,14 +169,9 @@ independent, what it enables for later increments.
 
 ### Phase 3: Execution Trace → later files
 
-As work progresses, new files capture what happened:
-
-- Staging findings, test results, unexpected discoveries
-- Pivots and adjustments to the original plan
-- Post-completion notes and follow-up work
-
-These are the chronological record of the plan meeting reality. They are
-not failures — they are expected. Plans change when they meet code.
+New files capture what happened: staging findings, test results, unexpected
+discoveries, pivots, follow-up work. A plan meeting reality is expected, not a
+failure.
 
 ## Quality Criteria for Each Increment
 
@@ -165,14 +180,10 @@ Boring. Reviewable is a target coherence may override:
 
 ### Logical
 
-It addresses a coherent concern. A reviewer understands the "why" without
-needing the master plan. If the only way to describe the PR is "part 1 of
-N", it's not a good extraction — each increment has its own reason to
-exist.
-
-Don't extract random mechanical changes (renames, moves, reformats) just
-to hit a line count. If it doesn't make sense on its own, it's not ready
-to be extracted.
+It addresses a coherent concern a reviewer understands without the master
+plan. If the only way to describe the PR is "part 1 of N", it is not a good
+extraction. Don't slice out mechanical changes (renames, moves, reformats) to
+hit a line count.
 
 ### Independent
 
@@ -186,18 +197,14 @@ of change that makes subsequent work easier, smaller, or possible.
 
 ### Reviewable
 
-Target ~200 lines of business logic per increment. Tests and test fixtures
-don't count toward this limit — they can always make the diff larger.
-
-If a coherent change exceeds ~200 lines, that's acceptable. Coherence
-always wins over size. But if it's large, ask whether it can be split
-further without losing coherence.
+Target ~200 lines of business logic per increment; tests and fixtures don't
+count. Coherence wins over size — but if a change is large, ask whether it
+splits without losing it.
 
 ### Boring
 
-No surprises. No hot swaps. No big bangs. The work is incremental, silent,
-well-thought-out. Each increment looks like a natural, obvious change in
-isolation.
+No hot swaps, no big bangs. Each increment looks like a natural, obvious
+change in isolation.
 
 ## Anti-Patterns
 
@@ -216,9 +223,8 @@ isolation.
 Before starting, check whether the effort already has files under its
 repository's directory, or under `_cross/`.
 
-Start with `plan-status` on that directory — it gives you the whole
-series' state in one pass, and tells you which files are stale or carry a
-`review:` flag before you spend anything reading them. Then read the files
+Start with `plan-status` on that directory: the whole series' state in one
+pass, including what is stale or carries a `review:` flag. Then read the files
 themselves, highest number first. Then:
 
 1. Understand what's been completed and what remains
