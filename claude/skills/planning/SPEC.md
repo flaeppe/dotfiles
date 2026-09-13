@@ -21,12 +21,11 @@ the largest single leaf; there are no leaves today, so SKILL.md is the whole
 path). Measure with `wc -c` — bytes, not `wc -m`: the em-dashes make those
 differ by ~50, which is enough to read as under when it is over.
 
-Currently 9090 — over the ceiling, knowingly. 2026-09-13 added `### Checks`
-(+1052) after trimming 745 of prose the global rules already call padding, for
-a net +307. The ceiling stays 8000 rather than being raised to fit: the gap is
-real debt, and closing it means cutting content that earns its place, which is
-a rehaul session and not a refine. Trim back or raise the ceiling deliberately,
-and restamp this figure either way.
+Currently 9090 — over the ceiling, knowingly, and queued as
+`planning-skill-rehaul` in the plan tree, which carries the reasoning and a
+check that reports the figure. The ceiling is never raised to fit whatever was
+last added. Trim back or raise it deliberately, and restamp this figure either
+way.
 
 **Rehaul threshold:** a change touching >25% of SKILL.md lines, or the
 frontmatter description, or the section structure — do it as its own rewrite
