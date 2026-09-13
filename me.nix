@@ -51,7 +51,7 @@ in {
   # Fires one cheap real Codex turn at 07:00 so the day's ~5h quota windows
   # land at roughly 07-12-17-22 instead of wherever the day's first
   # incidental Codex use happens to fall (Petter, 2026-09-10; see
-  # ~/.plan/me/quota-calibration.md). A window activates only on a real
+  # me/quota-calibration.md in the plan tree). A window activates only on a real
   # completed turn, never on a quota read, so this has to be an actual turn,
   # not a status check. codex-daily-poke.sh checks the turn's own exit code
   # and then asserts the primary window really did land ~5h out; either
