@@ -54,18 +54,29 @@ local rebuild_index, apply_indicators
 
 -- Root and repo resolution -------------------------------------------------
 
---- Overridable so a headless test can point the whole surface at a temp
---- directory without touching `~/.plan`. Read fresh on every call: nothing
---- here may cache it, or an override set after this file loads would be
---- invisible to it.
+--- The notes tree, read from `~/.config/reasoning-root` when that file
+--- exists. The path is a property of the machine, not of this config, so it
+--- lives outside the repo -- the same arrangement `~/.config/me-home` uses.
+--- Read fresh on every call: nothing here may cache it, or an override set
+--- after this file loads would be invisible to it.
 local function notes_root()
-    return vim.fn.expand(vim.g.reasoning_notes_root or "~/.plan")
+    if vim.g.reasoning_notes_root then
+        return vim.fn.expand(vim.g.reasoning_notes_root)
+    end
+    local pointer = vim.fn.expand("~/.config/reasoning-root")
+    if vim.fn.filereadable(pointer) == 1 then
+        local line = vim.fn.readfile(pointer, "", 1)[1]
+        if line and line ~= "" then
+            return vim.fn.expand(vim.trim(line))
+        end
+    end
+    return vim.fn.expand("~/.plan")
 end
 
 --- Same override pattern as `notes_root`, for the `reasoning-queue` binary
 --- `:NoteNext`/`:NoteSkip` shell out to.
 local function queue_bin()
-    return vim.fn.expand(vim.g.reasoning_queue_bin or "~/.plan/bin/reasoning-queue")
+    return vim.fn.expand(vim.g.reasoning_queue_bin or (notes_root() .. "/bin/reasoning-queue"))
 end
 
 local function run(cmd, cwd)
