@@ -3,7 +3,7 @@
 -- an indicator wherever that symbol is read again.
 --
 -- A note is a `## ` section in a
--- markdown file under `<root>/<repo>/reasoning/<relpath>.md`. Its truth is one
+-- markdown file under `<root>/notes/<repo>/<relpath>.md`. Its truth is one
 -- or more `ref:` lines of the form `repo@relpath[:Chain.Of.Symbols][+n]`; a
 -- second reference (another file, another repo) rides in the same section via
 -- `:NoteAdd`, and the section's home file is decided by sorting those `ref:`
@@ -259,7 +259,7 @@ local function parse_ref(token)
 end
 
 local function home_file_path(repo, relpath)
-    return notes_root() .. "/" .. repo .. "/reasoning/" .. relpath .. ".md"
+    return notes_root() .. "/notes/" .. repo .. "/" .. relpath .. ".md"
 end
 
 -- Compose buffer: one in flight, capture from anywhere -------------------
@@ -291,7 +291,7 @@ authoring.CUTLINE = "# ---------------------- >8 ----------------------"
 --- term list itself so the card cannot drift from what `me reasoning` will
 --- accept. An unreadable list yields none and the card omits that section.
 function authoring.vocabulary_terms()
-    local path = notes_root() .. "/_cross/reasoning/traits/vocabulary"
+    local path = notes_root() .. "/traits/vocabulary"
     if vim.fn.filereadable(path) == 0 then
         return {}
     end
@@ -1101,7 +1101,7 @@ end, { desc = "Notes: drop the open candidate and load the next" })
 -- Passive indicator: signs at every resolvable `ref:` -----------------------
 
 -- Keyed `repo@relpath` -> list of `{ chain, span, token, home_file }`, built
--- from every `ref:` line under `<root>/*/reasoning/**/*.md` -- not from where
+-- from every `ref:` line under `<root>/{notes,traits}/**/*.md` -- not from where
 -- a note happens to be filed, so a note homed under another repo still
 -- surfaces here.
 local INDEX = {}
@@ -1114,7 +1114,7 @@ local EXTMARK_DATA = {}
 rebuild_index = function()
     INDEX = {}
     local root = notes_root()
-    for _, path in ipairs(vim.fn.globpath(root, "*/reasoning/**/*.md", false, true)) do
+    for _, path in ipairs(vim.fn.globpath(root, "{notes,traits}/**/*.md", false, true)) do
         local ok, lines = pcall(vim.fn.readfile, path)
         if ok then
             for _, line in ipairs(lines) do
