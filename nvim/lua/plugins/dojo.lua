@@ -328,6 +328,39 @@ local ENTRIES = {
         run = false,
     },
 
+    -- Notes: your own reasoning about code you are reading, keyed to a symbol
+    {
+        group = "note",
+        keys = "<Leader>ns",
+        desc = "Worth saying about this code -- one line, no compose buffer, straight back to reading (x: a range)",
+        added = "2026-09-16",
+    },
+    {
+        group = "note",
+        keys = "<Leader>nk",
+        desc = "A marker in the gutter -- what does it already say?",
+        added = "2026-09-16",
+    },
+    {
+        group = "note",
+        keys = "<Leader>ne",
+        desc = "That note is wrong or thin -- open it where it lives and fix it",
+        added = "2026-09-16",
+    },
+    {
+        group = "note",
+        keys = "me reasoning scribbles",
+        desc = "The later half: the draft pile, --next to serve one, --done <id> once it is written up",
+        added = "2026-09-16",
+        run = false,
+    },
+    {
+        group = "note",
+        keys = ":NoteNext",
+        desc = "Work the candidate queue instead: prefilled buffer, :wq keeps, :NoteSkip defers, :NoteDrop discards",
+        added = "2026-09-16",
+    },
+
     -- Tree
     { group = "tree", keys = "<Leader>nf", desc = "Reveal the current file in the tree", added = "2019-08-02" },
 

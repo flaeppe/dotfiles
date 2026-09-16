@@ -45,7 +45,7 @@
 --                      buffer without writing, open the next candidate with
 --                      the same args
 --
--- `nc`/`nk`/`ne` are unclaimed: nerdtree owns `<Leader>nn` and `<Leader>nf`
+-- `ns`/`nk`/`ne` are unclaimed: nerdtree owns `<Leader>nn` and `<Leader>nf`
 -- (nvim/lua/plugins/nerdtree.lua), nothing else starts with `<Leader>n`.
 
 local M = {}
