@@ -11,8 +11,12 @@
 -- the note is filed: everything below indexes and matches on `ref:` lines,
 -- not on directory listings.
 --
---   <Leader>nc (n/x)   capture a reference at the cursor (or over the visual
---                      selection) and open a compose buffer for the note body
+--   <Leader>ns (n/x)   scribble: one line about the cursor's symbol (or the
+--                      visual selection), parked in the draft pile for a later
+--                      pass. There is no compose buffer -- reading code and
+--                      writing a note are different jobs, and charging the
+--                      first for the second means neither happens. `me
+--                      reasoning scribbles` is the pile; `--next` serves one.
 --   :NoteAdd           add another reference to the open compose buffer
 --   <Leader>nk (n)      hover the note for the marker under/above the cursor
 --   <Leader>ne (n)      jump to the note's home file at its section
@@ -265,7 +269,7 @@ end
 -- Compose buffer: one in flight, capture from anywhere -------------------
 
 -- `nil`, or `{ bufnr = ... }` while a note is being written. A second
--- `<Leader>nc` refuses rather than opening a second draft; `:NoteAdd`
+-- `:NoteNext` refuses rather than opening a second draft; `:NoteAdd`
 -- targets whichever one this holds.
 local compose = nil
 
@@ -471,66 +475,67 @@ end
 --- New compose buffer, cursor in insert mode on the blank body line. Uses
 --- acwrite + `bufhidden = "hide"` so an abandoned `:q!` keeps the draft,
 --- only `BufWipeout` releases the lock.
-function M.capture()
-    if compose and vim.api.nvim_buf_is_valid(compose.bufnr) and vim.api.nvim_buf_is_loaded(compose.bufnr) then
-        vim.notify("Notes: a compose buffer is already open -- :wq or :bd! it first", vim.log.levels.ERROR)
+--- The visual selection's line range, or the cursor's line twice. Leaves the
+--- cursor on the first line of the range, because the symbol is resolved from
+--- wherever the cursor lands.
+local function selected_lines()
+    if not vim.fn.mode():match("[vV]") then
+        local line = vim.fn.line(".")
+        return line, line
+    end
+    local first, last = vim.fn.line("v"), vim.fn.line(".")
+    if first > last then
+        first, last = last, first
+    end
+    vim.cmd("normal! \27")
+    vim.api.nvim_win_set_cursor(0, { first, 0 })
+    return first, last
+end
+
+--- Park a draft against the cursor or the selection: one prompt, one line, no
+--- buffer to finish.
+---
+--- Everything expensive is resolved here or by `me` -- the enclosing symbol,
+--- the repo, the relative path, the commit, and the selected lines read back
+--- off disk -- so the prompt asks for the only part a tool cannot supply. What
+--- lands is a note missing its prose, which is the half worth a human.
+function M.scribble()
+    local file = vim.fn.expand("%:p")
+    if file == "" then
+        vim.notify("Notes: no file behind this buffer", vim.log.levels.ERROR)
         return
     end
 
-    local span = selected_span()
-    local ref = capture_ref(span)
+    local first, last = selected_lines()
+    local ref = capture_ref(last > first and (last - first + 1) or 0)
     if not ref then
         return
     end
 
-    local bufnr = vim.api.nvim_create_buf(true, false)
-    vim.api.nvim_buf_set_name(bufnr, ("reasoning-note://compose/%d"):format(bufnr))
-    vim.bo[bufnr].buftype = "acwrite"
-    vim.bo[bufnr].filetype = "markdown"
-    vim.bo[bufnr].bufhidden = "hide"
-
-    local lines = {
-        "## " .. heading_part(ref, true),
-        "ref: " .. ref.token,
-        "at: " .. ref.repo .. "@" .. ref.sha,
-        "captured: " .. os.date("%Y-%m-%d"),
-        "strength: ",
-        "tags: ",
-        "",
-    }
-    local body_lnum = #lines
-    vim.list_extend(lines, authoring.cheatsheet_lines())
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-    vim.bo[bufnr].modified = false
-
-    vim.api.nvim_create_autocmd("BufWriteCmd", {
-        buffer = bufnr,
-        callback = function()
-            M.write(bufnr)
-        end,
-    })
-    vim.api.nvim_create_autocmd("BufWipeout", {
-        buffer = bufnr,
-        callback = function()
-            if compose and compose.bufnr == bufnr then
-                compose = nil
-            end
-        end,
-    })
-
-    compose = { bufnr = bufnr }
-
-    vim.cmd("botright split")
-    vim.api.nvim_win_set_buf(0, bufnr)
-    vim.api.nvim_win_set_cursor(0, { body_lnum, 0 })
-    vim.cmd.startinsert({ bang = true })
+    local subject = ref.symbol or vim.fs.basename(ref.relpath)
+    vim.ui.input({ prompt = ("Scribble %s: "):format(subject) }, function(text)
+        if not text or vim.trim(text) == "" then
+            return
+        end
+        local target = ("%s:%d-%d"):format(file, first, last)
+        local result = vim.system(
+            { "me", "reasoning", "scribble", target, "--ref", ref.token, text },
+            { text = true }
+        ):wait()
+        if result.code ~= 0 then
+            vim.notify("Notes: " .. vim.trim(result.stderr or result.stdout or "scribble failed"),
+                vim.log.levels.ERROR)
+            return
+        end
+        vim.notify(vim.trim(result.stdout or ""))
+    end)
 end
 
 --- Append a second (or third...) reference to the open compose buffer: one
 --- more `ref:` line, and the repo added to `at:` if it is not there yet.
 function M.note_add()
     if not (compose and vim.api.nvim_buf_is_valid(compose.bufnr)) then
-        vim.notify("Notes: no compose buffer open -- start one with <Leader>nc", vim.log.levels.ERROR)
+        vim.notify("Notes: no compose buffer open -- start one with :NoteNext", vim.log.levels.ERROR)
         return
     end
     local span = selected_span()
@@ -772,7 +777,7 @@ end
 --- buffer (`:NoteNext`) additionally marks the candidate `kept` in
 --- `reasoning-queue` once the file is written -- or, with an empty body,
 --- takes the `drop_candidate` path instead and never gets this far. A plain
---- (`<Leader>nc`) buffer has no candidate to drop, so an empty body there is
+--- A hand-started buffer has no candidate to drop, so an empty body there is
 --- just another refusal.
 function M.write(bufnr)
     local refs, at_line, source_line, captured_line, strength_line, tags_line, body =
@@ -904,7 +909,7 @@ end
 --- The heading reuses `parse_ref` +
 --- `heading_part` rather than the candidate's `title`,
 --- which is only a fallback for the refs-empty case (there is no ref to
---- derive a heading from). Same acwrite/bufhidden pattern as `M.capture`.
+--- derive a heading from). Same acwrite/bufhidden pattern the pile uses.
 --- `args` is the (normalized) argument string `reasoning-queue next` was
 --- called with, remembered on the buffer so `:NoteSkip`/`:NoteDrop` fetch
 --- the next candidate under the same filter.
@@ -1003,7 +1008,7 @@ local function normalize_next_args(args)
 end
 
 --- `reasoning-queue next -n 1 --json <args>`, opened as a candidate compose
---- buffer. Refuses like `M.capture` when one is already open; reports the
+--- buffer. Refuses when one is already open; reports the
 --- queue drained (`nothing left`) rather than opening anything.
 function M.note_next(args)
     if compose and vim.api.nvim_buf_is_valid(compose.bufnr) and vim.api.nvim_buf_is_loaded(compose.bufnr) then
@@ -1342,7 +1347,7 @@ end
 
 -- Bindings ------------------------------------------------------------------
 
-vim.keymap.set({ "n", "x" }, "<Leader>nc", M.capture, { desc = "Notes: capture a reference" })
+vim.keymap.set({ "n", "x" }, "<Leader>ns", M.scribble, { desc = "Notes: scribble a draft" })
 vim.keymap.set("n", "<Leader>nk", M.hover, { desc = "Notes: hover the marker's note" })
 vim.keymap.set("n", "<Leader>ne", M.edit, { desc = "Notes: edit the marker's home file" })
 
