@@ -1651,6 +1651,24 @@ local function unwritten_markers(root)
     return files
 end
 
+--- Whether the touch-up pass has read the marker text now going out, or nil with the reason
+--- it has not. Compared by mtime, since the sentinel records only that a pass ran, never
+--- which markers it covered -- coarse enough to warn on an unrelated edit to the same file,
+--- but that costs nothing here where the reviewer reads the line before deciding anyway.
+local function touchup_state(context, accepted, orphans)
+    local sentinel = (vim.uv.fs_stat(context.root .. "/.review/marker-touchup") or {}).mtime
+    if not sentinel then
+        return "no touch-up pass has read this text -- it posts exactly as typed"
+    end
+    for _, entry in ipairs(vim.list_extend(vim.list_extend({}, accepted), orphans)) do
+        local stat = vim.uv.fs_stat(context.root .. "/" .. entry.path)
+        if stat and stat.mtime.sec > sentinel.sec then
+            return "marker text has changed since the last touch-up pass"
+        end
+    end
+    return nil
+end
+
 --- The block under the cut: the verdict, and every comment the write will post, at the line
 --- it will land on. The one chance to see the anchoring before the author does.
 local function preview_lines(context, event, accepted, orphans)
@@ -1663,6 +1681,11 @@ local function preview_lines(context, event, accepted, orphans)
         "block was drawn still goes up.",
         "",
     }
+    local stale = touchup_state(context, accepted, orphans)
+    if stale then
+        table.insert(lines, stale .. ".")
+        table.insert(lines, "")
+    end
     local function render(entry)
         table.insert(
             lines,
