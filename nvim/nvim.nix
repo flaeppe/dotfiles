@@ -167,6 +167,11 @@
             plugin = fzf-lua;
             type = "lua";
             config = ''
+              -- Neovim caps a chunk at 200 active locals, and home-manager
+              -- concatenates every plugin config into one init.lua. These six
+              -- files declare 158 of them between them, none referenced from
+              -- outside this block, so they get a scope of their own.
+              do
               ${builtins.readFile ./lua/plugins/fzf.lua}
               -- Rendered through an fzf-lua picker, so it loads with fzf-lua
               -- rather than as its own plugin entry.
@@ -181,6 +186,7 @@
               -- and the checkout it annotates, loaded together with them even
               -- though its own keymaps do not open an fzf-lua picker.
               ${builtins.readFile ./lua/plugins/notes.lua}
+              end
             '';
           }
           # Incremental tag generation
