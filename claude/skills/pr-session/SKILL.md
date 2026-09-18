@@ -12,6 +12,7 @@ Run one phase of a local review session. `$ARGUMENTS` selects it:
 | *(empty)* or `analyse` | **A** — analyse the PR into markers |
 | `analyse --analysis <skill>` | **A**, delegated to a domain provider |
 | `implement [ids]` | **B** — implement accepted findings on the stack |
+| `polish` | **the marker touch-up pass alone** — for a review posted from the editor |
 | `assemble` | **C** — build the review artifacts locally |
 | `publish` | **D** — send what `assemble` produced |
 | `help [question]` | **Diagnose** — read-only; where this session stands and what to do next |
@@ -325,6 +326,62 @@ must *not* become comments: they are diff-relative and tied to one review, which
 exactly what a durable comment may never contain. Those survive in the PR description
 instead, which outlives the commits it describes. Two durable surfaces, and the commit
 bodies are the carrier between them.
+
+### The marker touch-up pass — once, after the documentation pass
+
+**`polish` reaches this subsection on its own, and that is the common way in:** a review
+posted from the editor never enters Phase C at all. Invoked that way it runs this
+subsection and stops at its end — no documentation pass, no record check, no assembly,
+and no precondition beyond a session file and markers to read.
+
+No marker carries who wrote it — the grammar (`review.lua`) and `order.json` have no
+author field, so a reviewer-written marker and an AI-rendered one are indistinguishable
+on disk. Treat every surviving marker the same; the restraint below carries the weight
+that provenance would otherwise have carried.
+
+**Default is no change.** A marker a stranger would understand is done. Touch only:
+
+- a sentence that does not parse
+- a pronoun with no referent outside the reviewer's own head
+- shorthand only the reviewer would decode
+- a claim about the code that moved and is now wrong
+
+**Never touch:** the judgement, the severity, the `kind` tag, or the site. Softening a
+finding is a change of judgement, not a touch-up. A marker wrong on the facts gets
+flagged back to the reviewer in the report below — never silently corrected. Skip
+`note` markers entirely: private, never posted, nothing to fit to a review.
+
+If `.review/marker-touchup` is absent, this has not run. Edit marker text in place in
+the review worktree, the same files Phase A wrote them into, then
+`checktime`-refresh any open buffers as Phase A does. Report every edit as an id-by-id
+before/after — this **is** the approval step: markers are never committed, so there is
+no accept-gate to route through as the documentation pass does; the report is what the
+reviewer sees before anything downstream reads the text. A marker the reviewer is not
+around to ask about is left alone. Write `.review/marker-touchup` once run, so a re-run
+does not repeat it — delete the sentinel to force another pass over markers added or
+reworded since.
+
+**Read the code each marker sits on, not just the marker.** Wording is the smallest of
+the three jobs:
+
+- **Does the finding hold?** Check it against the file. A marker that is wrong on the
+  facts, or right about a thing that is no longer there, is worth more to the reviewer
+  than a tidier sentence.
+- **Is anything adjacent missing?** The same defect two functions down, the case the
+  marker's fix does not cover. Raise it; do not write a new marker for it.
+- **Is it in the right place?** A comment on the caller when the defect is in the
+  callee, or on the last line of a block instead of its first, lands somewhere the
+  author has to work backwards from. Say where it would land better and why.
+
+So the pass has two outputs and they are not interchangeable. **Wording edits land in
+the buffer** — that is the touch-up, and the before/after report is what the reviewer
+sees. **Everything else is raised as a question and changed by nobody but them**: a
+fact the marker gets wrong, a gap beside it, a better site. Moving a marker changes
+which line the author reads it on, which is the reviewer's decision, not a tidy-up.
+
+Recording the text Phase A actually rendered, in `.review/`, would let this pass skip
+AI-authored markers outright instead of guessing from restraint alone — a gap to close
+in the editor plugin, not here.
 
 **Then check the record.** Reconcile any `REVIEW[<id>]:` commit whose body no longer
 matches the code, under the Phase B guards. A commit with no body at all was accepted
