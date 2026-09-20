@@ -36,7 +36,7 @@ WIDE_FLAGS_WITH_VALUE: Final = frozenset(
     )
 )
 
-ANYFIN_LOG_REDIRECT: Final = (
+LOG_REDIRECT_MESSAGE: Final = (
     "gcloud logging is retired here -- use `af log read <filter> --since 1h` "
     "(read-only Cloud Logging CLI)"
 )
@@ -116,7 +116,7 @@ def main() -> None:
     if not invocations:
         return
     if any(is_logging_command(invocation) for invocation in invocations):
-        decide("deny", ANYFIN_LOG_REDIRECT)
+        decide("deny", LOG_REDIRECT_MESSAGE)
         return
     decide("ask", "gcloud requires approval")
 
