@@ -1,7 +1,7 @@
 # Select with: codex --profile development
 # Model selection remains with the caller.
 model_reasoning_effort = "xhigh"
-model_auto_compact_token_limit = 400000
+model_auto_compact_token_limit = 450000
 project_doc_fallback_filenames = ["CLAUDE.md"]
 
 [tui]

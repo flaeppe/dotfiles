@@ -61,7 +61,7 @@ Codex's explicit-only policy belongs in `agents/openai.yaml` as
 | Feature | Behavior |
 |---|---|
 | Reasoning | The profile requests `xhigh`; it does not pin a model. Support depends on the selected model. |
-| Compaction | `model_auto_compact_token_limit = 400000` requests a token threshold. The model's context limits still apply; this does not enlarge its window or guarantee compaction at exactly that count. |
+| Compaction | `model_auto_compact_token_limit = 450000` requests a token threshold. The model's context limits still apply; this does not enlarge its window or guarantee compaction at exactly that count. |
 | Model changes | Global guidance preserves the user's requested model. No verified configuration switch universally forbids fallback; explicit CLI/model selections remain possible. |
 | Attribution | Global guidance forbids tool attribution in commits and PRs. No equivalent to Claude's two attribution settings was found in the installed config surface. This is an instruction, not an enforced trailer filter. |
 | Footer | Model, directory, session-total input tokens, context-used percentage, in that order. Input totals are cumulative, not current-context token occupancy. Built-in separators, labels, and number formatting differ. |
