@@ -7,8 +7,12 @@
 
 set -l socket $KITTY_LISTEN_ON
 if test -z "$socket"
-    # `find` rather than a glob, which errors in fish when nothing matches.
-    set -l listening (find /tmp -maxdepth 1 -name 'mykitty-*' -type s 2>/dev/null)
+    # `find` rather than a glob, which errors in fish when nothing matches. `-L`
+    # is load-bearing: /tmp is itself a symlink (to /private/tmp on macOS), and
+    # without it `find /tmp -maxdepth 1` treats /tmp as the one entry to test
+    # rather than descending into what it points at, so it never sees the
+    # socket regardless of maxdepth.
+    set -l listening (find -L /tmp -maxdepth 1 -name 'mykitty-*' -type s 2>/dev/null)
     if test (count $listening) -eq 1
         set socket "unix:$listening[1]"
     end

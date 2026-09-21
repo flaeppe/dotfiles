@@ -275,7 +275,7 @@ explicit separate step.
 ### Shell
 
 ```
-review <pr>
+review <pr> [--stack]
 ```
 
 `<pr>` is a bare number in this repository, or a pull-request URL naming another one
@@ -286,8 +286,11 @@ accepts the same argument shape.
 
 Resolves the PR, fetches its head, creates both worktrees, copies in the gitignored
 local configuration a fresh worktree lacks (so the toolchain activates), writes
-`session.json`, and opens a terminal session with one tab per worktree. Re-running
-against the same PR reuses the worktrees, so a session survives closing the editor.
+`session.json`, and opens a terminal tab on the review worktree. The stack worktree
+is created either way but only gets its own tab with `--stack` -- most sessions never
+touch the stack, and it stays ready to open, on this run or a later one, without
+forcing a second pane on every session. Re-running against the same PR reuses the
+worktrees, so a session survives closing the editor.
 
 Re-entry after a crash or a stray `:q` is `nvim -c Review` in either worktree — the
 session is read from the working directory.

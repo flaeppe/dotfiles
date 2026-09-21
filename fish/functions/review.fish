@@ -1,5 +1,6 @@
-# Set up a two-worktree review session for a GitHub PR and open an editor on each.
-# See docs/pr-review.md for what the two worktrees are for.
+# Set up a two-worktree review session for a GitHub PR. Both worktrees are always
+# created, but only the review one gets an editor tab by default -- pass --stack for
+# the second. See docs/pr-review.md for what the two worktrees are for.
 #
 #   .worktrees/review/<pr>/head    detached at the PR head; markers only, never commits
 #   .worktrees/review/<pr>/stack   branch review-suggestions/<pr>-<round>; code only
@@ -7,10 +8,10 @@
 # Re-running against the same PR reuses existing worktrees, so a session is resumable
 # after closing the editor.
 #
-#   review <pr>          start or resume a session
-#   review skim [<pr>]   the read-only surface: browse PRs across the org, one worktree
-#   review list          every session in this repo, live or retired
-#   review retire <pr>   archive a session and take its worktrees down
+#   review <pr> [--stack]   start or resume a session; --stack also opens the stack tab
+#   review skim [<pr>]      the read-only surface: browse PRs across the org, one worktree
+#   review list             every session in this repo, live or retired
+#   review retire <pr>      archive a session and take its worktrees down
 #
 # <pr> is a bare number in this repository, or a pull-request URL naming another one --
 # own PRs included, so a link pasted out of a browser or Slack works exactly like a
@@ -28,18 +29,36 @@ switch "$argv[1]"
         return $status
 end
 
-if test -z "$argv[1]"
-    echo "Usage: review <pr-number|url> | review skim [<pr-number|url>] | review list | review retire <pr-number>"
+# --stack opens a second tab on the stack worktree, in addition to the review one.
+# The worktree itself is always created either way -- see the tab-opening block
+# below for why only the tab is conditional.
+set -l stack 0
+set -l pr_arg
+for arg in $argv
+    if test "$arg" = --stack
+        set stack 1
+    else
+        set -q pr_arg[1]
+        or set pr_arg $arg
+    end
+end
+
+if test -z "$pr_arg"
+    echo "Usage: review <pr-number|url> [--stack] | review skim [<pr-number|url>] | review list | review retire <pr-number>"
     return 1
 end
 
-set -l ref (_review_pr_ref $argv[1])
+set -l ref (_review_pr_ref $pr_arg)
 or return 1
 set -l fields (string split \t -- $ref)
 if test (count $fields) -eq 2
     # The ref named another repository -- hand off to that clone rather than running
     # git commands against this one.
-    fish -c "cd $fields[1]; and review $fields[2]"
+    set -l handoff "review $fields[2]"
+    if test $stack -eq 1
+        set handoff "$handoff --stack"
+    end
+    fish -c "cd $fields[1]; and $handoff"
     return $status
 end
 
@@ -187,10 +206,14 @@ if test -z "$kitty_socket"
     return 1
 end
 
-# One tab per loop: curating findings and building suggestions are different
+# One tab per worktree: curating findings and building suggestions are different
 # worktrees, so they need separate cwd, LSP root and tag file rather than one
 # editor straddling both. The editor first in each tab, then a shell beside it,
 # kept out of focus so landing on either tab lands on the editor.
+#
+# The stack tab is opt-in (--stack): most sessions never touch the stack, and its
+# worktree -- created above regardless, so a session already open can still be
+# handed --stack later -- sits ready without a tab on it until asked for.
 kitty @ --to $kitty_socket launch --type=tab --tab-title "review $pr" \
     --cwd $review_tree fish -i -c $review_launch >/dev/null
 or begin
@@ -199,8 +222,13 @@ or begin
 end
 kitty @ --to $kitty_socket launch --location=hsplit --dont-take-focus --cwd $review_tree >/dev/null 2>&1
 
-kitty @ --to $kitty_socket launch --type=tab --tab-title "stack $pr" \
-    --cwd $stack_tree fish -i -c $stack_launch >/dev/null
-kitty @ --to $kitty_socket launch --location=hsplit --dont-take-focus --cwd $stack_tree >/dev/null 2>&1
+if test $stack -eq 1
+    kitty @ --to $kitty_socket launch --type=tab --tab-title "stack $pr" \
+        --cwd $stack_tree fish -i -c $stack_launch >/dev/null
+    kitty @ --to $kitty_socket launch --location=hsplit --dont-take-focus --cwd $stack_tree >/dev/null 2>&1
+end
 
 echo "review $pr: $title"
+if test $stack -eq 0
+    echo "             stack pane not opened -- reopen this session with: review $pr --stack"
+end
