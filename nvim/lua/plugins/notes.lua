@@ -1244,8 +1244,6 @@ apply_indicators = function(bufnr)
                 sign_text = "»",
                 sign_hl_group = "NoteMarkerSign",
                 end_row = math.min(end_lnum, vim.api.nvim_buf_line_count(bufnr)) - 1,
-                hl_group = "NoteMarkerSpan",
-                hl_eol = false,
             })
             EXTMARK_DATA[bufnr .. ":" .. id] = entry
         end
@@ -1253,7 +1251,6 @@ apply_indicators = function(bufnr)
 end
 
 vim.api.nvim_set_hl(0, "NoteMarkerSign", { link = "DiagnosticHint", default = true })
-vim.api.nvim_set_hl(0, "NoteMarkerSpan", { link = "Comment", default = true })
 
 vim.api.nvim_create_autocmd({ "BufRead", "BufWinEnter" }, {
     callback = function(event)
