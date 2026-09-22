@@ -1809,6 +1809,43 @@ local function post_review(bufnr)
     end)
 end
 
+--- Replace the open compose buffer's summary with a file's contents and post it -- the
+--- effect of typing over the cut and `:write`ing, for whatever is driving the buffer from
+--- outside the editor: a script, or a headless instance with no keystrokes to send it.
+local function post_from_file(path)
+    local bufnr
+    for _, candidate in ipairs(vim.api.nvim_list_bufs()) do
+        if vim.api.nvim_buf_get_name(candidate):match("^GithubReview://") then
+            bufnr = candidate
+        end
+    end
+    if not bufnr then
+        return vim.notify(
+            "Review: no compose buffer open -- run :GithubApprove, :GithubComment or :GithubRequestChanges first",
+            vim.log.levels.ERROR
+        )
+    end
+    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local cut = #lines
+    for i, line in ipairs(lines) do
+        if line:find(CUT, 1, true) then
+            cut = i - 1
+            break
+        end
+    end
+    local rest = {}
+    for i = cut + 1, #lines do
+        table.insert(rest, lines[i])
+    end
+    local summary = vim.fn.filereadable(path) == 1 and vim.fn.readfile(path) or {}
+    local new_lines = {}
+    vim.list_extend(new_lines, summary)
+    vim.list_extend(new_lines, rest)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, new_lines)
+    vim.api.nvim_set_current_buf(bufnr)
+    vim.cmd("write")
+end
+
 --- Compose a review of the loaded pull request and post it on write.
 ---
 --- A buffer rather than a prompt, because a summary is prose and because the list under the
@@ -1962,6 +1999,11 @@ end, { desc = "Comment on the loaded PR, posting the markers as inline comments"
 vim.api.nvim_create_user_command("GithubRequestChanges", function()
     M.github_review("REQUEST_CHANGES")
 end, { desc = "Request changes on the loaded PR, posting the markers as inline comments" })
+-- A path, not the text itself: a summary is prose, and a headless caller has no terminal
+-- to quote multi-line prose through safely, but every shell can write a file.
+vim.api.nvim_create_user_command("GithubPostFrom", function(opts)
+    post_from_file(opts.args)
+end, { nargs = 1, complete = "file", desc = "Post the open review, with its summary replaced from a file" })
 vim.api.nvim_create_user_command("Review", M.panel, { desc = "Where the session stands and what to do next" })
 vim.api.nvim_create_user_command("ReviewStatus", M.status, { desc = "Findings and their states" })
 vim.api.nvim_create_user_command("ReviewDiff", M.diff, { desc = "Browse the whole change in a file panel" })

@@ -492,69 +492,28 @@ exists to fix:
 Write the result to `.review/post-summary.md` — gitignored, ephemeral, gone by
 the end of step 4.
 
-**4. Post, headlessly.** The compose buffer that `:GithubApprove` et al. open is
-ordinary Neovim state, reachable from a script exactly as it is from a keystroke:
-`:Github<Verdict>` creates it, a `BufWriteCmd` posts it on `:write`
-(`review.lua:1850-1855`). Drive both from outside the editor, from the review
-worktree:
+**4. Post, headlessly.** `:GithubApprove`/`:GithubComment`/`:GithubRequestChanges`
+open the compose buffer; `:GithubPostFrom <path>` fills its summary from a file and
+`:write`s it — the same effect as typing over the cut and saving, for a caller with
+no keystrokes to send (`review.lua`, beside `github_review`). A path rather than
+the text itself, because a headless caller has no terminal to quote multi-line
+prose through safely, but every shell can write a file. From the review worktree:
 
 ```sh
-cat >.review/post.lua <<'LUA'
-local bufnr
-for _, b in ipairs(vim.api.nvim_list_bufs()) do
-  if vim.api.nvim_buf_get_name(b):match("^GithubReview://") then
-    bufnr = b
-  end
-end
-if not bufnr then
-  print("POST_ERROR=no GithubReview buffer -- did the Github command run first?")
-  vim.cmd("cquit! 1")
-end
--- The compose buffer's summary sits above an HTML-comment cut; nothing below it
--- is read back here, since post_review() recomputes the comment set itself.
-local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-local cut = #lines
-for i, line in ipairs(lines) do
-  if vim.startswith(line, "<!--") then
-    cut = i - 1
-    break
-  end
-end
-local rest = {}
-for i = cut + 1, #lines do
-  table.insert(rest, lines[i])
-end
-local summary = vim.fn.filereadable(".review/post-summary.md") == 1
-    and vim.fn.readfile(".review/post-summary.md")
-  or {}
-local new_lines = {}
-vim.list_extend(new_lines, summary)
-vim.list_extend(new_lines, rest)
-vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, new_lines)
-vim.api.nvim_set_current_buf(bufnr)
-
-local sent = {}
-vim.notify = function(msg)
-  table.insert(sent, msg)
-end
-vim.cmd("write")
-print("POST_RESULT=" .. table.concat(sent, " | "):gsub("\n", " "))
-LUA
-nvim --headless -c "Github<Verdict>" -c "luafile .review/post.lua" -c "qa!"
-rm -f .review/post.lua .review/post-summary.md
+nvim --headless -c "Github<Verdict>" -c "GithubPostFrom .review/post-summary.md" -c "qa!"
+rm -f .review/post-summary.md
 ```
 
 Replace `<Verdict>` with `Approve`, `Comment` or `RequestChanges` to match step 2.
-`vim.notify` is overridden only inside this one throwaway process, only to catch
-`post_review`'s own report — the exact inline and summary counts it already
-prints (`review.lua:1795-1800`) — as something a shell command can read back.
-Nothing here reimplements posting or anchoring; it drives the same code path the
-keybindings do, so that logic keeps exactly one home.
+This drives the exact code path the keybindings do — no separate posting logic,
+no re-derivation of the compose buffer's name or its cut marker outside
+`review.lua`.
 
-**5. Report** the `POST_RESULT=` or `POST_ERROR=` line verbatim, plus the verdict
-and whether the touch-up pass ran this time or had already run.
-`POST_ERROR=no GithubReview buffer` means step 2's `Github<Verdict>` command
-never ran — check the verdict name is spelled as one of the three commands.
+**5. Report** what `post_review` printed — its own line already carries the event,
+the inline count and the summary count (`review.lua:1795-1800`) — plus whether the
+touch-up pass ran this time or had already run. A "no compose buffer open" error
+means step 2's `Github<Verdict>` command never ran — check the verdict name is
+spelled as one of the three commands.
 
 ---
 
