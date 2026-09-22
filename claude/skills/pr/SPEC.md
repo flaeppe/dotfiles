@@ -26,8 +26,8 @@ diff, the check runs, the commit list) or is padding.
   not the floor.
 - **No code-internal vocabulary in reviewer-facing text**, title and in-diff UI
   strings included. Identifiers are cited in backticks, never conjugated into
-  English. Measured origin: the only wording complaint in two weeks of nexus
-  sessions was "legs", "fold" and "delta" used as common nouns — "This PR title
+  English. Measured origin: the only wording complaint in two weeks was
+  "legs", "fold" and "delta" used as common nouns — "This PR title
   makes no sense ... speak in NORMAL language" (user, 2026-09-02). Importance
   adjectives (comprehensive, robust, seamless) drew **zero** complaints in the
   same window; do not add a rule against them without evidence.

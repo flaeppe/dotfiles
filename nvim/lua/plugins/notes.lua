@@ -311,8 +311,8 @@ end
 
 --- The `repo:` and `service:` values already in use across the notes corpus,
 --- as two sorted lists. Enumerating them is what keeps the facet space from
---- growing a near-duplicate: a facet is exact-match, so `service:seb` and
---- `service:seb-camt` are two vendors as far as any index is concerned.
+--- growing a near-duplicate: a facet is exact-match, so `service:acme` and
+--- `service:acme-widget` are two vendors as far as any index is concerned.
 --- Harvested rather than declared -- unlike traits there is no closed list, so
 --- what exists is the only available answer.
 function authoring.facets_in_use()
