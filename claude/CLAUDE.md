@@ -259,7 +259,7 @@ integration docs, planning documents. When the tool is available:
 - `service:<name>` tags join external specs with the implementation notes
   that integrate against them (the tag appears on both sides). For
   spec-vs-implementation questions ("do we follow X", gap analysis), filter
-  on the service tag (e.g. `tags=["service:seb-camt"]`) to retrieve the spec
+  on the service tag (e.g. `tags=["service:acme-widget"]`) to retrieve the spec
   and our documented reality together.
 - Results are chunks with metadata; read the file at `path` when the chunk
   isn't enough. Files on disk are the source of truth.
