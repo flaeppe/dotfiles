@@ -1,6 +1,6 @@
 ---
 name: pr-session
-description: Drive an AI-assisted local PR review — analyse a PR into in-code markers, implement the accepted findings as a stacked suggestion branch, then assemble the review locally. Runs inside a review session created by the `review <pr>` shell function.
+description: Drive an AI-assisted local PR review — analyse a PR into in-code markers, implement the accepted findings as a stacked suggestion branch, assemble the review locally, or post the curated markers as a GitHub review on the reviewer's word. Runs inside a review session created by the `review <pr>` shell function.
 user-invocable: true
 disable-model-invocation: true
 ---
@@ -13,6 +13,7 @@ Run one phase of a local review session. `$ARGUMENTS` selects it:
 | `analyse --analysis <skill>` | **A**, delegated to a domain provider |
 | `implement [ids]` | **B** — implement accepted findings on the stack |
 | `polish` | **the marker touch-up pass alone** — for a review posted from the editor |
+| `post-review [approve\|comment\|request-changes]` | **post the curated markers as one GitHub review, headlessly** — no editor keystroke |
 | `assemble` | **C** — build the review artifacts locally |
 | `publish` | **D** — send what `assemble` produced |
 | `help [question]` | **Diagnose** — read-only; where this session stands and what to do next |
@@ -438,6 +439,122 @@ Absent a policy, the review event is `--comment`, never `--request-changes`.
 
 Then tell the reviewer to read `out/` and
 `DiffviewOpen <pr_head>...HEAD` in the stack worktree.
+
+---
+
+## Post-review — post the curated markers as a GitHub review
+
+Turns the marker set into the review GitHub sees, on the reviewer's word, without
+opening the editor. This is a different exit than Phases C–D: those ship the
+*suggestion stack* as its own PR; this posts the *markers* as inline comments on
+the PR under review, the same outcome `:GithubApprove`/`:GithubComment`/
+`:GithubRequestChanges` produce from the keyboard. Runs in the **review worktree**;
+the stack worktree holds no markers to post.
+
+**Preconditions.** Stop and report if either fails:
+
+- `.review/session.json` exists and its `role` is `review`.
+- At least one marker exists (`rg --hidden --vimgrep --no-heading 'REVIEW\[\d+\]'`,
+  the same scan `M.project_markers` runs). Nothing to post is not an error, just
+  nothing to do here.
+
+This reads markers from **disk**, unlike the interactive command, which also warns
+about markers typed but not yet `:w`'d in the buffer doing the posting
+(`unwritten_markers`, `review.lua:1641-1652`) — a headless process run from outside
+the editor cannot see another process's unsaved buffers at all. If the reviewer's
+editor is open and curation is still in progress, confirm nothing there is unsaved
+before posting; there is no way to check that from here.
+
+**1. Touch up first, if it has not run.** If `.review/marker-touchup` is absent,
+run the marker touch-up pass (above) before continuing — tidying happens once, at
+the source, never as a second pass with its own judgement at posting time.
+
+**2. Pick the verdict.** From `$ARGUMENTS`: `approve` → `APPROVE`,
+`request-changes` → `REQUEST_CHANGES`, anything else (including nothing) →
+`COMMENT` — the same default `assemble` uses. Honour `.review/policy.json`'s
+`forbid` list if present: refuse a forbidden verdict and say so rather than
+posting it anyway.
+
+**3. Compose the summary.** Framing and the verdict, in prose — never a list of
+the findings. Draw on `.review/summary.md`'s short version if it still describes
+the current marker set; write it fresh if curating since the last `analyse` has
+left it stale. Two rules, because restating is the exact complaint this phase
+exists to fix:
+
+- **Never repeat a finding's own text.** Every marker body is about to become its
+  own inline comment; the summary is what those comments cannot say for
+  themselves.
+- **Never hand-list the orphans** (findings on lines this PR does not touch).
+  `post_review` appends them to the body itself (`review.lua`'s
+  `orphan_section`) — writing them into the summary too posts them twice, which
+  is the bug this phase exists to not repeat.
+
+Write the result to `.review/post-summary.md` — gitignored, ephemeral, gone by
+the end of step 4.
+
+**4. Post, headlessly.** The compose buffer that `:GithubApprove` et al. open is
+ordinary Neovim state, reachable from a script exactly as it is from a keystroke:
+`:Github<Verdict>` creates it, a `BufWriteCmd` posts it on `:write`
+(`review.lua:1850-1855`). Drive both from outside the editor, from the review
+worktree:
+
+```sh
+cat >.review/post.lua <<'LUA'
+local bufnr
+for _, b in ipairs(vim.api.nvim_list_bufs()) do
+  if vim.api.nvim_buf_get_name(b):match("^GithubReview://") then
+    bufnr = b
+  end
+end
+if not bufnr then
+  print("POST_ERROR=no GithubReview buffer -- did the Github command run first?")
+  vim.cmd("cquit! 1")
+end
+-- The compose buffer's summary sits above an HTML-comment cut; nothing below it
+-- is read back here, since post_review() recomputes the comment set itself.
+local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+local cut = #lines
+for i, line in ipairs(lines) do
+  if vim.startswith(line, "<!--") then
+    cut = i - 1
+    break
+  end
+end
+local rest = {}
+for i = cut + 1, #lines do
+  table.insert(rest, lines[i])
+end
+local summary = vim.fn.filereadable(".review/post-summary.md") == 1
+    and vim.fn.readfile(".review/post-summary.md")
+  or {}
+local new_lines = {}
+vim.list_extend(new_lines, summary)
+vim.list_extend(new_lines, rest)
+vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, new_lines)
+vim.api.nvim_set_current_buf(bufnr)
+
+local sent = {}
+vim.notify = function(msg)
+  table.insert(sent, msg)
+end
+vim.cmd("write")
+print("POST_RESULT=" .. table.concat(sent, " | "):gsub("\n", " "))
+LUA
+nvim --headless -c "Github<Verdict>" -c "luafile .review/post.lua" -c "qa!"
+rm -f .review/post.lua .review/post-summary.md
+```
+
+Replace `<Verdict>` with `Approve`, `Comment` or `RequestChanges` to match step 2.
+`vim.notify` is overridden only inside this one throwaway process, only to catch
+`post_review`'s own report — the exact inline and summary counts it already
+prints (`review.lua:1795-1800`) — as something a shell command can read back.
+Nothing here reimplements posting or anchoring; it drives the same code path the
+keybindings do, so that logic keeps exactly one home.
+
+**5. Report** the `POST_RESULT=` or `POST_ERROR=` line verbatim, plus the verdict
+and whether the touch-up pass ran this time or had already run.
+`POST_ERROR=no GithubReview buffer` means step 2's `Github<Verdict>` command
+never ran — check the verdict name is spelled as one of the three commands.
 
 ---
 

@@ -83,6 +83,11 @@ the cut, every comment listed below it at the line it will land on — and `:wq`
 `:q!` abandons, an empty summary posts nothing. The set is recomputed on write, so a
 finding written after the block was drawn still goes up.
 
+The posting trigger is the buffer write, not the keystroke, so a session can drive it
+too: saying "post the review" runs the `pr-session` skill's `post-review` phase, which
+tidies the markers, composes a summary that does not restate them, and writes the same
+compose buffer from a headless `nvim`. The keybindings are unaffected either way.
+
 Anchoring needs two translations, and both are the reason this is mechanical rather than
 hand-transcribed:
 
