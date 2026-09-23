@@ -38,7 +38,7 @@ fi
 # prompt -- measured 2026-09-10 at 5,620 tokens / ~4.4s wall time from here
 # (5,626 from ~/.dotfiles -- the repo's own instructions cost was negligible
 # either way; the point is not dragging in whatever a future repo adds).
-output=$(cd "$HOME" && "$CODEX" exec -m gpt-5.6-luna -c model_reasoning_effort=low -s read-only --skip-git-repo-check "hi" 2>&1)
+output=$(cd "$HOME" && "$CODEX" exec -m gpt-6-luna -c model_reasoning_effort=low -s read-only --skip-git-repo-check "hi" 2>&1)
 status=$?
 if [ "$status" -ne 0 ]; then
   note "codex exec exited $status -- $(printf '%s' "$output" | tail -c 300)"
