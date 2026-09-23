@@ -48,6 +48,27 @@ in {
     };
   };
 
+  # Hourly sweep of a Gmail label into a private automation repo; see that
+  # repo for what it does and why -- this file only names where it lives.
+  # Same shape as me-prs-sweep/me-pulse above, except the target script isn't
+  # under this repo (it's private, no remote): resolve it at runtime from
+  # ~/.config/me-home, the same machine-local, uncommitted indirection
+  # codex-daily-poke.sh's SAM_DIR already uses, so the repo name never has to
+  # appear in this public repo.
+  launchd.agents.composer-sweep = lib.mkIf pkgs.stdenv.isDarwin {
+    enable = true;
+    config = {
+      ProgramArguments = [
+        "${pkgs.bash}/bin/bash"
+        "-c"
+        ''exec "$(cat "$HOME/.config/me-home")/scripts/composer-sweep"''
+      ];
+      StartInterval = 3600; # hourly
+      RunAtLoad = false;
+      EnvironmentVariables.PATH = launchdPath;
+    };
+  };
+
   # Fires one cheap real Codex turn at 07:00 so the day's ~5h quota windows
   # land at roughly 07-12-17-22 instead of wherever the day's first
   # incidental Codex use happens to fall (Petter, 2026-09-10; see
