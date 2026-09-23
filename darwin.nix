@@ -36,6 +36,7 @@ in {
       openssl
       ripgrep
       terminal-notifier
+      tree
       uv
       yq-go
     ]) ++ [
