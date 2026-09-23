@@ -6,7 +6,11 @@ Sonnet is the default for every agent. Reach for opus only when the brief
 cannot be reduced to a procedure — the agent has to design against real
 tradeoffs, or judge across many interacting parts. That bar is absolute:
 "more complex than the others" is not a reason, and several opus agents in one
-fan-out means the briefs are underspecified. When unsure, pick sonnet.
+fan-out means the briefs are underspecified. When unsure, pick sonnet. Haiku only
+for a mechanical, read-only summary of something already on disk: it has no
+auto mode, so a haiku agent that has to write or report through a prompt
+stalls. Pass the model on every dispatch — an inherited one is a choice nobody
+made.
 
 Every agent brief that measures or investigates something bounded (a time
 window, a population, a file set) must state the bound it assumes AND how the
