@@ -8,7 +8,12 @@
 # Re-running against the same PR reuses existing worktrees, so a session is resumable
 # after closing the editor.
 #
-#   review <pr> [--stack]   start or resume a session; --stack also opens the stack tab
+#   review <pr> [--stack] [--no-tab]   start or resume a session; --stack also opens
+#                                       the stack tab; --no-tab creates the worktrees
+#                                       and stops there -- no kitty tab, no editor --
+#                                       and prints the review worktree's path as the
+#                                       last line of stdout, for a caller with no tab
+#                                       to watch to `cd` into
 #   review skim [<pr>]      the read-only surface: browse PRs across the org, one worktree
 #   review list             every session in this repo, live or retired
 #   review retire <pr>      archive a session and take its worktrees down
@@ -35,12 +40,16 @@ end
 
 # --stack opens a second tab on the stack worktree, in addition to the review one.
 # The worktree itself is always created either way -- see the tab-opening block
-# below for why only the tab is conditional.
+# below for why only the tab is conditional. --no-tab skips that whole block,
+# for a caller with no tab to land the result in.
 set -l stack 0
+set -l no_tab 0
 set -l pr_arg
 for arg in $argv
     if test "$arg" = --stack
         set stack 1
+    else if test "$arg" = --no-tab
+        set no_tab 1
     else
         set -q pr_arg[1]
         or set pr_arg $arg
@@ -48,7 +57,7 @@ for arg in $argv
 end
 
 if test -z "$pr_arg"
-    echo "Usage: review <pr-number|url> [--stack] | review skim [<pr-number|url>] | review list | review retire <pr-number> | review post <pr-number>"
+    echo "Usage: review <pr-number|url> [--stack] [--no-tab] | review skim [<pr-number|url>] | review list | review retire <pr-number> | review post <pr-number>"
     return 1
 end
 
@@ -187,6 +196,16 @@ for role in review stack
     printf '  "review_socket": "%s",\n' $review_socket >>"$tree/.review/session.json"
     printf '  "stack_socket": "%s"\n' $stack_socket >>"$tree/.review/session.json"
     printf '}\n' >>"$tree/.review/session.json"
+end
+
+# --no-tab is for a caller with nobody watching a tab: the worktrees and
+# session.json above are the whole deliverable, so stop here rather than reach
+# for kitty at all. The worktree path on its own last line is the handoff --
+# a caller reads it off stdout and cd's there.
+if test $no_tab -eq 1
+    echo "review $pr: $title"
+    echo $review_tree
+    return 0
 end
 
 # The base the editor's diff surfaces measure against, as a commit -- the merge base
