@@ -90,6 +90,10 @@
           {
             "type": "command",
             "command": "env -u DEVELOPER_DIR ~/.claude/hooks/log-assertion-check"
+          },
+          {
+            "type": "command",
+            "command": "env -u DEVELOPER_DIR ~/.claude/hooks/toolchain-path-guard"
           }
         ]
       },

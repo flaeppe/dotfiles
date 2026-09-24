@@ -1,0 +1,188 @@
+#!/usr/bin/python3
+"""Claude Code PreToolUse guard: refuse a Bash command that will run a JS
+toolchain program (`yarn`, `bun`, `npx`, `pnpm`, `node`) in a directory whose
+`.envrc` this hook's own environment did not load, when that program is not
+otherwise on PATH -- direct invocations and `git commit`/`git push` whose
+hooks (husky, or any `core.hooksPath` script) call one.
+
+Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0 --
+a broken guard must never wedge a session.
+
+Shebang is an absolute path, not `env python3` -- see git-local-path-guard for why.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+from typing import Final
+
+import shellwords
+
+TOOLCHAIN_PROGRAMS: Final = frozenset(("yarn", "bun", "npx", "pnpm", "node"))
+
+GIT_HOOK_NAMES: Final = {"commit": "pre-commit", "push": "pre-push"}
+
+# Git global flags that consume the following word, so the subcommand is not it.
+GIT_GLOBAL_FLAGS_WITH_VALUE: Final = frozenset(
+    ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env")
+)
+
+MENTION_RE: Final = re.compile(r"\b(%s)\b" % "|".join(sorted(TOOLCHAIN_PROGRAMS)))
+
+
+def toolchain_program(word: str | None) -> str | None:
+    if not word:
+        return None
+    name = word.rsplit("/", 1)[-1]
+    return name if name in TOOLCHAIN_PROGRAMS else None
+
+
+def is_git(word: str | None) -> bool:
+    return word == "git" or bool(word) and word.endswith("/git")
+
+
+def git(directory: str, *args: str) -> str | None:
+    """stdout of a git command, or None if it failed."""
+    result = subprocess.run(
+        ("git", "-C", directory, *args),
+        capture_output=True,
+        text=True,
+        errors="replace",
+    )
+    return result.stdout if result.returncode == 0 else None
+
+
+def git_subcommand_and_dir(words: list[str], git_index: int) -> tuple[str | None, str | None]:
+    """(subcommand, `-C` directory) for the `git` word at git_index."""
+    directory = None
+    index = git_index + 1
+    while index < len(words):
+        word = words[index]
+        if not word.startswith("-"):
+            return word, directory
+        if word == "-C" and index + 1 < len(words):
+            directory = words[index + 1]
+        index += 2 if word in GIT_GLOBAL_FLAGS_WITH_VALUE else 1
+    return None, directory
+
+
+def resolve_directory(candidate: str | None, cwd: str) -> str:
+    """A `cd`/`-C` argument as a usable directory, falling back to cwd."""
+    if not candidate:
+        return cwd
+    expanded = os.path.expanduser(os.path.expandvars(candidate.strip("\"'")))
+    absolute = expanded if os.path.isabs(expanded) else os.path.join(cwd, expanded)
+    return absolute if os.path.isdir(absolute) else cwd
+
+
+def envrc_root(directory: str) -> str | None:
+    """Nearest directory at or above `directory` carrying an `.envrc`, or None."""
+    current = directory
+    while True:
+        if os.path.isfile(os.path.join(current, ".envrc")):
+            return current
+        parent = os.path.dirname(current)
+        if parent == current:
+            return None
+        current = parent
+
+
+def hooks_directory(directory: str) -> str | None:
+    """Where git runs hooks from for `directory`'s repo: `core.hooksPath` when
+    set (husky's mechanism), else the repo's own `.git/hooks`."""
+    configured = git(directory, "config", "--get", "core.hooksPath")
+    if configured:
+        configured = configured.strip()
+        return configured if os.path.isabs(configured) else os.path.join(directory, configured)
+    git_dir = git(directory, "rev-parse", "--git-dir")
+    if not git_dir:
+        return None
+    git_dir = git_dir.strip()
+    absolute = git_dir if os.path.isabs(git_dir) else os.path.join(directory, git_dir)
+    return os.path.join(absolute, "hooks")
+
+
+def toolchain_mentions(directory: str, hook_name: str) -> list[str]:
+    """Toolchain programs named in `directory`'s <hook_name> script, in the
+    order they first appear -- empty when there is no such script."""
+    hooks_dir = hooks_directory(directory)
+    if not hooks_dir:
+        return []
+    try:
+        with open(os.path.join(hooks_dir, hook_name), errors="replace") as handle:
+            text = handle.read()
+    except OSError:
+        return []
+    seen: list[str] = []
+    for match in MENTION_RE.finditer(text):
+        if match.group(1) not in seen:
+            seen.append(match.group(1))
+    return seen
+
+
+def candidates(command: str, cwd: str) -> list[tuple[str, str]]:
+    """(program, directory) for every toolchain program this command line
+    will need on PATH -- run directly, or reached through a `git commit`/
+    `git push` hook script. `direnv exec ... yarn` never surfaces one: the
+    leading word of that sub-command is `direnv`, not a toolchain program or
+    `git`, so it is never inspected here."""
+    found: list[tuple[str, str]] = []
+    cd_target: str | None = None
+    for segment in shellwords.sub_commands(shellwords.words_of(command)):
+        word, index = shellwords.leading_command(segment)
+        if word == "cd" and index + 1 < len(segment):
+            candidate = segment[index + 1]
+            if not candidate.startswith("-"):
+                cd_target = candidate
+            continue
+        program = toolchain_program(word)
+        if program:
+            found.append((program, resolve_directory(cd_target, cwd)))
+            continue
+        if is_git(word):
+            subcommand, c_dir = git_subcommand_and_dir(segment, index)
+            hook_name = GIT_HOOK_NAMES.get(subcommand or "")
+            if not hook_name:
+                continue
+            directory = resolve_directory(c_dir or cd_target, cwd)
+            for program in toolchain_mentions(directory, hook_name):
+                found.append((program, directory))
+    return found
+
+
+def main() -> int:
+    payload = json.load(sys.stdin)
+    if payload.get("tool_name") != "Bash":
+        return 0
+
+    command = payload.get("tool_input", {}).get("command", "")
+    if not command:
+        return 0
+
+    cwd = payload.get("cwd") or os.getcwd()
+
+    for program, directory in candidates(command, cwd):
+        if envrc_root(directory) is None:
+            continue
+        if shutil.which(program) is not None:
+            continue
+        display_directory = "." if directory == cwd else directory
+        print(
+            "%s is not on PATH outside direnv here -- run: direnv exec %s %s"
+            % (program, display_directory, command),
+            file=sys.stderr,
+        )
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit(0)
