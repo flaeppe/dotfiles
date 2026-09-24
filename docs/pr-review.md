@@ -83,10 +83,12 @@ the cut, every comment listed below it at the line it will land on — and `:wq`
 `:q!` abandons, an empty summary posts nothing. The set is recomputed on write, so a
 finding written after the block was drawn still goes up.
 
-The posting trigger is the buffer write, not the keystroke, so a session can drive it
-too: saying "post the review" runs the `pr-session` skill's `post-review` phase, which
-tidies the markers, composes a summary that does not restate them, and writes the same
-compose buffer from a headless `nvim`. The keybindings are unaffected either way.
+`review post <pr> [--dry-run]` posts the same way from outside the editor, so a session
+can drive it too: saying "post the review" composes `.review/post.json` -- merging,
+dropping and rewording the marker set into something that reads well as a PR comment,
+never adding a claim no marker carries -- then runs this one documented command, with no
+editor or `gh` discovery. `--dry-run` prints the composed review and posts nothing. The
+keybindings are unaffected either way.
 
 Anchoring needs two translations, and both are the reason this is mechanical rather than
 hand-transcribed:
@@ -217,6 +219,7 @@ worktree's copy, so one session means one `.review/`.
 | `session.json` | `review <pr>` | PR, role, pinned commits, stack branch, socket paths |
 | `order.json` | the session | the route through the PR: one entry per changed file |
 | `summary.md` | the session | the review as prose: answer first, then themes |
+| `post.json` | the session, on "post the review" | the composed review -- `event`, `body`, `comments[]` -- for `review post` to post |
 | `policy.json` | the session (optional) | constraints the assembled review must honour |
 | `findings.md` | the editor | the harvested marker set, `note` excluded |
 | `messages/<id>.md` | `implement` | that suggestion commit's message: what it achieves, what was ruled out, what was verified |
@@ -338,6 +341,16 @@ whether deleting the branch would be recoverable.
 `retire` refuses rather than forces when something would be lost — uncommitted work in the
 stack worktree, an editor still serving on the session's socket, or a shell standing inside
 a worktree about to be removed. `--force` overrides the first two.
+
+```
+review post <pr> [--dry-run]
+```
+
+Posts `.review/post.json` as one GitHub review: deterministic and LLM-free, it checks
+each comment's `path`+`line` against the PR's own diff at this worktree's HEAD and posts,
+it never composes one. A comment landing outside a diff hunk moves into the body under
+its own heading instead of being dropped — GitHub rejects the whole review on one bad
+anchor. `--dry-run` prints exactly what would post and posts nothing.
 
 ### Worktree preparation
 
@@ -594,3 +607,5 @@ why they are here.
 - `fish/functions/review.fish` — session bootstrap and verb dispatch.
 - `fish/functions/_review_retire.fish` — archive, then teardown.
 - `fish/functions/_review_list.fish` — what sessions exist, live or retired.
+- `fish/functions/_review_post.fish` — checks `.review/post.json` against the PR's diff
+  and posts it; composing that file is a session's job, not this command's.

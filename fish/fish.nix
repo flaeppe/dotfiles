@@ -131,6 +131,14 @@
             ${builtins.readFile ./functions/_review_retire.fish}
           '';
         };
+        # Reached through `review post`. Deterministic and LLM-free -- composing
+        # `.review/post.json` is a session's job, this only anchors and posts it.
+        _review_post = {
+          description = "Posts .review/post.json as one PR review, checked against the diff";
+          body = ''
+            ${builtins.readFile ./functions/_review_post.fish}
+          '';
+        };
         _review_skim = {
           description =
             "Opens the read-only skim worktree for browsing pull requests across the org";

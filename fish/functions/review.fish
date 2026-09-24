@@ -12,6 +12,7 @@
 #   review skim [<pr>]      the read-only surface: browse PRs across the org, one worktree
 #   review list             every session in this repo, live or retired
 #   review retire <pr>      archive a session and take its worktrees down
+#   review post <pr>        post .review/post.json as one PR review; see `_review_post --help`
 #
 # <pr> is a bare number in this repository, or a pull-request URL naming another one --
 # own PRs included, so a link pasted out of a browser or Slack works exactly like a
@@ -26,6 +27,9 @@ switch "$argv[1]"
         return $status
     case skim
         _review_skim $argv[2..]
+        return $status
+    case post
+        _review_post $argv[2..]
         return $status
 end
 
@@ -44,7 +48,7 @@ for arg in $argv
 end
 
 if test -z "$pr_arg"
-    echo "Usage: review <pr-number|url> [--stack] | review skim [<pr-number|url>] | review list | review retire <pr-number>"
+    echo "Usage: review <pr-number|url> [--stack] | review skim [<pr-number|url>] | review list | review retire <pr-number> | review post <pr-number>"
     return 1
 end
 
