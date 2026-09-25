@@ -71,6 +71,9 @@ if test (count $fields) -eq 2
     if test $stack -eq 1
         set handoff "$handoff --stack"
     end
+    if test $no_tab -eq 1
+        set handoff "$handoff --no-tab"
+    end
     fish -c "cd $fields[1]; and $handoff"
     return $status
 end
