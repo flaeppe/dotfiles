@@ -1,11 +1,23 @@
 #!/usr/bin/python3
-"""Claude Code PreToolUse gate for `gcloud`.
+"""Claude Code PreToolUse gate for Cloud Monitoring and Cloud Logging access.
 
-Input: a PreToolUse payload on stdin for a Bash tool call. Any `gcloud
-logging` invocation on the command line -- including inside pipes, `timeout`,
-or another wrapper -- is denied with a redirect to `af log`; every other
-gcloud invocation gets an `ask` verdict. Non-gcloud commands and non-Bash
-tool calls get no verdict.
+Input: a PreToolUse payload on stdin for a Bash tool call. Denies two things:
+
+  * any command whose text contains `monitoring.googleapis.com` or
+    `logging.googleapis.com` -- catching curl, wget, httpie, xh, or any other
+    way of hitting those REST APIs directly, not just a named list of clients
+  * a `gcloud logging ...` / `gcloud monitoring ...` invocation, wherever it
+    sits on the command line -- including inside a pipe, `timeout`, or
+    another wrapper
+
+Each is redirected to the matching read-only wrapper CLI (`af log read` /
+`af metrics query`). Every other gcloud invocation gets an `ask` verdict;
+everything else gets no verdict.
+
+Ceiling: the host match is a plain substring test over the whole command
+text, so a command that only quotes or mentions one of those hostnames -- a
+commit message, a comment, a grep pattern -- denies too. Narrower than that
+needs parsing the command the way gcloud_invocations does for gcloud.
 """
 
 from __future__ import annotations
@@ -36,9 +48,18 @@ WIDE_FLAGS_WITH_VALUE: Final = frozenset(
     )
 )
 
+LOGGING_HOST: Final = "logging.googleapis.com"
+MONITORING_HOST: Final = "monitoring.googleapis.com"
+
 LOG_REDIRECT_MESSAGE: Final = (
-    "gcloud logging is retired here -- use `af log read <filter> --since 1h` "
+    "Cloud Logging is retired here -- use `af log read <filter> --since 1h` "
     "(read-only Cloud Logging CLI)"
+)
+
+MONITORING_REDIRECT_MESSAGE: Final = (
+    "Cloud Monitoring is retired here -- use `af metrics query <metric-type> "
+    "[filter]` (read-only Cloud Monitoring CLI; `af metrics descriptor "
+    "<metric-type>` lists field names)"
 )
 
 
@@ -83,10 +104,11 @@ def command_path(words: list[str]) -> list[str]:
     return path
 
 
-def is_logging_command(invocation: list[str]) -> bool:
-    """Whether a gcloud invocation, gcloud word included, is a logging one."""
+def gcloud_api_category(invocation: list[str]) -> str | None:
+    """The API category ("logging" or "monitoring") a gcloud invocation,
+    gcloud word included, targets; None otherwise."""
     path = command_path(invocation[1:])
-    return bool(path) and path[0] == "logging"
+    return path[0] if path and path[0] in ("logging", "monitoring") else None
 
 
 def decide(decision: str, reason: str) -> None:
@@ -109,14 +131,27 @@ def main() -> None:
         return
 
     command = payload.get("tool_input", {}).get("command", "")
+
+    if LOGGING_HOST in command:
+        decide("deny", LOG_REDIRECT_MESSAGE)
+        return
+    if MONITORING_HOST in command:
+        decide("deny", MONITORING_REDIRECT_MESSAGE)
+        return
+
     if "gcloud" not in command:
         return
 
     invocations = gcloud_invocations(shellwords.words_of(command))
     if not invocations:
         return
-    if any(is_logging_command(invocation) for invocation in invocations):
+    if any(gcloud_api_category(invocation) == "logging" for invocation in invocations):
         decide("deny", LOG_REDIRECT_MESSAGE)
+        return
+    if any(
+        gcloud_api_category(invocation) == "monitoring" for invocation in invocations
+    ):
+        decide("deny", MONITORING_REDIRECT_MESSAGE)
         return
     decide("ask", "gcloud requires approval")
 
