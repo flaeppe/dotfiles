@@ -22,12 +22,20 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from typing import Final
 
 import shellwords
 
 MARKER: Final = "<!-- pr:v1 -->"
+
+# A PR's own description lives at `.../pulls` (create) or `.../pulls/<number>`
+# (edit) -- sibling resources nested under a PR (`/comments`, `/reviews`,
+# `/requested_reviewers`, ...) have more path after the number and don't
+# match. An optional leading slash and `repos/<owner>/<repo>/` prefix cover
+# how `gh api` endpoints are usually written.
+PR_BODY_ENDPOINT: Final = re.compile(r"/?(repos/[^/]+/[^/]+/)?pulls(/\d+)?/?")
 
 # Checked as a plain substring anywhere in the body -- these never resolve for
 # a reader who only has GitHub and this repo.
@@ -149,8 +157,10 @@ def pr_body(segment: list[str], start: int, cwd: str) -> tuple[str | None, str]:
 
 def api_pr_body(segment: list[str], start: int) -> tuple[str | None, str] | None:
     """(body text, description) if this `gh api` call POSTs/PATCHes a `body`
-    field onto a `.../pulls` endpoint, else None -- it's not a call this
-    guard covers.
+    field onto the PR's own description endpoint (`.../pulls` or
+    `.../pulls/<number>`), else None -- it's not a call this guard covers.
+    A reply to a review comment, an issue comment or a review submission
+    targets a different endpoint and passes through untouched.
 
     Ceiling: only `-f`/`-F`/`--field`/`--raw-field body=...` is read as the
     body. A JSON body from `--input <file>`/`--input -`, or a `gh api
@@ -183,7 +193,7 @@ def api_pr_body(segment: list[str], start: int) -> tuple[str | None, str] | None
             endpoint = word
         index += 1
 
-    if not endpoint or "pulls" not in endpoint:
+    if not endpoint or not PR_BODY_ENDPOINT.fullmatch(endpoint.split("?", 1)[0]):
         return None
     if method is None:
         method = "POST" if saw_fields else "GET"

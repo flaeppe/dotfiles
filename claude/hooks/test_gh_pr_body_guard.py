@@ -118,6 +118,23 @@ class GhPrBodyGuardTest(unittest.TestCase):
         result = self.run_guard("gh pr list")
         self.assertEqual(result.returncode, 0)
 
+    def test_allows_review_comment_reply_endpoint(self):
+        command = 'gh api repos/example/example/pulls/1/comments/2/replies -f "body=no marker, not a PR body"'
+        result = self.run_guard(command)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_allows_review_comment_reply_via_in_reply_to(self):
+        command = (
+            'gh api repos/example/example/pulls/1/comments '
+            '-f in_reply_to=2 -f "body=no marker, not a PR body"'
+        )
+        result = self.run_guard(command)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_allows_pr_comment(self):
+        result = self.run_guard('gh pr comment 1 --body "no marker, not a PR body"')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_ignores_a_non_bash_tool(self):
         payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "x"}})
         result = subprocess.run([str(GUARD)], input=payload, capture_output=True, text=True, timeout=10)
