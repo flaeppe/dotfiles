@@ -1,6 +1,6 @@
 ---
 name: pr
-description: Create a pull request with well-structured title and description
+description: Write or edit a pull request's title and body. Use before gh pr create, gh pr edit, or "open a PR".
 user-invocable: true
 ---
 Push the branch, then read EVERY commit on it — not just the latest — before
@@ -38,10 +38,6 @@ If either fails, cut. Do not justify the length. The commonest overrun is a body
 that argues for the change — the diff plus one `file:line` already does that.
 
 **A body larger than its own diff is the failure this gate exists to catch.**
-Observed: a 58-line body on a `+58/-4` diff, carrying five headings, a
-`## Testing` section and a "findings from building it" section — every one of
-them already forbidden below. The rules were present; nothing checked them, so
-add the check rather than re-reading the rules.
 
 Two that hit it, both one file:
 
@@ -60,6 +56,11 @@ Two that hit it, both one file:
 
 ### Never write
 
+- **Anything only this machine or this conversation can resolve.** A path
+  outside the repo (`~/.plan/…`, `/Users/…`), a plan file's name or number
+  ("per 041"), the tools and sessions that did the work (Sam, a subagent, me,
+  af, kn, "this session", "the sandbox"), or who will merge. If the evidence
+  lives in a plan file, state the fact and its number, not where it lives.
 - **That tests, lint, typecheck or CI ran or passed — and no section for it.**
   `## Test plan`, `## Testing`, `## Verification`, `- [x] tests pass`: all go,
   including the ones carrying real counts. The checks report themselves on the
@@ -109,8 +110,13 @@ ask "what's a leg?", replace the noun — not the sentence.
 
 ## Create it
 
+Body's last line, always: `<!-- pr:v1 -->`. A hook checks for it and blocks
+the create/edit without it — invisible in the rendered PR, so it costs
+nothing.
+
     gh pr create --title "type(scope): subject" --body "$(cat <<'BODY'
     ...
+    <!-- pr:v1 -->
     BODY
     )"
 

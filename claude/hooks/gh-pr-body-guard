@@ -1,0 +1,308 @@
+#!/usr/bin/python3
+"""Claude Code PreToolUse guard: refuse `gh pr create`/`gh pr edit` (and the
+equivalent `gh api .../pulls` call) unless the body carries the `pr` skill's
+marker, and unless the marked body passes the skill's content rules.
+
+Two refusals:
+1. No marker (including a body this hook cannot read at all, e.g. `--fill`,
+   no body flag, or a `--body-file -`/`@-` stdin body): send the session to
+   the skill. The refusal never prints the marker itself, or a session would
+   paste it back without ever loading the skill.
+2. Marker present, content lint fails: name the rule and quote the line.
+
+Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0
+-- a broken guard must never wedge a session.
+
+Shebang is an absolute path, not `env python3`, for the same reason as
+git-local-path-guard beside it: a project's own direnv/flake shell can shadow
+the global interpreter on PATH.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from typing import Final
+
+import shellwords
+
+MARKER: Final = "<!-- pr:v1 -->"
+
+# Checked as a plain substring anywhere in the body -- these never resolve for
+# a reader who only has GitHub and this repo.
+LOCAL_ONLY_FRAGMENTS: Final = (
+    ".plan/",
+    "_cross/",
+    "_private/",
+    ".claude/plans/",
+    "/Users/",
+    "~/",
+)
+
+# Matched as a line prefix (after stripping leading whitespace).
+FORBIDDEN_HEADINGS: Final = ("## Test plan", "## Testing", "## Summary")
+
+MAX_BODY_LINES: Final = 12
+
+# `gh api` global flags that consume a value, so the endpoint scan does not
+# mistake a flag's argument for the positional endpoint.
+API_VALUE_FLAGS: Final = frozenset(
+    (
+        "-H",
+        "--header",
+        "--jq",
+        "--template",
+        "--hostname",
+        "--cache",
+        "--input",
+    )
+)
+API_FIELD_FLAGS: Final = frozenset(("-f", "-F", "--field", "--raw-field"))
+API_METHOD_FLAGS: Final = frozenset(("-X", "--method"))
+
+# `gh` global flags that take a value, so the subcommand scan does not treat
+# a flag's argument (e.g. the repo of `-R owner/repo`) as the subcommand.
+GH_GLOBAL_FLAGS_WITH_VALUE: Final = frozenset(("-R", "--repo", "--hostname"))
+
+
+def read_file(path: str, cwd: str) -> str | None:
+    expanded = os.path.expanduser(os.path.expandvars(path.strip("\"'")))
+    absolute = expanded if os.path.isabs(expanded) else os.path.join(cwd, expanded)
+    try:
+        with open(absolute, encoding="utf-8", errors="replace") as handle:
+            return handle.read()
+    except OSError:
+        return None
+
+
+def resolve_body_source(value: str, cwd: str) -> tuple[str | None, str]:
+    """(body text, description) for a --body-file/-F value or a `gh api`
+    `-f body=...` value. None means it could not be read -- refuse rather
+    than guess, per `-` / `@-` meaning stdin, which this hook cannot see."""
+    if value in ("-", "@-"):
+        return None, "stdin body ('%s') can't be inspected" % value
+    path = value[1:] if value.startswith("@") else value
+    text = read_file(path, cwd)
+    if text is None:
+        return None, "%s couldn't be read" % path
+    return text, path
+
+
+def flag_value(segment: list[str], index: int) -> tuple[str | None, int]:
+    """(value, index following the flag and its value) for `--flag value` or
+    `--flag=value` starting at index."""
+    word = segment[index]
+    if "=" in word:
+        return word.split("=", 1)[1], index + 1
+    if index + 1 < len(segment):
+        return segment[index + 1], index + 2
+    return None, index + 1
+
+
+def gh_calls(command: str) -> list[tuple[list[str], int]]:
+    """(sub-command words, index of `gh`) for each `gh` standing in command
+    position -- mirrors git-local-path-guard's `git_invocations`."""
+    calls: list[tuple[list[str], int]] = []
+    for segment in shellwords.sub_commands(shellwords.words_of(command)):
+        word, index = shellwords.leading_command(segment)
+        if word == "gh":
+            calls.append((segment, index))
+    return calls
+
+
+def gh_subcommand(segment: list[str], gh_index: int) -> tuple[str | None, int]:
+    """(top-level gh command, its index), skipping global flags that take a
+    value -- mirrors git-local-path-guard's `git_invocation`."""
+    index = gh_index + 1
+    while index < len(segment):
+        word = segment[index]
+        if not word.startswith("-"):
+            return word, index
+        index += 2 if word in GH_GLOBAL_FLAGS_WITH_VALUE else 1
+    return None, index
+
+
+def pr_body(segment: list[str], start: int, cwd: str) -> tuple[str | None, str]:
+    """(body text, description) for a `gh pr create`/`edit` invocation.
+    None body means there is nothing to lint yet: --fill, no body flag at
+    all, or a body source that could not be read."""
+    index = start
+    while index < len(segment):
+        word = segment[index]
+        flag = word.split("=", 1)[0]
+        if flag in ("--body", "-b"):
+            value, _ = flag_value(segment, index)
+            if value is None:
+                return None, "--body (empty)"
+            return value, "--body"
+        if flag in ("--body-file", "-F"):
+            value, _ = flag_value(segment, index)
+            if value is None:
+                return None, "--body-file (empty)"
+            return resolve_body_source(value, cwd)
+        if word == "--fill" or word.startswith("--fill-"):
+            return None, word
+        index += 1
+    return None, "no body flag"
+
+
+def api_pr_body(segment: list[str], start: int) -> tuple[str | None, str] | None:
+    """(body text, description) if this `gh api` call POSTs/PATCHes a `body`
+    field onto a `.../pulls` endpoint, else None -- it's not a call this
+    guard covers.
+
+    Ceiling: only `-f`/`-F`/`--field`/`--raw-field body=...` is read as the
+    body. A JSON body from `--input <file>`/`--input -`, or a `gh api
+    graphql` mutation, passes through unlinted -- add here if those show up.
+    """
+    endpoint: str | None = None
+    method: str | None = None
+    body: str | None = None
+    saw_fields = False
+    index = start
+    while index < len(segment):
+        word = segment[index]
+        if word in API_METHOD_FLAGS:
+            value, index = flag_value(segment, index)
+            method = (value or "").upper()
+            continue
+        if word in API_FIELD_FLAGS:
+            saw_fields = True
+            value, index = flag_value(segment, index)
+            if value and value.startswith("body="):
+                body = value[len("body=") :]
+            continue
+        if word in API_VALUE_FLAGS:
+            _, index = flag_value(segment, index)
+            continue
+        if word.startswith("-"):
+            index += 1
+            continue
+        if endpoint is None:
+            endpoint = word
+        index += 1
+
+    if not endpoint or "pulls" not in endpoint:
+        return None
+    if method is None:
+        method = "POST" if saw_fields else "GET"
+    if method not in ("POST", "PATCH") or body is None:
+        return None
+    # `-f key=value` is literal text; only `@file`/`@-` reads from disk/stdin.
+    if body.startswith("@"):
+        return resolve_body_source(body, os.getcwd())
+    return body, endpoint
+
+
+def pr_body_calls(command: str, cwd: str) -> list[tuple[str | None, str]]:
+    """(body text or None, description) for every gh pr create/edit and
+    body-bearing gh api .../pulls call in the command."""
+    calls: list[tuple[str | None, str]] = []
+    for segment, gh_index in gh_calls(command):
+        subcommand, sub_index = gh_subcommand(segment, gh_index)
+        if subcommand == "pr" and sub_index + 1 < len(segment) and segment[
+            sub_index + 1
+        ] in ("create", "edit"):
+            calls.append(pr_body(segment, sub_index + 2, cwd))
+        elif subcommand == "api":
+            call = api_pr_body(segment, sub_index + 1)
+            if call is not None:
+                calls.append(call)
+    return calls
+
+
+def has_trailing_marker(body: str) -> bool:
+    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    return bool(lines) and lines[-1] == MARKER
+
+
+def is_push_back_line(line: str) -> bool:
+    # Normalize "Push back", "**Push back**" and "**Push back on:**" alike --
+    # all three name the same required line in practice.
+    return line.strip().lstrip("*").strip().lower().startswith("push back")
+
+
+def lint_findings(body: str) -> list[tuple[str, str]]:
+    """(rule that failed, offending line) for every content-lint violation of
+    an already-marked body."""
+    findings: list[tuple[str, str]] = []
+    lines = body.splitlines()
+    non_blank = [line for line in lines if line.strip()]
+
+    for fragment in LOCAL_ONLY_FRAGMENTS:
+        for line in lines:
+            if fragment in line:
+                findings.append(
+                    ("names a path only this machine has (%s)" % fragment, line.strip())
+                )
+                break
+
+    for line in lines:
+        stripped = line.strip()
+        for heading in FORBIDDEN_HEADINGS:
+            if stripped.startswith(heading):
+                findings.append(("`%s` heading is not allowed" % heading, stripped))
+
+    if len(non_blank) > MAX_BODY_LINES:
+        findings.append(
+            (
+                "body is %d non-blank lines, over the %d-line cap"
+                % (len(non_blank), MAX_BODY_LINES),
+                non_blank[-1],
+            )
+        )
+
+    if not any(is_push_back_line(line) for line in lines):
+        findings.append(
+            ("no line states what to push back on", non_blank[-1] if non_blank else "")
+        )
+
+    return findings
+
+
+def refuse_no_marker(source: str) -> int:
+    print(
+        "\n".join(
+            [
+                "BLOCKED: this PR body (%s) has no marker to check." % source,
+                "",
+                "Load the pr skill (/pr) and write the body through it.",
+            ]
+        ),
+        file=sys.stderr,
+    )
+    return 2
+
+
+def refuse_lint(findings: list[tuple[str, str]]) -> int:
+    lines = ["BLOCKED: this PR body breaks the pr skill's rules.", ""]
+    for rule, line in findings:
+        lines.append("  %s: %r" % (rule, line))
+    lines += ["", "Fix the body and try again."]
+    print("\n".join(lines), file=sys.stderr)
+    return 2
+
+
+def main() -> int:
+    payload = json.load(sys.stdin)
+    if payload.get("tool_name") != "Bash":
+        return 0
+
+    command = payload.get("tool_input", {}).get("command", "")
+    cwd = payload.get("cwd") or os.getcwd()
+
+    for body, source in pr_body_calls(command, cwd):
+        if body is None or not has_trailing_marker(body):
+            return refuse_no_marker(source)
+        findings = lint_findings(body)
+        if findings:
+            return refuse_lint(findings)
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(main())
+    except Exception:
+        sys.exit(0)

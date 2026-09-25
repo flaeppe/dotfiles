@@ -5,6 +5,9 @@ claude/hooks/git-local-path-guard
 claude/hooks/plan-verified-guard
 claude/hooks/plan-check-guard
 claude/hooks/test_plan_check_guard.py
+claude/hooks/gh-pr-body-guard
+claude/hooks/test_gh_pr_body_guard.py
+claude/skills/pr/SKILL.md
 git/git.nix
 nvim/lua/plugins/plan.lua
 nvim/lua/plugins/notes.lua

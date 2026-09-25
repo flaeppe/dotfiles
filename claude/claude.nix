@@ -88,6 +88,9 @@ in {
       ./hooks/git-local-path-guard
     } "$HOME/.claude/hooks/git-local-path-guard"
     install -m 755 ${
+      ./hooks/gh-pr-body-guard
+    } "$HOME/.claude/hooks/gh-pr-body-guard"
+    install -m 755 ${
       ./hooks/protected-path-guard
     } "$HOME/.claude/hooks/protected-path-guard"
     install -m 755 ${
