@@ -59,7 +59,7 @@ in {
   launchd.agents.me-outside-review = lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
-      ProgramArguments = [ me "outside-review" ];
+      ProgramArguments = [ me "outside-review" "run" ];
       StartCalendarInterval = [{
         Hour = 6;
         Minute = 30;
