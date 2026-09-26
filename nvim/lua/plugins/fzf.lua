@@ -99,18 +99,51 @@ end, { desc = "Project symbols (ctags, every language at once)" })
 vim.keymap.set("n", "<Leader>e", function()
     fzf.lsp_live_workspace_symbols()
 end, { desc = "Project symbols (LSP, type-accurate)" })
--- The aerial picker lists the outline as an indented tree with the cursor's
--- symbol preselected, so an empty query reads as the file's structure and a
--- typed one narrows it.
-vim.keymap.set("n", "<Leader>d", function()
-    -- aerial defers its setup; the backend lookup reads config it has not loaded yet.
-    require("aerial").sync_load()
-    local has_outline_backend = require("aerial.backends").get() ~= nil
-    if has_outline_backend then
-        return require("aerial").fzf_lua_picker()
+local function lsp_supports(method)
+    for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
+        if client:supports_method(method) then
+            return true
+        end
     end
-    fzf.btags()
-end, { desc = "Document symbols as an outline tree (aerial, ctags fallback)" })
+    return false
+end
+-- The outline sidebar stays on screen beside the picker, as a map of the whole
+-- file to read names from while typing the query. The picker is sized to the
+-- side of the sidebar with more room, so the float never covers it.
+vim.keymap.set("n", "<Leader>d", function()
+    local aerial = require("aerial")
+    local outline_was_open = aerial.is_open()
+    aerial.open({ focus = false })
+    local outline_win
+    for _, win in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if vim.bo[vim.api.nvim_win_get_buf(win)].filetype == "aerial" then
+            outline_win = win
+        end
+    end
+    local winopts = {}
+    if outline_win then
+        local outline_col = vim.api.nvim_win_get_position(outline_win)[2]
+        local outline_end = outline_col + vim.api.nvim_win_get_width(outline_win) + 1
+        local room_left = outline_col - 1
+        local room_right = vim.o.columns - outline_end
+        if room_left >= room_right then
+            winopts = { col = 0, width = room_left }
+        else
+            winopts = { col = outline_end, width = room_right }
+        end
+        -- The backdrop dims the whole editor, the sidebar included.
+        winopts.backdrop = false
+        winopts.on_close = function()
+            if not outline_was_open and vim.api.nvim_win_is_valid(outline_win) then
+                vim.api.nvim_win_close(outline_win, false)
+            end
+        end
+    end
+    if lsp_supports("textDocument/documentSymbol") then
+        return fzf.lsp_document_symbols({ winopts = winopts })
+    end
+    fzf.btags({ winopts = winopts })
+end, { desc = "Document symbols, with the outline sidebar beside them" })
 -- Call hierarchy has no ctags equivalent: tags record where a name is defined,
 -- never who reaches it.
 vim.keymap.set("n", "<Leader>ci", function()
