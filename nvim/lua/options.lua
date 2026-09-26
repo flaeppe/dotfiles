@@ -24,6 +24,19 @@ vim.opt.errorbells = false
 vim.opt.clipboard = "unnamedplus"
 -- Relative line number on by default
 vim.opt.relativenumber = true
+-- Keep the cursor line vertically centred, so the lines below it are always on
+-- screen without a manual zz after every move. A zz per move rather than
+-- scrolloff=999, because scrolloff never scrolls past the last line and so
+-- pins the end of a file to the bottom of the window. File buffers only:
+-- trees, pickers and lists keep their own scrolling.
+vim.api.nvim_create_autocmd("CursorMoved", {
+    callback = function()
+        if vim.bo.buftype ~= "" then
+            return
+        end
+        vim.cmd("normal! zz")
+    end,
+})
 -- Disable mouse
 vim.opt.mouse = ""
 -- No swap files. Their only payoff is crash recovery, which goes unused, while
