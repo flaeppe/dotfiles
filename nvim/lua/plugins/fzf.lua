@@ -99,20 +99,18 @@ end, { desc = "Project symbols (ctags, every language at once)" })
 vim.keymap.set("n", "<Leader>e", function()
     fzf.lsp_live_workspace_symbols()
 end, { desc = "Project symbols (LSP, type-accurate)" })
-local function lsp_supports(method)
-    for _, client in ipairs(vim.lsp.get_clients({ bufnr = 0 })) do
-        if client:supports_method(method) then
-            return true
-        end
-    end
-    return false
-end
+-- The aerial picker lists the outline as an indented tree with the cursor's
+-- symbol preselected, so an empty query reads as the file's structure and a
+-- typed one narrows it.
 vim.keymap.set("n", "<Leader>d", function()
-    if lsp_supports("textDocument/documentSymbol") then
-        return fzf.lsp_document_symbols()
+    -- aerial defers its setup; the backend lookup reads config it has not loaded yet.
+    require("aerial").sync_load()
+    local has_outline_backend = require("aerial.backends").get() ~= nil
+    if has_outline_backend then
+        return require("aerial").fzf_lua_picker()
     end
     fzf.btags()
-end, { desc = "Document symbols (LSP, ctags fallback)" })
+end, { desc = "Document symbols as an outline tree (aerial, ctags fallback)" })
 -- Call hierarchy has no ctags equivalent: tags record where a name is defined,
 -- never who reaches it.
 vim.keymap.set("n", "<Leader>ci", function()
