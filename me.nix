@@ -48,6 +48,27 @@ in {
     };
   };
 
+  # Fires once a day; the command throttles itself to a real 14-day cadence
+  # via a persisted timestamp, same self-throttle shape as me-prs-sweep/
+  # me-pulse above but on a much longer cycle, since it drives a real Codex
+  # turn (cost, not just a cheap local scan) rather than a background scan.
+  # StartCalendarInterval, not StartInterval: a fixed daily check-in beats
+  # the review firing at an arbitrary clock time depending on when the
+  # machine last woke, and 06:30 sits ahead of codex-daily-poke's 07:00 so
+  # the two don't contend for the day's first quota window.
+  launchd.agents.me-outside-review = lib.mkIf pkgs.stdenv.isDarwin {
+    enable = true;
+    config = {
+      ProgramArguments = [ me "outside-review" ];
+      StartCalendarInterval = [{
+        Hour = 6;
+        Minute = 30;
+      }];
+      RunAtLoad = false;
+      EnvironmentVariables.PATH = launchdPath;
+    };
+  };
+
   # Hourly sweep of a Gmail label into a private automation repo; see that
   # repo for what it does and why -- this file only names where it lives.
   # Same shape as me-prs-sweep/me-pulse above, except the target script isn't
