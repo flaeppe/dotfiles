@@ -267,20 +267,6 @@ integration docs, planning documents. When the tool is available:
   needed. Always check for an existing plan before creating a new planning
   document.
 
-### Knowledge vault (kn)
-The `kn` MCP server is the governed, shared vault: table and job concepts,
-caveats, attested numbers. kb is my local index; kn is the shared record.
-When kn is available:
-
-- Search it before investigating a failing job, a table, a vendor
-  integration or a number -- the caveat explaining the failure is often
-  already written down. One search per question; search again when the
-  subject moves.
-- Search both kn and kb for context; neither replaces reading the code or
-  the live system.
-- Every brief or seed handed to another agent or session names both, and
-  what to search them for.
-
 ---
 
 # Compact instructions
