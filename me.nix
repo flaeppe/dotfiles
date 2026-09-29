@@ -69,6 +69,22 @@ in {
     };
   };
 
+  # Once a day: folds new knowledge crumbs into the local kn draft pile via a
+  # headless model with read-only knowledge-base access. The command exits 0
+  # when there is nothing to fold; a fixed 05:30 keeps the run off working hours.
+  launchd.agents.me-kn-draft-sweep = lib.mkIf pkgs.stdenv.isDarwin {
+    enable = true;
+    config = {
+      ProgramArguments = [ me "drafts" "sweep" ];
+      StartCalendarInterval = [{
+        Hour = 5;
+        Minute = 30;
+      }];
+      RunAtLoad = false;
+      EnvironmentVariables.PATH = launchdPath;
+    };
+  };
+
   # Hourly sweep of a Gmail label into a private automation repo; see that
   # repo for what it does and why -- this file only names where it lives.
   # Same shape as me-prs-sweep/me-pulse above, except the target script isn't
