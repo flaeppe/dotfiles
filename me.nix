@@ -75,7 +75,7 @@ in {
   launchd.agents.me-kn-draft-sweep = lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
     config = {
-      ProgramArguments = [ me "drafts" "sweep" ];
+      ProgramArguments = [ me "drafts" "sweep" "--write" ];
       StartCalendarInterval = [{
         Hour = 5;
         Minute = 30;
