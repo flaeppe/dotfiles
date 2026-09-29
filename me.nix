@@ -48,6 +48,26 @@ in {
     };
   };
 
+  # Every 5 minutes, only `sam crumbs poke`: a session is asked for its crumbs
+  # while still inside its prompt cache, an idle window (45-55 min) far
+  # narrower than the pulse cadence. The state repo is resolved at runtime from
+  # ~/.config/me-home, the same machine-local indirection composer-sweep uses.
+  launchd.agents.sam-crumbs-poke = lib.mkIf pkgs.stdenv.isDarwin {
+    enable = true;
+    config = {
+      ProgramArguments = [
+        "${pkgs.bash}/bin/bash"
+        "-c"
+        ''cd "$(cat "$HOME/.config/me-home")" && exec bin/sam crumbs poke''
+      ];
+      StartInterval = 300; # 5 minutes
+      RunAtLoad = false;
+      StandardOutPath = "/dev/null";
+      StandardErrorPath = "/dev/null";
+      EnvironmentVariables.PATH = launchdPath;
+    };
+  };
+
   # Fires once a day; the command throttles itself to a real 14-day cadence
   # via a persisted timestamp, same self-throttle shape as me-prs-sweep/
   # me-pulse above but on a much longer cycle, since it drives a real Codex
