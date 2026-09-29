@@ -111,6 +111,9 @@ in {
     install -m 755 ${
       ./hooks/session-mark
     } "$HOME/.claude/hooks/session-mark"
+    install -m 755 ${
+      ./hooks/session-registry
+    } "$HOME/.claude/hooks/session-registry"
   '';
 
   # Status line script (referenced by settings.json statusLine.command)

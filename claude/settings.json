@@ -221,6 +221,14 @@
             "command": "~/.claude/hooks/cbm-session-reminder"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "~/.claude/hooks/session-registry"
+          }
+        ]
       }
     ]
   }
