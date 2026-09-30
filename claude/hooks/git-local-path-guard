@@ -80,6 +80,24 @@ TOKEN_SEPARATORS: Final = re.compile(r"[^\w.@~${}/+-]+")
 
 HOME_PREFIX: Final = re.compile(re.escape(HOME) + r"/|~/|\$\{?HOME\}?/")
 
+STAGED_CHANGES: Final = ("diff", "--cached")
+
+# Each commit reachable from HEAD but from no remote-tracking ref, diffed against
+# its own parent: exactly what a push would publish. A range against the upstream
+# branch cannot say that -- after a rebase its merge-base is the old fork point,
+# so every commit the rebase pulled in from the default branch looks like the
+# branch's own. Merge commits are skipped, which leaves out conflict resolutions
+# made in a merge; any remote-tracking ref counts as published, whichever remote
+# the push targets.
+UNPUBLISHED_COMMITS: Final = (
+    "log",
+    "--no-merges",
+    "--format=",
+    "HEAD",
+    "--not",
+    "--remotes",
+)
+
 
 def git(directory: str, *args: str) -> str | None:
     """stdout of a git command, or None if it failed."""
@@ -229,10 +247,10 @@ def classify(
 
 
 def added_lines(
-    repo_root: str, revisions: Sequence[str]
+    repo_root: str, diff_command: Sequence[str]
 ) -> Iterator[tuple[str, str, str]]:
     """(repo-relative path, absolute dir, added line) for each added diff line."""
-    diff = git(repo_root, "diff", "--unified=0", "--no-color", *revisions)
+    diff = git(repo_root, *diff_command, "--unified=0", "--no-color", "--patch")
     if diff is None:
         return
     path, file_dir = "", repo_root
@@ -246,27 +264,22 @@ def added_lines(
             yield path, file_dir, line[1:]
 
 
-def changed_paths(repo_root: str, revisions: Sequence[str]) -> list[str]:
-    output = git(repo_root, "diff", "--name-only", *revisions)
-    return output.splitlines() if output else []
+def changed_paths(repo_root: str, diff_command: Sequence[str]) -> list[str]:
+    output = git(repo_root, *diff_command, "--name-only")
+    return [line for line in output.splitlines() if line] if output else []
 
 
-def outgoing_range(repo_root: str) -> str | None:
-    """`<base>...HEAD` covering the commits a push would publish, or None."""
-    for revision in ("@{upstream}", "origin/HEAD"):
-        if git(repo_root, "rev-parse", "--verify", "--quiet", revision):
-            return revision + "...HEAD"
-    return None
-
-
-def scan_diff(repo: Repo, label: str, revisions: Sequence[str]) -> Iterator[Finding]:
-    """(location, token, reason) for every local-only reference in a diff range."""
-    for path in changed_paths(repo.root, revisions):
+def scan_diff(
+    repo: Repo, label: str, diff_command: Sequence[str]
+) -> Iterator[Finding]:
+    """(location, token, reason) for every local-only reference a git diff or
+    log command reports as added."""
+    for path in changed_paths(repo.root, diff_command):
         reason = classify(path, repo.root, repo, PLAN_FRAGMENTS + SCRATCH_FRAGMENTS)
         if reason:
             yield "%s file" % label, path, reason
 
-    for path, file_dir, line in added_lines(repo.root, revisions):
+    for path, file_dir, line in added_lines(repo.root, diff_command):
         if not repo.scans_content_of(path):
             continue
         resolve_relatives = repo.resolves_relatives_of(path)
@@ -330,11 +343,9 @@ def main() -> int:
     # blocked far more honest commits than it caught leaks.
     sources: list[Iterable[Finding]] = []
     if committing:
-        sources.append(scan_diff(repo, "staged", ["--cached"]))
+        sources.append(scan_diff(repo, "staged", STAGED_CHANGES))
     if pushing:
-        outgoing = outgoing_range(repo.root)
-        if outgoing:
-            sources.append(scan_diff(repo, "outgoing", [outgoing]))
+        sources.append(scan_diff(repo, "outgoing", UNPUBLISHED_COMMITS))
 
     findings = deduplicated(sources)
     if not findings:
