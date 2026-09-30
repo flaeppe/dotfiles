@@ -49,8 +49,8 @@ in {
   };
 
   # Every 5 minutes, only `sam crumbs poke`: a session is asked for its crumbs
-  # while still inside its prompt cache, an idle window (45-55 min) far
-  # narrower than the pulse cadence. The state repo is resolved at runtime from
+  # while still inside its prompt cache (idle 45-55 min); past that, and for
+  # sessions it may not type into, it extracts from the transcript instead. The state repo is resolved at runtime from
   # ~/.config/me-home, the same machine-local indirection composer-sweep uses.
   launchd.agents.sam-crumbs-poke = lib.mkIf pkgs.stdenv.isDarwin {
     enable = true;
