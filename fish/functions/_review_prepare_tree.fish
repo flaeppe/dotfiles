@@ -31,7 +31,8 @@ set -l LOCAL_CONFIG .envrc .ignore .sqruff .cbmignore postgres-language-server.j
 # typecheck fails. Symlinked because installing is project-specific and slow,
 # and reviewing rarely needs dependencies that differ from the main checkout's.
 # Stale if the PR itself changes dependencies -- install into the worktree by hand
-# in that case.
+# in that case, after removing the link: an install run through it writes into the
+# main checkout's tree, and from there into every other worktree sharing it.
 #
 # A pnpm/npm/yarn workspace keeps one node_modules per package, not only at the root,
 # so each name here is walked rather than looked up once at $root -- pruned at every
@@ -57,6 +58,16 @@ set -l LOCAL_CONFIG .envrc .ignore .sqruff .cbmignore postgres-language-server.j
 # actually import each other this way needs the same kind of hook, run after this
 # function, to repoint those particular links.
 set -l LINK_DIRS node_modules
+
+# Every link names the main checkout's tree, so one written into it from inside a worktree
+# -- a package manager linking a workspace package by the absolute path it was run from --
+# lands in all of them: each worktree's typecheck then resolves that package to the one
+# worktree that ran the install. Such links are pointed back at the same path in $root.
+# Only the top two levels are walked (`name` and `@scope/name`), where workspace packages
+# are linked. Known ceiling: a link can point into a worktree again between runs, and is
+# repaired by the next one; separate per-entry links for each tree would prevent it.
+set -l escaped_root (string escape --style=regex -- $root)
+set -l sibling_trees (git -C $root worktree list --porcelain | string replace -rf "^worktree ($escaped_root/\.worktrees/.+)\$" '$1')
 
 for name in $LOCAL_CONFIG
     if test -e "$root/$name"; and not test -e "$tree/$name"
@@ -95,6 +106,24 @@ end
 for name in $LINK_DIRS
     for found in (find "$root" -name .git -prune -o -name .worktrees -prune -o -type d -name "$name" -print -prune)
         set -l rel (string replace -- "$root/" "" $found)
+        if set -q sibling_trees[1]
+            for link in (find "$found" -maxdepth 2 -type l)
+                set -l target (readlink $link)
+                string match -q -- '/*' $target; or set target (dirname $link)/$target
+                set target (path normalize -- $target)
+                for sibling in $sibling_trees
+                    string match -q -- "$sibling/*" $target; or continue
+                    set -l replacement "$root/"(string sub -s (math (string length -- $sibling) + 2) -- $target)
+                    if test -e $replacement
+                        ln -sfn $replacement $link
+                        echo "$label: repointed $link from a sibling worktree to $replacement"
+                    else
+                        echo "$label: WARNING $link points into $sibling and $replacement does not exist"
+                    end
+                    break
+                end
+            end
+        end
         set -l parent (dirname "$tree/$rel")
         if not test -d $parent
             # The workspace package's own source isn't in this worktree -- untracked

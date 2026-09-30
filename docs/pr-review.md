@@ -584,7 +584,8 @@ why they are here.
   hook tooling, and the commit is a local suggestion the author's own CI will check
   for real; a blocked accept would strand the change with nowhere to go.
 - **Dependencies are symlinked into the worktrees, not installed.** Stale if the PR
-  itself changes dependencies — install into the worktree by hand in that case.
+  itself changes dependencies — remove the link and install into the worktree by hand in that
+  case; an install run through the link writes into the main checkout's tree.
 - **Whether a stack branch's suggestions landed is never computed.** A squash merge leaves
   its commits unreachable from the base branch, so an ancestry test reads false forever and
   a branch that shipped looks identical to one that was abandoned. Only the reviewed PR's
