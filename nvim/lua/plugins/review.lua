@@ -1226,7 +1226,9 @@ function M.list()
         cwd = root,
         previewer = "builtin",
         winopts = { title = " review markers " },
-        fzf_opts = { ["--ansi"] = true },
+        -- `fzf_exec` is single-select unless asked: without --multi, tab marks nothing
+        -- and ctrl-q's select-all accepts only the row under the cursor.
+        fzf_opts = { ["--ansi"] = true, ["--multi"] = true },
         -- One selection opens it; several become a quickfix list, which is how the
         -- marker set reaches the same surface the work list uses.
         actions = { ["default"] = fzf.actions.file_edit_or_qf },
