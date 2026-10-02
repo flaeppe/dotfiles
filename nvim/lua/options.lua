@@ -57,9 +57,20 @@ function _G.quickfix_position()
     end
     return string.format("[qf %d/%d] ", qf.idx, qf.size)
 end
+-- A buffer's name as the status and tab lines show it: relative to the working
+-- directory whenever it is inside it. A file opened by absolute path keeps that path
+-- as its name, and in a linked worktree the prefix is long enough that the statusline
+-- truncates the repository-relative tail instead.
+function _G.buffer_label(buffer)
+    local name = vim.fn.bufname(buffer)
+    if name == "" then
+        return "[No Name]"
+    end
+    return vim.fn.fnamemodify(name, ":.")
+end
 -- What the status bar should look like
 vim.opt.statusline = "%-10.3n " -- %-10.3n: Buffer number, left-aligned, max 10 chars, min 3 chars
-    .. "%f " -- %f: Full path to the file
+    .. "%{v:lua.buffer_label('%')} " -- %{...}: Evaluate expression. Shows the path relative to the working directory
     .. "%h%m%r%w " -- %h: Help file flag, %m: Modified flag, %r: Readonly flag, %w: Preview window flag
     .. "[%{strlen(&ft)?&ft:'none'}] " -- %{...}: Evaluate expression. Shows filetype or 'none' if empty.
     .. "%=" -- %=: Right-aligns the following items
@@ -70,5 +81,21 @@ vim.opt.statusline = "%-10.3n " -- %-10.3n: Buffer number, left-aligned, max 10 
     -- %c: Current column number
     -- %V: Virtual column number (byte index in line)
     .. "%<%P" -- %<%P: File position as percentage, truncated if too long
+-- Tab labels: the built-in label cuts every directory down to one letter
+-- (`s/s/offers.ts`), which removes exactly the path a tab is told apart by.
+function _G.tabline()
+    local labels = {}
+    local current_tab = vim.fn.tabpagenr()
+    for tab = 1, vim.fn.tabpagenr("$") do
+        local buffers = vim.fn.tabpagebuflist(tab)
+        local bufnr = buffers[vim.fn.tabpagewinnr(tab)]
+        local window_count = #buffers > 1 and (#buffers .. " ") or ""
+        local modified = vim.bo[bufnr].modified and "+" or ""
+        local highlight = tab == current_tab and "%#TabLineSel#" or "%#TabLine#"
+        labels[#labels + 1] = ("%s%%%dT %s%s%s "):format(highlight, tab, window_count, modified, _G.buffer_label(bufnr))
+    end
+    return table.concat(labels) .. "%#TabLineFill#%T"
+end
+vim.opt.tabline = "%!v:lua.tabline()"
 -- Disable unused providers
 vim.g.loaded_perl_provider = 0
