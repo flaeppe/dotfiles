@@ -13,8 +13,8 @@ require("diffview").setup({
         -- A revision's buffer is named `diffview://<git dir>/<rev>/<path>`. In a linked
         -- worktree the git dir is `<main>/.git/worktrees/<name>`, a prefix long enough
         -- that the tabline and statusline cut the part worth reading (`src/...`) away.
-        -- The buffer takes the place its file has in the checkout instead, suffixed with
-        -- the revision so it never collides with the working-tree buffer of that path.
+        -- The buffer is renamed to where its file sits in the checkout, suffixed with the
+        -- revision so it never collides with the working-tree buffer of that path.
         diff_buf_read = function(bufnr)
             local view = require("diffview.lib").get_current_view()
             if not view then
