@@ -116,6 +116,11 @@ local function repo_and_relpath(filepath)
         return nil
     end
     local dir = vim.fn.fnamemodify(filepath, ":h")
+    -- URL-style buffer names (diffview://, fugitive://) have no directory behind
+    -- them, and spawning a process in a missing cwd raises instead of failing.
+    if vim.fn.isdirectory(dir) == 0 then
+        return nil
+    end
     local wt_root = worktree_root(dir)
     local root = main_root(dir)
     if not wt_root or not root then
