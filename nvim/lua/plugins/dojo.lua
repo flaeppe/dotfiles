@@ -57,7 +57,7 @@ local ENTRIES = {
     {
         group = "plan",
         keys = "@svc =status #dir",
-        desc = "In that list: @service, =status, #folder, .category, ?review, ?stale -- and 'word to match fuzzily",
+        desc = "In that list: @service, =status, #folder, .type, ?review, ?stale -- and 'word to match fuzzily",
         added = "2026-08-16",
         run = false,
     },

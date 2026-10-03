@@ -49,7 +49,9 @@ Every file starts with YAML frontmatter, before the title:
 ```markdown
 ---
 status: Draft | In Progress | Complete | Deferred | Superseded | Abandoned
-category: code | docs | ticket | record
+type: Research | Decision | Build | Review | Monitoring | Seed | Record | Reference
+summary: one line, at most 140 characters
+journal: <journal-key>
 services: [repo, other-repo@6537]
 verified: YYYY-MM-DD
 date: YYYY-MM-DD
@@ -63,11 +65,23 @@ next: NNN-filename.md
 | field | rule |
 | --- | --- |
 | `status` | one of those six words, nothing else — any nuance goes in `status_note` |
+| `type` | required; exactly one of the eight values, TitleCase. `category` is retired and refused, naming the `type` it maps to |
+| `summary` | optional; one line, at most 140 characters |
+| `journal` | optional; the key of the journal the plan belongs to |
 | `services` | every repo the work touches, not just the one it is filed under |
 | `@<ref>` | the PR or SHA that carried it. Never a branch — branches get deleted |
 | `verified` | date the status was last checked against reality |
 | `review` | why it could not be settled. Replaces `verified`; never sits beside it |
 
+- `type` says what the file is for. `Research` finds out, `Decision` chooses,
+  `Build` changes code or config, `Review` answers a review, `Monitoring`
+  watches something after a change, `Seed` is a prompt that starts a session,
+  `Record` is an append-only ledger or log, `Reference` is a fact sheet.
+- `Record` and `Reference` are never "done", so they are exempt from the
+  done-when requirement.
+- Files in the vault drafts directories keep their own vault `type` values; the
+  closed set does not apply to them, and `me plans check-file` skips the check
+  for those paths.
 - A ref hangs off its service because a PR number only resolves next to a repo.
 - `verified` is what makes drift detectable: a status is a claim, a status plus
   a date is a claim with an age.

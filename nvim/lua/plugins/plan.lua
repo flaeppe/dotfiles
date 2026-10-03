@@ -11,7 +11,8 @@
 --   @service   every repo in `services:`, so a _cross plan touching payout answers @payout
 --   #dir       where it is filed, repository-qualified: #_cross, #api/de-signing-provider
 --   =status    the six words the planning skill allows, `=?` for a header claiming none
---   .category  code | docs | ticket | record
+--   .type      Research | Decision | Build | Review | Monitoring | Seed | Record | Reference
+--              (a plan not yet migrated shows its old `category:` instead)
 --   ?review    the header carries a `review:` flag in place of a `verified:` stamp
 --   ?stale     verified, but longer ago than the threshold `plan-status --stale` uses
 --
@@ -215,7 +216,7 @@ local function rows()
             end
             vim.list_extend(facets, service_tokens(meta.services))
             table.insert(facets, ANSI.directory .. "#" .. vim.fs.dirname(relative) .. ANSI.off)
-            table.insert(facets, ANSI.dim .. "." .. (meta.category or "?") .. ANSI.off)
+            table.insert(facets, ANSI.dim .. "." .. (meta.type or meta.category or "?") .. ANSI.off)
             -- The filename last, because typing at it has to work: on half of these plans it
             -- carries a word the heading does not (`scope-and-sequence` over "Mark the
             -- payments file uploaded"), and the path itself is in the hidden field, where
@@ -320,7 +321,7 @@ local function list()
     fzf.fzf_exec(all, {
         prompt = "plans> ",
         winopts = {
-            title = (" %d plans · @service #dir =status .category ?review ?stale · 'fuzzy · ctrl-g grep these "):format(
+            title = (" %d plans · @service #dir =status .type ?review ?stale · 'fuzzy · ctrl-g grep these "):format(
                 #all
             ),
             preview = { layout = "flex", horizontal = ("right:%d"):format(preview_width()) },
