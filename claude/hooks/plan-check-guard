@@ -184,7 +184,7 @@ def main() -> int:
         message_lines.append(
             "a (CHECK: ...) is present but inside a code fence -- fenced "
             "markers are quoted rather than run; unfence it so `me plans "
-            "check-file` (and `me check`) can see it."
+            "check-file` can see it."
         )
 
     print(
