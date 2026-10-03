@@ -226,10 +226,12 @@ worktree's copy, so one session means one `.review/`.
 | `out/` | `assemble` | the review artifacts, local until `publish` |
 
 `summary.md` is written answer-first, so its opening block is the whole review in a few
-sentences. That block is inlined into the orientation panel and the file is reachable from
-there, which is what makes the reasoning available without harvesting — harvesting rewrites
-`findings.md` from whatever the marker set currently is, so reaching prose through it would
-mean advancing the workflow to read.
+sentences; the mode (`light` or `full`) is its closing line. A summary from before that
+change opens with the mode as a bare word, which the panel skips. The opening block is
+inlined into the orientation panel and the file is reachable from there, which is what makes
+the reasoning available without harvesting — harvesting rewrites `findings.md` from whatever
+the marker set currently is, so reaching prose through it would mean advancing the workflow
+to read.
 
 **Analysis provider.** Analysis is pluggable, and a provider is a **function**: a PR
 goes in, a finding set comes out — an order, the findings with their sites, the review

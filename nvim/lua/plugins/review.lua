@@ -708,13 +708,21 @@ end
 --- is the summary's to decide. The cap is a backstop for prose that outgrew its own format,
 --- and it announces itself rather than stopping mid-sentence, since a page that silently
 --- truncates a paragraph reads as broken rather than as abridged.
+---
+--- A line 1 that is only the review mode (`light` or `full`) is a label, not prose, and is
+--- skipped; summaries written before the mode moved to a closing line begin that way.
 local function summary_opening(dir)
     local path = dir .. "/summary.md"
     if vim.fn.filereadable(path) ~= 1 then
         return nil
     end
+    local lines = vim.fn.readfile(path)
+    local first = lines[1] and vim.trim(lines[1])
+    if first == "light" or first == "full" then
+        table.remove(lines, 1)
+    end
     local out, truncated = {}, false
-    for _, line in ipairs(vim.fn.readfile(path)) do
+    for _, line in ipairs(lines) do
         if line:match("^#") then
             if #out > 0 then
                 break
