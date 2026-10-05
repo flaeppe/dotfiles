@@ -16,9 +16,31 @@
     "pr": ""
   },
   "enabledPlugins": {
-    "pg@aiguide": true,
+    "pg@aiguide": false,
     "context7-plugin@context7-marketplace": true
   },
+  "skillOverrides": {
+    "dataviz": "off",
+    "update-config": "off",
+    "claude-in-chrome": "off",
+    "run": "off",
+    "loop": "off",
+    "workflow-authoring": "off",
+    "fewer-permission-prompts": "off"
+  },
+  "deniedMcpServers": [
+    { "serverName": "claude.ai Notion" },
+    { "serverName": "claude.ai Google Calendar" },
+    { "serverName": "claude.ai Google Drive" },
+    { "serverName": "claude.ai Google Sheets" },
+    { "serverName": "claude.ai Google Docs" },
+    { "serverName": "claude.ai Figma" },
+    { "serverName": "claude.ai Excalidraw" },
+    { "serverName": "claude.ai Canva" },
+    { "serverName": "claude.ai meta" },
+    { "serverName": "claude.ai Higgsfield" },
+    { "serverName": "claude.ai Claude Docs" }
+  ],
   "permissions": {
     "allow": [
       "Bash(git status*)",
