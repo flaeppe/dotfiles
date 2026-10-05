@@ -80,7 +80,8 @@
       "Artifact",
       "Workflow",
       "ReportFindings",
-      "ShareOnboardingGuide"
+      "ShareOnboardingGuide",
+      "SendFeedback"
     ],
     "ask": [
       "Bash(terraform*)",
