@@ -108,7 +108,7 @@ set -l title $fields[3]
 set -l url $fields[4]
 
 echo "review $pr: fetching pull/$pr/head"
-git fetch -q --force origin "pull/$pr/head:refs/heads/pr/$pr"; or return 1
+git fetch -q --force --no-prune origin "pull/$pr/head:refs/heads/pr/$pr"; or return 1
 git fetch -q origin "$base_branch"
 
 # The upstream tip, which is not necessarily what this session reviews: the author
