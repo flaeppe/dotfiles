@@ -345,6 +345,18 @@ stack worktree, an editor still serving on the session's socket, or a shell stan
 a worktree about to be removed. `--force` overrides the first two.
 
 ```
+review refresh <pr>
+```
+
+Moves the head worktree onto the PR's current head after the author pushed, markers carried
+along, and prints the commits and `--stat` since the commit last reviewed. `session.json`'s
+`pr_head`, `pr_tip` and `merge_base` follow, so the sign column and `review post` measure
+against the new head; the old head is kept in `.review/previous_head`, and an editor serving
+on the session opens `:DiffviewOpen <old>..<new>`. It is a plain `git checkout --detach`, so
+git refuses — naming the files, tree untouched — when a marked file differs between the two
+heads. The stack worktree is not moved: its suggestions are commits on the old head.
+
+```
 review post <pr> [--dry-run]
 ```
 

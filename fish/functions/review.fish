@@ -15,6 +15,8 @@
 #                                       last line of stdout, for a caller with no tab
 #                                       to watch to `cd` into
 #   review skim [<pr>]      the read-only surface: browse PRs across the org, one worktree
+#   review refresh <pr>     move the head tree onto the PR's new head, markers kept, and show
+#                           what changed since the commit last reviewed
 #   review list             every session in this repo, live or retired
 #   review retire <pr>      archive a session and take its worktrees down
 #   review post <pr>        post .review/post.json as one PR review; see `_review_post --help`
@@ -26,6 +28,9 @@
 switch "$argv[1]"
     case list
         _review_list $argv[2..]
+        return $status
+    case refresh
+        _review_refresh $argv[2..]
         return $status
     case retire
         _review_retire $argv[2..]
@@ -57,7 +62,7 @@ for arg in $argv
 end
 
 if test -z "$pr_arg"
-    echo "Usage: review <pr-number|url> [--stack] [--no-tab] | review skim [<pr-number|url>] | review list | review retire <pr-number> | review post <pr-number>"
+    echo "Usage: review <pr-number|url> [--stack] [--no-tab] | review skim [<pr-number|url>] | review list | review refresh <pr-number> | review retire <pr-number> | review post <pr-number>"
     return 1
 end
 
@@ -158,7 +163,8 @@ if test "$pr_head" != "$pr_tip"
     set -l ahead (git rev-list --count $pr_head..$pr_tip 2>/dev/null)
     echo "review $pr: NOTE the PR has moved on -- $ahead new commit(s) upstream."
     echo "             this session reviews $pr_head"
-    echo "             to review the new head:  review retire $pr  then  review $pr"
+    echo "             to review the new head:  review refresh $pr  (keeps your markers)"
+    echo "             or start over:           review retire $pr  then  review $pr"
     echo "             (retiring archives this round's findings and keeps $stack_branch)"
 end
 

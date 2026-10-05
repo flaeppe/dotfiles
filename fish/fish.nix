@@ -131,6 +131,13 @@
             ${builtins.readFile ./functions/_review_retire.fish}
           '';
         };
+        _review_refresh = {
+          description =
+            "Moves a review session's head tree onto the PR's new head and shows what changed";
+          body = ''
+            ${builtins.readFile ./functions/_review_refresh.fish}
+          '';
+        };
         # Reached through `review post`. Deterministic and LLM-free -- composing
         # `.review/post.json` is a session's job, this only anchors and posts it.
         _review_post = {
