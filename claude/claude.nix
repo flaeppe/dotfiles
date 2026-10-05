@@ -72,9 +72,8 @@ in {
     # Imported by the hooks in this directory, which Python resolves from the
     # running script's own directory. Not executable: nothing runs it directly.
     install -m 644 ${./hooks/shellwords.py} "$HOME/.claude/hooks/shellwords.py"
-    install -m 755 ${
-      ./hooks/gcloud-command-gate
-    } "$HOME/.claude/hooks/gcloud-command-gate"
+    # gcloud-command-gate is named in settings.json but not shipped here: it is
+    # linked into this directory by whatever owns the policy it enforces.
     install -m 755 ${
       ./hooks/commit-denylist-guard
     } "$HOME/.claude/hooks/commit-denylist-guard"

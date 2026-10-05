@@ -25,7 +25,6 @@ target-version = "py39"
 extend-include = [
     "claude/hooks/edit-content-guard",
     "claude/hooks/format-after-edit",
-    "claude/hooks/gcloud-command-gate",
     "claude/hooks/git-local-path-guard",
     "claude/hooks/protected-path-guard",
 ]

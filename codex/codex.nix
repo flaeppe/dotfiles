@@ -45,9 +45,11 @@ in {
   # Deploy hooks as copies so Python resolves sibling imports from this directory.
   home.activation.codexHooks = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     mkdir -p "$HOME/.codex/hooks"
-    install -m 755 ${
-      ../claude/hooks/gcloud-command-gate
-    } "$HOME/.codex/hooks/gcloud-command-gate-shared"
+    # The shared guard is Claude's gcloud-command-gate, which is linked into
+    # ~/.claude/hooks rather than shipped by this repo. A link, so Python
+    # resolves its sibling imports from the guard's real directory.
+    ln -sfn "$HOME/.claude/hooks/gcloud-command-gate" \
+      "$HOME/.codex/hooks/gcloud-command-gate-shared"
     install -m 755 ${
       ./hooks/gcloud-command-gate.py
     } "$HOME/.codex/hooks/gcloud-command-gate"
