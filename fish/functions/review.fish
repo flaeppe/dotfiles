@@ -21,12 +21,29 @@
 #   review list             every session in this repo, live or retired
 #   review retire <pr>      archive a session and take its worktrees down
 #   review post <pr>        post .review/post.json as one PR review; see `_review_post --help`
+#   review help             usage, marker syntax; also --help, -h, and `review <subcommand> --help`
 #
 # <pr> is a bare number in this repository, or a pull-request URL naming another one --
 # own PRs included, so a link pasted out of a browser or Slack works exactly like a
 # number typed by hand. See `_review_pr_ref`.
 
+# Before the dispatch: `review 123 --help` would otherwise start a session on 123.
+if contains -- --help $argv; or contains -- -h $argv
+    switch "$argv[1]"
+        case post
+            _review_post --help
+        case list refresh retire skim
+            _review_help $argv[1]
+        case '*'
+            _review_help
+    end
+    return 0
+end
+
 switch "$argv[1]"
+    case help
+        _review_help $argv[2]
+        return 0
     case list
         _review_list $argv[2..]
         return $status
@@ -63,7 +80,7 @@ for arg in $argv
 end
 
 if test -z "$pr_arg"
-    echo "Usage: review <pr-number|url> [--stack] [--no-tab] | review skim [<pr-number|url>] | review list | review refresh <pr-number> | review retire <pr-number> | review post <pr-number>"
+    _review_help
     return 1
 end
 

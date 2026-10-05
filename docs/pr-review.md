@@ -285,6 +285,9 @@ explicit separate step.
 
 ### Shell
 
+`review --help` (also `-h`, `help`, and `review <subcommand> --help`) lists every
+subcommand below with its arguments, the marker syntax and the `STALE` tag.
+
 ```
 review <pr> [--stack]
 ```
@@ -639,6 +642,7 @@ why they are here.
 - `claude/skills/pr-session/SKILL.md` — the phase router.
 - `nvim/lua/plugins/review.lua` — markers, scope, and every editor surface.
 - `fish/functions/review.fish` — session bootstrap and verb dispatch.
+- `fish/functions/_review_help.fish` — the usage text; one line per subcommand.
 - `fish/functions/_review_retire.fish` — archive, then teardown.
 - `fish/functions/_review_list.fish` — what sessions exist, live or retired.
 - `fish/functions/_review_post.fish` — checks `.review/post.json` against the PR's diff

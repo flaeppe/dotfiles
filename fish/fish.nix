@@ -169,6 +169,12 @@
             ${builtins.readFile ./functions/_review_skim.fish}
           '';
         };
+        _review_help = {
+          description = "Prints review's usage, marker syntax, or one subcommand's line";
+          body = ''
+            ${builtins.readFile ./functions/_review_help.fish}
+          '';
+        };
         _review_pr_ref = {
           description =
             "Resolves a review command's PR argument: a bare number, or a pull-request URL naming another repository";

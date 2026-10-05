@@ -18,7 +18,7 @@ end
 
 set -l parts (string match -r 'github\.com/[^/]+/([^/]+)/pull/(\d+)' -- $ref)
 if test -z "$parts"
-    echo "review: '$ref' is not a PR number or a pull-request URL" >&2
+    echo "review: '$ref' is not a PR number or a pull-request URL; see review --help" >&2
     return 1
 end
 set -l repo $parts[2]
