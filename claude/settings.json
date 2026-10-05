@@ -54,7 +54,11 @@
       "Bash(rm -rf /*)",
       "Bash(sudo rm -rf /*)",
       "Bash(kubectl*)",
-      "Bash(* kubectl*)"
+      "Bash(* kubectl*)",
+      "Artifact",
+      "Workflow",
+      "ReportFindings",
+      "ShareOnboardingGuide"
     ],
     "ask": [
       "Bash(terraform*)",
