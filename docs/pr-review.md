@@ -219,6 +219,7 @@ worktree's copy, so one session means one `.review/`.
 | `session.json` | `review <pr>` | PR, role, pinned commits, stack branch, socket paths |
 | `order.json` | the session | the route through the PR: one entry per changed file |
 | `summary.md` | the session | the review as prose: answer first, then themes |
+| `anchors.json` | `review refresh` | the markers of the last refresh: where each was, where it went (`kept`, `stale`, `deleted`) |
 | `post.json` | the session, on "post the review" | the composed review -- `event`, `body`, `comments[]` -- for `review post` to post |
 | `policy.json` | the session (optional) | constraints the assembled review must honour |
 | `findings.md` | the editor | the harvested marker set, `note` excluded |
@@ -352,9 +353,26 @@ Moves the head worktree onto the PR's current head after the author pushed, mark
 along, and prints the commits and `--stat` since the commit last reviewed. `session.json`'s
 `pr_head`, `pr_tip` and `merge_base` follow, so the sign column and `review post` measure
 against the new head; the old head is kept in `.review/previous_head`, and an editor serving
-on the session opens `:DiffviewOpen <old>..<new>`. It is a plain `git checkout --detach`, so
-git refuses — naming the files, tree untouched — when a marked file differs between the two
-heads. The stack worktree is not moved: its suggestions are commits on the old head.
+on the session opens `:DiffviewOpen <old>..<new>`. The stack worktree is not moved: its
+suggestions are commits on the old head.
+
+The markers are lifted out of the files before the tree moves and put back after, so a
+marked file the new commits change no longer stops the refresh. Each marker is first recorded
+as an anchor in `.review/anchors.json` -- old head, file, line, the text of the code line it
+sits above and its neighbours, the marker itself. After the move a marker whose code line is
+found again (at its old line, or as the only such line in the file, or the only one with the
+same neighbours) goes back unchanged; one that is not is inserted at its old line number,
+clamped into the file, as `REVIEW[n]fix: STALE(<sha7>:<file>:<line>) text`, and one whose file
+is gone is put in a re-created file holding only its markers. A renamed file is followed.
+The summary lists every stale and deleted marker. Anchors carry the line text, so none of this
+reads the old commit -- a force push that removes it from the clone changes nothing except
+that a renamed file can no longer be followed.
+
+A STALE tag means the position is unconfirmed: read the new code, move the marker if it
+belongs elsewhere, delete the tag. `review post` refuses while one exists. If the refresh
+is interrupted after lifting, the next `review refresh` finishes it (or puts the markers back
+when the tree never moved); a checkout git still refuses -- uncommitted edits that are not
+markers, in a file the new commits change -- puts every marker back and leaves the tree as it was.
 
 ```
 review post <pr> [--dry-run]
@@ -364,7 +382,8 @@ Posts `.review/post.json` as one GitHub review: deterministic and LLM-free, it c
 each comment's `path`+`line` against the PR's own diff at this worktree's HEAD and posts,
 it never composes one. A comment landing outside a diff hunk moves into the body under
 its own heading instead of being dropped — GitHub rejects the whole review on one bad
-anchor. `--dry-run` prints exactly what would post and posts nothing.
+anchor. `--dry-run` prints exactly what would post and posts nothing. It refuses, dry run
+included, while a marker is still tagged `STALE` from a refresh.
 
 ### Worktree preparation
 

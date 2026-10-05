@@ -16,6 +16,8 @@
 # heading instead -- never dropped, never silently skipped.
 #
 # `--dry-run` prints exactly what would post and posts nothing.
+#
+# Refuses while a marker is still tagged STALE -- see `_review_markers_reapply`.
 
 if contains -- --help $argv; or contains -- -h $argv
     echo "Usage: review post <pr-number> [--dry-run]"
@@ -58,6 +60,24 @@ if not test -d $review_tree
 end
 if not test -f $session_json
     echo "review post: no $session_json -- this worktree was never a review session"
+    return 1
+end
+
+# `review refresh` tags a marker it could not re-find with STALE(...), and leaves a refresh it
+# could not finish unapplied: either way a marker's position is unconfirmed, and posting
+# would anchor it to code the reviewer has not looked at again.
+set -l anchors_json "$review_tree/.review/anchors.json"
+if test -f $anchors_json; and test (jq -r .applied $anchors_json) = false
+    echo "review post: an unfinished review refresh left markers out of the tree -- run: review refresh $pr"
+    return 1
+end
+set -l stale_markers
+for hit in (git -C $review_tree grep -nE --untracked 'REVIEW\[[0-9]+\].*STALE\([0-9a-f]{7}:' -- . ':!.review')
+    set -l found (string match -r -- '^(.*?):(\d+):.*REVIEW\[(\d+)\]' $hit)
+    set -a stale_markers "REVIEW[$found[4]] $found[2]:$found[3]"
+end
+if test (count $stale_markers) -gt 0
+    echo "review post: "(count $stale_markers)" STALE marker(s) left by review refresh, place each and delete its STALE(...) tag first: "(string join ', ' -- $stale_markers)
     return 1
 end
 if not test -f $post_json

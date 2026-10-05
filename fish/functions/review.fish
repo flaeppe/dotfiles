@@ -15,8 +15,9 @@
 #                                       last line of stdout, for a caller with no tab
 #                                       to watch to `cd` into
 #   review skim [<pr>]      the read-only surface: browse PRs across the org, one worktree
-#   review refresh <pr>     move the head tree onto the PR's new head, markers kept, and show
-#                           what changed since the commit last reviewed
+#   review refresh <pr>     move the head tree onto the PR's new head, markers kept (tagged STALE
+#                           where their code moved away), and show what changed since the commit
+#                           last reviewed
 #   review list             every session in this repo, live or retired
 #   review retire <pr>      archive a session and take its worktrees down
 #   review post <pr>        post .review/post.json as one PR review; see `_review_post --help`

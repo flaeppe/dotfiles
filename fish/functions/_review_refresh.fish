@@ -6,6 +6,10 @@
 # Reached from `review refresh <pr>`. The stack tree is not touched: its suggestions are
 # commits on the head the session was started from, and moving it would mean rebasing them.
 #
+# Markers are carried by lifting them out of the files, moving the tree, and putting each
+# back where its code line now is -- or, when that line cannot be found, tagged STALE for
+# the reviewer to place. See `_review_markers_lift` and `_review_markers_reapply`.
+#
 # The previous head is kept in `.review/previous_head`, which `review <pr>` never rewrites,
 # so the range stays reproducible:  git diff $(cat .review/previous_head) HEAD
 
@@ -28,6 +32,26 @@ if not test -f $session_json
     return 1
 end
 
+# A refresh that stopped between lifting the markers and putting them back leaves the
+# markers only in `.review/anchors.json`; finish or undo it before anything else moves.
+set -l anchors_json "$review_tree/.review/anchors.json"
+if test -f $anchors_json; and test (jq -r .applied $anchors_json) = false
+    set -l here (git -C $review_tree rev-parse HEAD)
+    if test "$here" = (jq -r .to $anchors_json)
+        echo "review $pr: finishing the marker re-application an earlier refresh left half-way"
+        _review_markers_reapply $review_tree
+        return $status
+    else if test "$here" = (jq -r .from $anchors_json)
+        echo "review $pr: an earlier refresh stopped before moving the tree -- putting its markers back"
+        _review_markers_lift --undo $review_tree
+    else
+        echo "review refresh: $anchors_json holds markers that were never put back, and the tree is at"
+        echo "  $here, not the commit it names -- the markers are in that file, the files as they were in"
+        echo "  $review_tree/.review/refresh-backup/"
+        return 1
+    end
+end
+
 set -l base_branch (jq -r .base_branch $session_json)
 # --no-prune: with `fetch.prune` set, git deletes `pr/<pr>` again whenever the fetch finds it
 # already present, because the refspec's source `pull/<pr>/head` never matches the remote's
@@ -47,11 +71,14 @@ end
 set -l merge_base (git -C $root merge-base "origin/$base_branch" $new)
 or return 1
 
-# A plain checkout: git refuses, naming the files, when it would overwrite an uncommitted
-# marker, and leaves the tree as it was.
+# With the markers out of the way a plain checkout only refuses for what else is uncommitted
+# in a file the new commits change -- naming the files, tree untouched -- or for an
+# untracked file in the way. The markers go back where they were.
+_review_markers_lift $review_tree $old $new; or return 1
 git -C $review_tree checkout -q --detach $new
 or begin
-    echo "review refresh: $review_tree is unchanged, still at "(string sub -l 9 -- $old)
+    _review_markers_lift --undo $review_tree
+    echo "review refresh: $review_tree is unchanged, still at "(string sub -l 9 -- $old)", markers back where they were"
     return 1
 end
 
@@ -60,7 +87,10 @@ jq --arg head $new --arg base $merge_base \
     '.pr_head = $head | .pr_tip = $head | .merge_base = $base' $session_json >"$session_json.tmp"
 and mv "$session_json.tmp" $session_json
 
-echo "review $pr: "(string sub -l 9 -- $old)" -> "(string sub -l 9 -- $new)", markers kept"
+set -l marker_report (_review_markers_reapply $review_tree)
+set -l reapplied $status
+
+echo "review $pr: "(string sub -l 9 -- $old)" -> "(string sub -l 9 -- $new)
 git -C $review_tree log --format='  %h %s' --reverse $old..$new
 git -C $review_tree diff --stat $old $new
 
@@ -71,4 +101,10 @@ if test -n "$socket"; and test -S $socket; and nvim --server $socket --remote-ex
     echo "review $pr: opened $old..$new in the editor"
 else
     echo "review $pr: no editor on this session -- open it with  :DiffviewOpen $old..$new"
+end
+
+# Last, so the line that says what is left to do is the one the reviewer reads.
+test $reapplied -eq 0; or echo "review $pr: WARNING putting the markers back failed -- they are in $anchors_json; run: review refresh $pr"
+if test (count $marker_report) -gt 0
+    printf '%s\n' $marker_report
 end

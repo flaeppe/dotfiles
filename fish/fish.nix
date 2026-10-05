@@ -138,6 +138,22 @@
             ${builtins.readFile ./functions/_review_refresh.fish}
           '';
         };
+        # Reached through `review refresh`: the markers leave the files before the tree moves
+        # and are put back, or tagged STALE, once it has.
+        _review_markers_lift = {
+          description =
+            "Records a review tree's uncommitted markers as anchors and takes them out of the files";
+          body = ''
+            ${builtins.readFile ./functions/_review_markers_lift.fish}
+          '';
+        };
+        _review_markers_reapply = {
+          description =
+            "Puts recorded markers back into a review tree at its new commit, tagging unplaceable ones STALE";
+          body = ''
+            ${builtins.readFile ./functions/_review_markers_reapply.fish}
+          '';
+        };
         # Reached through `review post`. Deterministic and LLM-free -- composing
         # `.review/post.json` is a session's job, this only anchors and posts it.
         _review_post = {
