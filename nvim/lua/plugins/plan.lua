@@ -3,13 +3,13 @@
 -- A plan is filed under the repository it belongs to -- ~/.plan/<repo>/, as a flat
 -- <description>.md or a <project>/NNN-*.md series -- except the cross-repo ones, which
 -- are filed under _cross/ and belong to several. The filing directory therefore cannot
--- answer "what is still open in payout" -- only the header's `services:` list can, and
+-- answer "what is still open in billing" -- only the header's `services:` list can, and
 -- that list has the same shape for both kinds of plan.
 -- So each row carries its header as sigil-prefixed tokens and fzf's own query algebra does
--- the filtering: `@payout =draft`, `@api !=complete`, `#_cross ?`.
+-- the filtering: `@billing =draft`, `@api !=complete`, `#_cross ?`.
 --
---   @service   every repo in `services:`, so a _cross plan touching payout answers @payout
---   #dir       where it is filed, repository-qualified: #_cross, #api/de-signing-provider
+--   @service   every repo in `services:`, so a _cross plan touching billing answers @billing
+--   #dir       where it is filed, repository-qualified: #_cross, #web/login-provider
 --   =status    the six words the planning skill allows, `=?` for a header claiming none
 --   .type      Research | Decision | Build | Review | Monitoring | Seed | Record | Reference
 --              (a plan not yet migrated shows its old `category:` instead)
