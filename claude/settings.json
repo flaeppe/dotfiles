@@ -83,7 +83,6 @@
       "SendFeedback"
     ],
     "ask": [
-      "Bash(*terraform*)"
     ]
   },
   "hooks": {
