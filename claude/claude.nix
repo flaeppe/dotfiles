@@ -104,15 +104,6 @@ in {
     install -m 755 ${
       ./hooks/format-after-edit
     } "$HOME/.claude/hooks/format-after-edit"
-    install -m 755 ${
-      ./hooks/session-end-inbox
-    } "$HOME/.claude/hooks/session-end-inbox"
-    install -m 755 ${
-      ./hooks/session-mark
-    } "$HOME/.claude/hooks/session-mark"
-    install -m 755 ${
-      ./hooks/session-registry
-    } "$HOME/.claude/hooks/session-registry"
   '';
 
   # Status line script (referenced by settings.json statusLine.command)

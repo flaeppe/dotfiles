@@ -1,9 +1,0 @@
-#!/bin/bash
-# Notification/Stop/UserPromptSubmit -> sam session mark <state>, reflecting
-# a session's state on its kitty tab. Never blocks a turn: an absent binary
-# or any failure exits 0 silently.
-ME_HOME="${ME_HOME:-$(cat "$HOME/.config/me-home" 2>/dev/null)}"
-SAM="$ME_HOME/bin/sam"
-[ -n "$ME_HOME" ] && [ -x "$SAM" ] || exit 0
-(cd "$ME_HOME" && "$SAM" session mark "$1") 2>/dev/null
-exit 0

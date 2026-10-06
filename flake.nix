@@ -75,7 +75,6 @@
               ./fish/fish.nix
               ./git/git.nix
               ./nvim/nvim.nix
-              ./me.nix
             ];
           };
         devShell = pkgs.mkShell {

@@ -54,6 +54,10 @@ Adding one is: create the file, `nix run home-manager -- switch --flake .`. Noth
 else. The deployed paths are nix-store symlinks, so nothing appears before
 activation.
 
+A machine that layers its own private flake over this one (extra launchd agents,
+extra hook entries) must switch through that flake. Switching this flake alone
+deploys a configuration without the layer and removes what the layer added.
+
 ## Secrets Management
 
 Secrets are managed via `pass` and written to disk during `home-manager switch` via activation scripts in `flake.nix`. Some secrets are also injected into wrapper scripts at launch time.
@@ -101,7 +105,8 @@ whatever it holds.
 
 Applying it is a separate step, and a single global slot: `nix run home-manager
 -- switch --flake .` deploys the working tree as it finds it, so it is not
-something to run while another session is editing the repository.
+something to run while another session is editing the repository. On a machine
+with a layering flake, the layer's own switch command replaces this one.
 
 ## Safety
 
