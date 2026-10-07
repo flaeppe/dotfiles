@@ -9,6 +9,7 @@
   },
   "effortLevel": "xhigh",
   "autoCompactWindow": 450000,
+  "syncClaudeAiSkills": false,
   "tui": "fullscreen",
   "editorMode": "vim",
   "attribution": {
