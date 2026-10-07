@@ -44,6 +44,18 @@
   ],
   "permissions": {
     "allow": [
+      "Bash(linear issue view*)",
+      "Bash(linear issue list*)",
+      "Bash(linear issue query*)",
+      "Bash(linear issue comment list*)",
+      "Bash(linear project list*)",
+      "Bash(linear project view*)",
+      "Bash(linear document list*)",
+      "Bash(linear document view*)",
+      "Bash(linear team list*)",
+      "Bash(linear user list*)",
+      "Bash(linear label list*)",
+      "Bash(linear auth whoami*)",
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)",
