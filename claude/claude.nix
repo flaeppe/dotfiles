@@ -3,7 +3,7 @@ let
   # MCP binary from nixpkgs-unstable; tracks the channel on `nix flake update`.
   # Provides only the executable -- the discovery hook + skill are wired below.
   # Do NOT run `codebase-memory-mcp install`/`update`: it mutates ~/.claude
-  # (hooks, settings.json, skills) which this flake owns and would revert.
+  # (hooks, skills) which this flake owns and would revert.
   inherit (unstable) codebase-memory-mcp;
 in {
   # npx, for `ccusage` (statusline session-spend reporting) -- no first-party
@@ -44,23 +44,6 @@ in {
       recursive = true;
     };
   };
-
-  # Deploy as writable copy (not symlink) so `claude plugin install` can write
-  # to it. Claude Code also persists its own /config choices here (theme,
-  # editorMode, model, tui, permissions.defaultMode, ...), so merge rather than
-  # overwrite: keys defined below win, everything else on disk survives, and
-  # permission rule lists are unioned (settings-merge.jq) so rules written by a
-  # tool's own setup command are kept. Consequence: dropping a key or a rule
-  # here no longer removes it from the live file.
-  home.activation.claudeSettings = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-    settings="$HOME/.claude/settings.json"
-    if [ -f "$settings" ]; then
-      ${unstable.jq}/bin/jq -s -f ${./settings-merge.jq} "$settings" ${./settings.json} \
-        > "$settings.new" && mv "$settings.new" "$settings"
-    else
-      install -m 644 ${./settings.json} "$settings"
-    fi
-  '';
 
   # Deploy hooks as executable copies (Nix store is read-only)
   home.activation.claudeHooks = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

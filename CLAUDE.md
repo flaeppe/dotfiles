@@ -22,7 +22,6 @@ Home Manager symlinks these files into `~/.config/` and `~/.local/` — this rep
 - `node-packages/` — Node packages built with node2nix
 - `claude/` — Claude Code configuration (module imported via `claude/claude.nix`)
   - `CLAUDE.md` — Global instructions, deployed to `~/.claude/CLAUDE.md`
-  - `settings.json` — Claude Code settings (model, permissions, hooks)
   - `rules/` — Language/framework rules, each gated by `paths:` frontmatter
   - `skills/` — Workflow skills, loaded on invocation
   - `agents/` — Subagent definitions dispatchable via the Agent tool
