@@ -98,7 +98,7 @@ logic belongs. Unless explicitly told otherwise, design systems so that:
 
 1. **Business logic exists as a plain language-level API** — functions and classes
    that can be called without any protocol awareness, and reachable from a CLI or
-   a test with nothing stood in for (e.g. dependency injection). This is the
+   a test with nothing stood in for (components injected, the database real). This is the
    source of truth.
 2. **Boundary layers do exactly two things:**
    - Parse foreign data (request bodies, messages, events) into the types the
@@ -133,7 +133,9 @@ should be trivial — just parsing and error mapping, no logic duplication.
 ### Testing
 - Write tests for new functionality when a test framework exists.
 - Prefer integration tests over unit tests for business logic.
-- Don't mock, design code to use dependency injection, unless unit testing (injectable) client implementations.
+- Don't mock; inject dependencies at the component level: a client, a gateway, a service that may own
+  a database inside it. Never inject the database itself: business logic runs against the real database
+  so transactions and atomicity stay real. A 1:1 interface over queries is a mock, not an injectable component.
 
 ### Working in Existing Codebases
 

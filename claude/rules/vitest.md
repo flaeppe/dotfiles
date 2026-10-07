@@ -103,7 +103,7 @@ afterAll(async () => {
 
 ## Dependencies
 
-Prefer dependency injection over mocking. Design code to accept dependencies, then inject test implementations.
+Prefer dependency injection over mocking. Design code to accept components (clients, gateways, services), then inject test implementations. Not the database: run against a real one, so transactions behave as in production.
 
 ```typescript
 // Production

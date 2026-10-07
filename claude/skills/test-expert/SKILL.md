@@ -26,7 +26,7 @@ unstaged/staged changes, and revise them.
 
 - Follow the naming convention: `test_<verb>_<what>[_<condition>]`
 - Use the `valid_data` pattern where applicable
-- No mock libraries — use dependency injection and test doubles
+- No mock libraries — inject components (clients, gateways, services) and test doubles; never the database itself
 - No redundant docstrings repeating the test name
 - No log assertions — assert on business outcomes
 - Prefer broader tests over narrow unit tests

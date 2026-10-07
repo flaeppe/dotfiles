@@ -19,7 +19,7 @@ The art of testing lies in structure and clarity: valid data → minimal modific
 
 ## Core Principles
 
-1. **No mocking libraries** - Use dependency injection and test doubles (fakes, stubs). Mock libraries are forbidden.
+1. **No mocking libraries** - Use dependency injection and test doubles (fakes, stubs) for components: clients, gateways, services. Mock libraries are forbidden. The database is not such a component: tests run against a real one, and a 1:1 interface over queries is a mock in disguise.
 
 2. **No log assertions** - Logs are side effects. Assert on business logic outcomes. This is always possible.
 
