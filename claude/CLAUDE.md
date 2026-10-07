@@ -110,32 +110,23 @@ The litmus test: adding a new exposure layer (e.g. REST, CLI, message consumer)
 should be trivial — just parsing and error mapping, no logic duplication.
 
 ### Comments & Docstrings
-- Write self-documenting code. Comments explain "why", never "what" the code does.
-- Docstrings describe WHAT a function/class does, never HOW it does it internally.
-  A docstring is a contract: inputs, outputs, side effects. Nothing else — no
-  implementation details, algorithms, internal mechanics, or design rationale.
-  Keep them terse. If the function name and type signature already say it, skip
-  the docstring entirely.
-
-  BAD: "Uses a Redis sorted set where each request is stored as a member scored
-  by its timestamp. On each check the window is trimmed and the remaining
-  cardinality is compared against the limit."
-  GOOD: "Sliding-window rate limiter. Enforces a maximum request count per
-  identifier within a rolling time window."
-- **No session-context comments** — every comment must make sense to a reader with zero knowledge of the conversation, PR, or task that produced the code. Don't justify design choices by referencing the current session ("we chose X because..." or "this avoids the problem where..."). If the reasoning matters long-term, phrase it as a standalone technical note.
-- **No cross-reference assumptions** — don't reference behavior of other modules as justification (e.g. "matches how service B handles this"). That coupling drifts silently when the referenced code changes. State the local reason instead.
-- **No diff-relative comments** — never describe what the code replaced (e.g. "batch query instead of row-by-row loop"). The old code won't exist after merge. Describe what the current code does and why, not what it improved upon.
-- Remove debug statements and commented-out code before completing a task.
+- Comments explain why, never what; code documents itself.
+- A docstring is a contract — inputs, outputs, side effects. Never algorithm, internals
+  or design rationale. Terse; skip it when name and signature already say it.
+- Every comment must read correctly with zero knowledge of the session, PR, task or diff:
+  no "we chose X because", no "matches how service B does it" (state the local reason),
+  no "instead of the old loop" (describe the current code).
+- Remove debug statements and commented-out code before finishing.
 
 ### Naming
 - Descriptive names over abbreviations (`i`/`j` loop counters and `x` lambdas excepted, but avoid otherwise).
 
 ### Testing
-- Write tests for new functionality when a test framework exists.
-- Prefer integration tests over unit tests for business logic.
-- Don't mock; inject dependencies at the component level: a client, a gateway, a service that may own
-  a database inside it. Never inject the database itself: business logic runs against the real database
-  so transactions and atomicity stay real. A 1:1 interface over queries is a mock, not an injectable component.
+- Write tests for new functionality when a test framework exists; integration over unit
+  tests for business logic.
+- Don't mock. Inject at the component level — a client, a gateway, a service that may own
+  a database — never the database itself: business logic runs against the real one so
+  transactions stay real. A 1:1 interface over queries is a mock.
 
 ### Working in Existing Codebases
 
@@ -156,33 +147,24 @@ Treat me as experienced - skip beginner explanations.
 
 ## `me` — my tooling, start here
 
-`me --help` lists every verb; each self-documents (`me <verb> --help`). **Explore it
-before assuming a capability doesn't exist**, and prefer a `me` verb over hand-rolling
-the equivalent — it is the entry point to my board, inbox, notes, sessions, PRs,
-worktrees and review flow.
-
-**`me` is always safe to run.** No verb needs sign-off and there is nothing to fence
-off — a verb that isn't safe is a bug in the tool, not something for you to guard
-against. Treat it as free to use.
-
-When briefing a subagent, point at the verb rather than restating what it does
-(`me wt new <name>`, `me dirty`, `me brief`). Shorter briefs, consistent behaviour.
+`me --help` lists every verb; each has its own `--help`. Check it before assuming a
+capability doesn't exist, and prefer a verb over hand-rolling the equivalent (board,
+inbox, notes, sessions, PRs, worktrees, review). Every verb is safe to run without
+sign-off — an unsafe one is a tool bug. Brief subagents with the verb (`me wt new
+<name>`, `me dirty`, `me brief`), not a restatement of it.
 
 ---
 
 ## Environment
 
-- **macOS with Nix, Home Manager, and direnv.** All project toolchains (Python, Node, compilers, etc.) are managed through Nix flakes with direnv integration.
-- To find the active toolchain for a project, check `.envrc` and `flake.nix` / `flake.lock` in the project root.
-- Run `direnv status` to see the currently active environment and its source `.envrc`.
-- The correct binary versions are those activated by direnv in the project's shell environment — these are the versions in PATH when the shell is inside the project directory.
-- If a binary is missing from PATH, it likely means the shell isn't inside a direnv-managed project directory, or `direnv allow` hasn't been run yet.
-- To set up a git worktree, use `me wt new <name> [<branch>]` rather than hand-rolling one
-  with `git worktree add`. It lands in `.worktrees/<name>` inside the repo and links
-  dependency trees (e.g. `node_modules`) into the new worktree automatically — hand-rolled
-  worktrees skip that and need a full reinstall. (`me wt` is a thin passthrough to the fish
-  `wt` function — `wt` itself is invisible to a zsh/bash shell, which is what Claude Code's
-  Bash tool runs.)
+macOS with Nix, Home Manager and direnv. Project toolchains come from the project's flake
+via direnv (`.envrc`, `flake.nix`; `direnv status` shows the active one); the correct
+binary is the one on PATH inside the project directory. Binary missing → not inside a
+direnv-managed directory, or `direnv allow` not run.
+
+Worktrees: `me wt new <name> [<branch>]`, never `git worktree add` — it lands in
+`.worktrees/<name>` and links dependency trees (`node_modules`); a hand-rolled one needs
+a full reinstall.
 
 ---
 
@@ -245,29 +227,16 @@ If unsure about base branch, **ASK**.
   and move on.
 
 ### Knowledge Base (kb)
-My work documents are indexed in a local knowledge base, exposed as the `kb`
-MCP server (`kb_find`: hybrid semantic search). It holds whatever I decide to
-make searchable - e.g. repo docs/READMEs, the payments inventory, external
-integration docs, planning documents. When the tool is available:
+My planning documents and work journals are indexed in a local knowledge base, exposed
+as the `kb` MCP server (`kb_find`: hybrid search; `kb_files`: path lookup).
 
-- Search it before answering questions about prior decisions, existing
-  documentation, integrations, "where is X", or "do we support X" - don't
-  answer such questions from memory alone.
-- It complements code exploration: kb carries the documented intent and
-  context around the code (and around external parties the code talks to),
-  while codebase-memory tools carry the code structure itself. When working
-  in a repo, a kb search scoped to it (e.g. `tags=["repo:api"]`) can surface
-  context the code doesn't show.
-- `service:<name>` tags join external specs with the implementation notes
-  that integrate against them (the tag appears on both sides). For
-  spec-vs-implementation questions ("do we follow X", gap analysis), filter
-  on the service tag (e.g. `tags=["service:acme-widget"]`) to retrieve the spec
-  and our documented reality together.
-- Results are chunks with metadata; read the file at `path` when the chunk
-  isn't enough. Files on disk are the source of truth.
-- kb holds the planning documents and returns them by default -- no flag
-  needed. Always check for an existing plan before creating a new planning
-  document.
+- Search it before answering questions about prior decisions, plans, "where is X" or
+  "do we support X" — don't answer from memory alone. Check for an existing plan before
+  creating a new planning document.
+- Don't assume what is indexed: `kb_find` with a tag that doesn't exist (e.g.
+  `tags=["?"]`) returns the live tag vocabulary; filter on what it lists.
+- Results are chunks; read the file at `path` when a chunk isn't enough. Files on disk
+  are the source of truth.
 
 ---
 
