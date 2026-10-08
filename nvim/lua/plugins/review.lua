@@ -595,6 +595,122 @@ local function open_diff(session)
     vim.cmd("DiffviewOpen " .. change_range(session))
 end
 
+-- Test files --------------------------------------------------------------
+--
+-- One flag, `vim.g.review_hide_tests`, read by the file panel, its next/previous-file
+-- walk, the review order and the hunk work list, so reading business code only is a
+-- single decision rather than one per surface.
+--
+-- Everything here hangs off `M` rather than being a file-level local: home-manager joins
+-- this file with every other plugin config into one chunk, and Lua caps a chunk at 200
+-- locals.
+
+-- Git pathspec globs: the file panel hands them to git as exclusions, and `vim.glob`
+-- reads the same strings for the lists built here, so there is one definition of a test
+-- file. A leading `**/` also matches the repository root.
+M.test_globs = {
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/test_*.py",
+    "**/*_test.py",
+    "**/*_test.go",
+    "**/tests/**",
+    "**/test/**",
+    "**/__tests__/**",
+}
+M.test_matchers = vim.tbl_map(vim.glob.to_lpeg, M.test_globs)
+
+--- `path` is relative to the repository root.
+function M.is_hidden_test(path)
+    if not vim.g.review_hide_tests then
+        return false
+    end
+    for _, matcher in ipairs(M.test_matchers) do
+        if matcher:match(path) then
+            return true
+        end
+    end
+    return false
+end
+
+function M.test_pathspecs(magic)
+    return vim.tbl_map(function(glob)
+        return magic .. glob
+    end, M.test_globs)
+end
+
+--- The test files the panel's diff contains, asked of git with the same globs that
+--- exclude them, so the number agrees with what disappears from the list.
+function M.count_test_files(view)
+    local revisions = { view.adapter:rev_to_args(view.left, view.right) }
+    -- Without a revision the panel also lists what is staged, which that diff leaves out.
+    if view.left.type == require("diffview.vcs.rev").RevType.STAGE then
+        table.insert(revisions, { "--cached" })
+    end
+    local count = 0
+    for _, revision_args in ipairs(revisions) do
+        local args = vim.list_extend({ "diff", "--name-only" }, revision_args)
+        vim.list_extend(args, { "--" })
+        vim.list_extend(args, M.test_pathspecs(":(glob)"))
+        count = count + #view.adapter:exec_sync(args, view.adapter.ctx.toplevel)
+    end
+    return count
+end
+
+--- Points a file panel's diff at the current setting. The panel keeps the path arguments
+--- the diff was opened with, so they are the base the exclusions are added to, and what
+--- showing the tests again returns to.
+---
+--- diffview lists untracked files without consulting path arguments, so a new test file
+--- not yet added stays listed in the stack's round view; committed and staged ones go.
+function M.apply_test_filter(view)
+    local path_args = vim.deepcopy(view.panel.path_args)
+    if vim.g.review_hide_tests then
+        vim.list_extend(path_args, M.test_pathspecs(":(exclude,glob)"))
+    end
+    view.path_args = path_args
+    local winid = view.panel.winid
+    if winid and vim.api.nvim_win_is_valid(winid) then
+        vim.wo[winid].winbar = vim.g.review_hide_tests
+                and ("%%#DiagnosticWarn# tests hidden (%d)"):format(M.count_test_files(view))
+            or ""
+    end
+end
+
+--- The file-panel diff in this tab, if the tab holds one.
+function M.current_diff_view()
+    local view = require("diffview.lib").get_current_view()
+    local DiffView = require("diffview.scene.views.diff.diff_view").DiffView
+    if view and view:instanceof(DiffView) then
+        return view
+    end
+end
+
+--- Applies to the diff on screen at once, and to every diff opened after it.
+function M.toggle_tests()
+    vim.g.review_hide_tests = not vim.g.review_hide_tests
+    local view = M.current_diff_view()
+    if view then
+        M.apply_test_filter(view)
+        view:update_files()
+    end
+    vim.notify(vim.g.review_hide_tests and "Test files hidden" or "Test files shown")
+end
+
+-- Emitted while the view opens, ahead of the file list it reads on the next tick, so a
+-- diff opened with tests hidden never lists one -- not even as the file it lands on.
+vim.api.nvim_create_autocmd("User", {
+    pattern = "DiffviewViewOpened",
+    callback = function()
+        local view = M.current_diff_view()
+        if view and vim.g.review_hide_tests then
+            M.apply_test_filter(view)
+        end
+    end,
+})
+
 -- Statusline --------------------------------------------------------------
 --
 -- Which worktree this editor is rooted in, how much of the review has landed, and
@@ -832,6 +948,7 @@ function M.panel()
         "next  " .. next_step,
         "",
         "      <Leader>rD  browse the change · <Leader>rq  the same change as a work list",
+        "      <Leader>rT  hide or show test files in the diff and both lists",
         "      <Leader>rl  findings · <Leader>rt  their states · <Leader>rp  refresh this page",
         "      <Leader>rj  same spot in the other worktree · <Leader>?  every key",
         -- This page reports state; it cannot reason about it. When the two disagree, or
@@ -1088,7 +1205,7 @@ function M.hunks()
         local target = line:match("^%+%+%+ b/(.*)$")
         if target then
             file = target
-        elseif file then
+        elseif file and not M.is_hidden_test(file) then
             -- @@ -old,n +new,m @@ trailing-context. The `,m` is omitted when the
             -- hunk is one line, so the count has to be consumed as opaque
             -- non-space -- matching only the omitted form drops every multi-line
@@ -1109,14 +1226,17 @@ function M.hunks()
     if session.role == "stack" then
         local untracked = git({ "ls-files", "--others", "--exclude-standard" }, root)
         for _, path in ipairs(vim.split(untracked, "\n", { trimempty = true })) do
-            table.insert(items, 1, { filename = root .. "/" .. path, lnum = 1, text = "new file" })
+            if not M.is_hidden_test(path) then
+                table.insert(items, 1, { filename = root .. "/" .. path, lnum = 1, text = "new file" })
+            end
         end
     end
     if #items == 0 then
         vim.notify("Nothing in " .. label, vim.log.levels.WARN)
         return
     end
-    vim.fn.setqflist({}, "r", { title = "changes: " .. label, items = items })
+    local suffix = vim.g.review_hide_tests and " (tests hidden)" or ""
+    vim.fn.setqflist({}, "r", { title = "changes: " .. label .. suffix, items = items })
     vim.cmd.copen()
 end
 
@@ -1166,13 +1286,18 @@ function M.order()
     -- must not read like one.
     local items = {}
     for index, entry in ipairs(decoded.entries) do
-        table.insert(items, {
-            filename = M.root() .. "/" .. entry.file,
-            lnum = entry.lnum or 1,
-            text = string.format("%d.%s %s", index, entry.context and " (context)" or "", entry.why or ""),
-        })
+        -- The number is the entry's place in order.json, so a gap where tests were
+        -- hidden still points at the same entry.
+        if not M.is_hidden_test(entry.file) then
+            table.insert(items, {
+                filename = M.root() .. "/" .. entry.file,
+                lnum = entry.lnum or 1,
+                text = string.format("%d.%s %s", index, entry.context and " (context)" or "", entry.why or ""),
+            })
+        end
     end
-    vim.fn.setqflist({}, "r", { title = "review order", items = items })
+    local suffix = vim.g.review_hide_tests and " (tests hidden)" or ""
+    vim.fn.setqflist({}, "r", { title = "review order" .. suffix, items = items })
     vim.cmd.copen()
 end
 
@@ -1994,6 +2119,7 @@ map("<Leader>rj", M.demo, "Review: same place in the other worktree")
 map("<Leader>rb", M.toggle_scope, "Review: this round, or the whole suggestion")
 map("<Leader>rp", M.panel, "Review: where the session stands")
 map("<Leader>rD", M.diff, "Review: browse the change")
+map("<Leader>rT", M.toggle_tests, "Review: hide or show test files")
 
 vim.api.nvim_create_user_command("ReviewOrder", M.order, { desc = "Load the review order into the quickfix list" })
 vim.api.nvim_create_user_command("ReviewReport", M.report, { desc = "Harvest markers into .review/findings.md" })

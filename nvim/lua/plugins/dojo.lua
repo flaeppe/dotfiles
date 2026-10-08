@@ -262,6 +262,12 @@ local ENTRIES = {
     },
     {
         group = "review",
+        keys = "<Leader>rT",
+        desc = "Walking business code only? Hide or show test files in the diff, the order and the work list",
+        added = "2026-10-08",
+    },
+    {
+        group = "review",
         keys = "<Leader>rp",
         desc = "Lost? Where the session stands and what is next",
         added = "2026-07-26",
