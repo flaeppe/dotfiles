@@ -641,9 +641,10 @@ function M.test_pathspecs(magic)
     end, M.test_globs)
 end
 
---- The test files the panel's diff contains, asked of git with the same globs that
---- exclude them, so the number agrees with what disappears from the list.
+--- How many test files the panel's diff contains.
 function M.count_test_files(view)
+    -- Asked of git with the same globs that exclude them, so the number agrees with what
+    -- disappears from the list.
     local revisions = { view.adapter:rev_to_args(view.left, view.right) }
     -- Without a revision the panel also lists what is staged, which that diff leaves out.
     if view.left.type == require("diffview.vcs.rev").RevType.STAGE then
@@ -659,13 +660,14 @@ function M.count_test_files(view)
     return count
 end
 
---- Points a file panel's diff at the current setting. The panel keeps the path arguments
---- the diff was opened with, so they are the base the exclusions are added to, and what
---- showing the tests again returns to.
----
---- diffview lists untracked files without consulting path arguments, so a new test file
---- not yet added stays listed in the stack's round view; committed and staged ones go.
+--- Makes a file panel's diff leave out test files, or list them again, per
+--- `vim.g.review_hide_tests`. Takes effect on the view's next `update_files`.
 function M.apply_test_filter(view)
+    -- The panel keeps the path arguments the diff was opened with, so they are the base
+    -- the exclusions are added to, and what showing the tests again returns to.
+    -- diffview lists untracked files without consulting path arguments, so a new test
+    -- file not yet added stays listed in the stack's round view; committed and staged
+    -- ones go.
     local path_args = vim.deepcopy(view.panel.path_args)
     if vim.g.review_hide_tests then
         vim.list_extend(path_args, M.test_pathspecs(":(exclude,glob)"))
