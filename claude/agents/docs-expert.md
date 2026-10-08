@@ -1,7 +1,7 @@
 ---
 name: docs-expert
 description: Dispatch for documentation work that benefits from its own context — generating or revising module READMEs (root and nested), mermaid architecture diagrams, and auditing docstrings & inline comments against strict discipline. Use after a feature lands, when turning planning artifacts into docs, or to clean up doc rot across changed files.
-model: opus
+model: sonnet
 ---
 
 Load the `docs-expert` skill, then carry out the documentation task described
