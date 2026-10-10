@@ -31,9 +31,11 @@
 --   :NoteNext [args]   open the next candidate (`reasoning-queue next -n 1
 --                      --json <args>`, args passed through verbatim; a bare
 --                      non-flag argument is shorthand for `--feed <arg>`),
---                      prefilled with its ref(s), at:, source:, captured:
---                      and strength: (blank; `hunch` | `leaning` | `firm`,
---                      dropped on write if left blank), then its body
+--                      prefilled with an id: prefix (the slug is yours to add;
+--                      the write is refused until it is there), its ref(s),
+--                      at:, source:, captured: and strength: (blank; `hunch`
+--                      | `leaning` | `firm`, dropped on write if left blank),
+--                      then its body
 --   :wq                non-empty body: writes the note as usual, then
 --                      `reasoning-queue decide <id> kept`. Empty body (a
 --                      candidate-backed buffer only -- nothing after the
@@ -296,6 +298,35 @@ local authoring = {}
 --- reminder is read at the moment it is needed.
 authoring.CUTLINE = "# ---------------------- >8 ----------------------"
 
+--- A name as a kebab-case id fragment: `journalAnswer` becomes
+--- `journal-answer`. Mirrors the prefix `reasoning check` expects, so a
+--- difference shows up there as an ID-PREFIX warning.
+function authoring.kebab(name)
+    local spaced = name:gsub("([a-z0-9])([A-Z])", "%1-%2")
+    spaced = spaced:gsub("([A-Z])([A-Z][a-z])", "%1-%2")
+    spaced = spaced:lower():gsub("[^a-z0-9]+", "-")
+    return (spaced:gsub("^%-+", ""):gsub("%-+$", ""))
+end
+
+--- The `ref:` a note is filed under: the first token in lexical order.
+function authoring.home_ref(refs)
+    local home = refs[1]
+    for _, ref in ipairs(refs) do
+        if ref.token < home.token then
+            home = ref
+        end
+    end
+    return home
+end
+
+--- What the `id:` line of a note about the file at `relpath` starts with: the
+--- file's stem, kebab-cased, and a dot.
+function authoring.id_prefix(relpath)
+    local base = vim.fs.basename(relpath)
+    local stem = base:match("^(.+)%.[^.]*$") or base
+    return authoring.kebab(stem) .. "."
+end
+
 --- The trait vocabulary, as `{ term, meaning }` pairs, read from the closed
 --- term list itself so the card cannot drift from what `me reasoning` will
 --- accept. An unreadable list yields none and the card omits that section.
@@ -358,6 +389,9 @@ function authoring.cheatsheet_lines()
         "# to type. `reasoning` is added for you.",
         "#",
         "# strength: how sure you are, in your own words. Blank is dropped.",
+        "#",
+        "# id: the prefix is filled in; add a slug. Kebab-case, at most 12",
+        "# characters, a name for the claim and not its title.",
     }
     local facets = authoring.facets_in_use()
     if #facets.repo > 0 or #facets.service > 0 then
@@ -667,10 +701,11 @@ function authoring.with_tags(frontmatter_lines, typed)
 end
 
 --- Parse the compose buffer into its parts: the parsed `ref:` lines (capture
---- order), the literal `at:` line, the literal `source:` line (nil unless
---- the candidate had one), the literal `captured:` line, the literal
---- `strength:` line (nil if absent; blank-valued left to the caller to
---- drop), and the body -- everything after the first blank line.
+--- order), the literal `id:` line (nil if absent), the literal `at:` line, the
+--- literal `source:` line (nil unless the candidate had one), the literal
+--- `captured:` line, the literal `strength:` line (nil if absent;
+--- blank-valued left to the caller to drop), and the body -- everything after
+--- the first blank line.
 local function parse_compose(bufnr)
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
     for i, line in ipairs(lines) do
@@ -679,8 +714,8 @@ local function parse_compose(bufnr)
             break
         end
     end
-    local refs, at_line, source_line, captured_line, strength_line, tags_line =
-        {}, nil, nil, nil, nil, nil
+    local refs, id_line, at_line, source_line, captured_line, strength_line, tags_line =
+        {}, nil, nil, nil, nil, nil, nil
     local blank_lnum = nil
     for i, line in ipairs(lines) do
         if line:match("^ref:%s*") then
@@ -688,6 +723,8 @@ local function parse_compose(bufnr)
             if parsed then
                 table.insert(refs, parsed)
             end
+        elseif line:match("^id:%s*") and not id_line then
+            id_line = line
         elseif line:match("^at:%s*") then
             at_line = line
         elseif line:match("^source:%s*") then
@@ -713,6 +750,7 @@ local function parse_compose(bufnr)
         table.remove(body)
     end
     return refs,
+        id_line,
         at_line,
         source_line,
         captured_line or ("captured: " .. os.date("%Y-%m-%d")),
@@ -785,7 +823,7 @@ end
 --- A hand-started buffer has no candidate to drop, so an empty body there is
 --- just another refusal.
 function M.write(bufnr)
-    local refs, at_line, source_line, captured_line, strength_line, tags_line, body =
+    local refs, id_line, at_line, source_line, captured_line, strength_line, tags_line, body =
         parse_compose(bufnr)
     local typed_tags = tags_line and tags_line:match("^tags:%s*(.*)$") or ""
     local candidate_id = vim.b[bufnr].reasoning_candidate_id
@@ -808,11 +846,12 @@ function M.write(bufnr)
         refuse_write("Notes: no ref: lines to write")
     end
 
-    local by_home = vim.deepcopy(refs)
-    table.sort(by_home, function(a, b)
-        return a.token < b.token
-    end)
-    local home = by_home[1]
+    local id = id_line and vim.trim(id_line:sub(4)) or ""
+    if not id:match("%.[^.]+$") then
+        refuse_write("Notes: finish the id: line -- <prefix>.<slug>, kebab-case, slug at most 12 characters")
+    end
+
+    local home = authoring.home_ref(refs)
     local path = home_file_path(home.repo, home.relpath)
 
     local heading_parts = {}
@@ -820,7 +859,7 @@ function M.write(bufnr)
         table.insert(heading_parts, heading_part(ref, i == 1))
     end
 
-    local section = { "## " .. table.concat(heading_parts, " · ") }
+    local section = { "## " .. table.concat(heading_parts, " · "), "id: " .. id }
     for _, ref in ipairs(refs) do
         table.insert(section, "ref: " .. ref.token)
     end
@@ -945,6 +984,7 @@ local function open_candidate_buffer(candidate, args)
     vim.bo[bufnr].bufhidden = "hide"
 
     local lines = { "## " .. heading }
+    table.insert(lines, "id: " .. (#refs > 0 and authoring.id_prefix(authoring.home_ref(refs).relpath) or ""))
     if #refs > 0 then
         for _, token in ipairs(candidate.refs) do
             table.insert(lines, "ref: " .. token)
