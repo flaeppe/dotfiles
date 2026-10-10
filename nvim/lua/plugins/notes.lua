@@ -383,7 +383,7 @@ function authoring.cheatsheet_lines()
         "# tags: one line, comma-separated. Three kinds, and they are not",
         "# interchangeable:",
         "#   repo:<name>       which checkout      e.g. repo:api",
-        "#   service:<vendor>  which third party   e.g. service:fourthline",
+        "#   service:<vendor>  which third party   e.g. service:acme",
         "#   trait:<term>      what the file is    e.g. trait:business-logic",
         "# A bare trait term is prefixed on write, so `business-logic` is fine",
         "# to type. `reasoning` is added for you.",
