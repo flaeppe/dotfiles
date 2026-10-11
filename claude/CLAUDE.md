@@ -220,6 +220,8 @@ If unsure about base branch, **ASK**.
 
 ### Exploration
 - Check for an existing implementation before writing new code; read the tests to learn expected behavior.
+- Independent reads share one round: several tool calls in one message, or one Bash call
+  joining read-only commands with `;`. Only a command that needs the previous output earns a new round.
 
 ### Org bookkeeping
 - When you surface something that's org-bookkeeping rather than your task — broken
