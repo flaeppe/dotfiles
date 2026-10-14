@@ -174,12 +174,24 @@ end
 
 # `--force` unconditionally: the review worktree is dirty by design, since markers are never
 # committed. What protects real work is the in-flight gate above, not this flag.
+#
+# Go writes its module cache read-only, directories included, and direnv puts one inside the
+# worktree. Nothing can unlink an entry from a directory it cannot write, so git's deletion
+# fails partway -- after deregistering the worktree -- and leaves a stub directory belonging
+# to nothing. Making the tree writable first avoids that; it is about to be deleted either way.
+# Symlinks are not followed, so a dependency tree linked from the main checkout is safe.
+set -l stuck
 for tree in $review_tree $stack_tree
-    if test -d $tree
-        git -C $root worktree remove --force $tree
+    test -d $tree; or continue
+    chmod -R u+w $tree 2>/dev/null
+    git -C $root worktree remove --force $tree
+    set -l removal_status $status
+    if test $removal_status -ne 0; or test -e $tree
+        set -a stuck $tree
     end
 end
 git -C $root worktree prune
+
 # Each rmdir refuses while anything is left, so a second session in this repo keeps its own
 # directories and only the last one out empties the tree.
 rmdir "$root/.worktrees/review/$pr" "$root/.worktrees/review" "$root/.worktrees" 2>/dev/null
@@ -192,6 +204,17 @@ end
 
 for socket in /tmp/nvim-review-$repo-$pr.sock /tmp/nvim-stack-$repo-$pr.sock
     test -e $socket; and rm -f $socket
+end
+
+# Reported after the branch and socket cleanup, not before it: once git has deregistered a
+# worktree a re-run cannot tell the session from a stub, so a return that skipped them would
+# leave them behind for good.
+if test (count $stuck) -gt 0
+    for tree in $stuck
+        echo "review retire: could not remove $tree -- it is still on disk"
+    end
+    echo "               archived to $archive; delete the directory by hand"
+    return 1
 end
 
 echo "review $pr: retired"

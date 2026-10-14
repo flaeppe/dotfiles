@@ -140,6 +140,14 @@ for target in $argv
         continue
     end
     echo "wt rm: removed $target"
+
+    # A namespaced worktree (`.worktrees/fix/<name>`) leaves its namespace folder behind.
+    # rmdir takes only an empty one, so a namespace still holding another worktree stays.
+    set -l parent (dirname $path)
+    while string match -q "$root/.worktrees/*" -- $parent
+        rmdir $parent 2>/dev/null; or break
+        set parent (dirname $parent)
+    end
     test "$owner" = skim; and echo "       `review skim` builds it again when it is next wanted"
 
     # Only when the work landed. A branch kept past a --force removal is the whole reason
