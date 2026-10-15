@@ -71,6 +71,12 @@ class GhPrBodyGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("line cap", result.stderr)
 
+    def test_allows_table_rows_beyond_line_cap(self):
+        table = "| area | lines |\n|---|---|\n" + "\n".join("| row %d | %d |" % (i, i) for i in range(20))
+        body = "One line of prose.\n\n" + table + "\n\n**Push back:** none.\n" + MARKER
+        result = self.run_guard_with_body("--body", body)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_refuses_missing_push_back_line(self):
         body = "Just a fix, nothing more to say.\n" + MARKER
         result = self.run_guard_with_body("--body", body)
