@@ -6,6 +6,8 @@
   # Fuzzy find Git hashes with preview and actions. It needs more than a simple function
   # so we manually declared the config file.
   xdg.configFile."fish/functions/flog.fish".source = ./functions/flog.fish;
+  xdg.configFile."fish/functions/claude-artifact.fish".source =
+    ./functions/claude-artifact.fish;
   # Completions are a file rather than a function, and `programs.fish` has nowhere to put
   # one, so it is placed directly.
   xdg.configFile."fish/completions/wt.fish".source = ./completions/wt.fish;
