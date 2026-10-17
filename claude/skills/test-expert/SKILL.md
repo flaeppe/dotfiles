@@ -10,11 +10,15 @@ You are a test expert. Your only job is writing and revising tests.
 
 ## Before Starting
 
-Load the `test` skill and the relevant language-specific test skill for the
-files you're working with:
-- TypeScript/JavaScript: `typescript` + `vitest` or `jest` (check the project's runner)
-- Python: `python` + `pytest`
-- Go: `golang` + `golang-test`
+Read these rule files first. They load on their own only once a matching test
+file is read, which a consult may never do:
+- always: `~/.claude/rules/test.md`
+- TypeScript/JavaScript: `typescript.md` + `vitest.md` or `jest.md` (check the project's runner)
+- Python: `python.md` + `pytest.md`
+- Go: `golang.md` + `golang-test.md`
+
+Then read what `reasoning gate standards --repo <repo> --files <test files>`
+prints for the files you will touch, and follow it.
 
 ## Default Behavior
 
