@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -155,6 +156,16 @@ def candidates(command: str, cwd: str) -> list[tuple[str, str]]:
     return found
 
 
+def direnv_invocation(directory: str, command: str) -> str:
+    """The shell line that runs `command` inside `directory`'s direnv environment."""
+    # `direnv exec` runs one program: a `cd` or `&&` ahead of it would run outside the
+    # environment, so a compound command goes through `bash -c`.
+    words = shellwords.words_of(command)
+    if any(shellwords.is_operator(word) for word in words):
+        return "direnv exec %s bash -c %s" % (directory, shlex.quote(command))
+    return "direnv exec %s %s" % (directory, command)
+
+
 def main() -> int:
     payload = json.load(sys.stdin)
     if payload.get("tool_name") != "Bash":
@@ -173,8 +184,8 @@ def main() -> int:
             continue
         display_directory = "." if directory == cwd else directory
         print(
-            "%s is not on PATH outside direnv here -- run: direnv exec %s %s"
-            % (program, display_directory, command),
+            "%s is not on PATH outside direnv here -- run: %s"
+            % (program, direnv_invocation(display_directory, command)),
             file=sys.stderr,
         )
         return 2

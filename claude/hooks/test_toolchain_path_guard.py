@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 import stat
 import subprocess
 import tempfile
@@ -72,6 +73,13 @@ class ToolchainPathGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("yarn is not on PATH outside direnv here", result.stderr)
         self.assertIn("direnv exec . yarn test", result.stderr)
+
+    def test_suggests_bash_c_for_a_compound_command(self):
+        (self.root / ".envrc").write_text("use flake\n")
+        command = f"cd {self.root} && yarn test"
+        result = self.run_guard(command, self.root)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn(f"direnv exec . bash -c {shlex.quote(command)}", result.stderr)
 
     def test_allows_when_already_wrapped_in_direnv_exec(self):
         (self.root / ".envrc").write_text("use flake\n")
