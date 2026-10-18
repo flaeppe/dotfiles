@@ -33,9 +33,35 @@ class GhPrBodyGuardTest(unittest.TestCase):
         command = 'gh pr create --title t %s "%s"' % (flag, body)
         return self.run_guard(command, cwd=cwd)
 
+    def run_guard_with_heredoc_body(self, body, delimiter="'BODY'"):
+        """The command the pr skill's template produces."""
+        bare = delimiter.strip("'\"")
+        command = 'gh pr create --title t --body "$(cat <<%s\n%s\n%s\n)"' % (delimiter, body, bare)
+        return self.run_guard(command)
+
     def test_allows_a_clean_body(self):
         result = self.run_guard_with_body("--body", CLEAN_BODY)
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_allows_the_skill_template_heredoc(self):
+        result = self.run_guard_with_heredoc_body(CLEAN_BODY)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_refuses_a_heredoc_body_missing_the_marker(self):
+        result = self.run_guard_with_heredoc_body("A fix, no marker.\n\n**Push back:** none.")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("load the pr skill", result.stderr.lower())
+
+    def test_lints_a_heredoc_body(self):
+        body = "## Summary\n\n**Push back:** none.\n" + MARKER
+        result = self.run_guard_with_heredoc_body(body)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("## Summary", result.stderr)
+
+    def test_refuses_a_heredoc_with_an_unquoted_delimiter(self):
+        # Unquoted, the shell expands the text, so the hook cannot know what gh receives.
+        result = self.run_guard_with_heredoc_body(CLEAN_BODY, delimiter="BODY")
+        self.assertEqual(result.returncode, 2)
 
     def test_refuses_missing_marker(self):
         result = self.run_guard_with_body("--body", "A fix, no marker.\n\n**Push back:** none.")

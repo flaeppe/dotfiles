@@ -53,6 +53,14 @@ FORBIDDEN_HEADINGS: Final = ("## Test plan", "## Testing", "## Summary")
 
 MAX_BODY_LINES: Final = 12
 
+# `"$(cat <<'TAG' ... TAG)"`, the heredoc the pr skill writes its body with. A quoted
+# delimiter turns expansion off, so the text between the markers is exactly what the
+# shell hands to gh.
+HEREDOC_SUBSTITUTION: Final = re.compile(
+    r"\$\(\s*cat\s+<<-?\s*(['\"])(\w+)\1[ \t]*\n(?P<text>.*)\n[ \t]*\2[ \t]*\n?\s*\)",
+    re.DOTALL,
+)
+
 # `gh api` global flags that consume a value, so the endpoint scan does not
 # mistake a flag's argument for the positional endpoint.
 API_VALUE_FLAGS: Final = frozenset(
@@ -131,6 +139,13 @@ def gh_subcommand(segment: list[str], gh_index: int) -> tuple[str | None, int]:
     return None, index
 
 
+def literal_body(value: str) -> str:
+    """`value` with a quoted-heredoc command substitution replaced by its text;
+    any other value unchanged."""
+    match = HEREDOC_SUBSTITUTION.fullmatch(value)
+    return match.group("text") if match else value
+
+
 def pr_body(segment: list[str], start: int, cwd: str) -> tuple[str | None, str]:
     """(body text, description) for a `gh pr create`/`edit` invocation.
     None body means there is nothing to lint yet: --fill, no body flag at
@@ -143,7 +158,7 @@ def pr_body(segment: list[str], start: int, cwd: str) -> tuple[str | None, str]:
             value, _ = flag_value(segment, index)
             if value is None:
                 return None, "--body (empty)"
-            return value, "--body"
+            return literal_body(value), "--body"
         if flag in ("--body-file", "-F"):
             value, _ = flag_value(segment, index)
             if value is None:
