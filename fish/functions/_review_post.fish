@@ -138,8 +138,10 @@ for comment in $all_comments
     set -l line (printf '%s' $comment | jq -r '.line')
     set -l body (printf '%s' $comment | jq -r '.body' | string collect)
 
+    # Three lines of context is what GitHub's diff view carries, and a context line takes
+    # a comment like a changed one -- a narrower diff would fold valid anchors into the body.
     set -l ok 0
-    for hunk in (git -C $review_tree diff --unified=0 $base $head -- $path | string match -r '^@@ .* @@')
+    for hunk in (git -C $review_tree diff --unified=3 $base $head -- $path | string match -r '^@@ .* @@')
         set -l m (string match -r -- '@@ -\d+,?\d* \+(\d+),?(\d*) @@' $hunk)
         test (count $m) -lt 3; and continue
         set -l new_start $m[2]
