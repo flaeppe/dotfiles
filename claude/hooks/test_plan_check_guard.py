@@ -22,6 +22,7 @@ GUARD = Path(__file__).parent / "plan-check-guard"
 
 IN_PROGRESS_NO_CHECK = """---
 status: In Progress
+type: Build
 date: 2026-09-11
 ---
 # test
@@ -32,6 +33,7 @@ date: 2026-09-11
 
 IN_PROGRESS_WITH_CHECK = """---
 status: In Progress
+type: Build
 date: 2026-09-11
 ---
 # test
@@ -42,6 +44,7 @@ date: 2026-09-11
 
 DRAFT_NO_CHECK = """---
 status: Draft
+type: Build
 date: 2026-09-11
 ---
 # test
@@ -49,6 +52,7 @@ date: 2026-09-11
 
 IN_PROGRESS_FENCED_CHECK = """---
 status: In Progress
+type: Build
 date: 2026-09-11
 ---
 # test
@@ -56,6 +60,60 @@ date: 2026-09-11
 ## Done when
 ```
 (CHECK: true)
+```
+"""
+
+
+IN_PROGRESS_NO_DONE_WHEN = """---
+status: In Progress
+type: Build
+date: 2026-09-11
+---
+# test
+
+## Notes
+- [ ] something (CHECK: true)
+"""
+
+JOURNAL_GOAL_WITH_CHECK = """---
+status: In Progress
+type: Decision
+date: 2026-09-11
+---
+# test
+
+## Journal goal
+End state.
+- [ ] something (step 1; CHECK: Checks t1)
+"""
+
+JOURNAL_GOAL_PROSE_ONLY = """---
+status: In Progress
+type: Decision
+date: 2026-09-11
+---
+# test
+
+## Journal goal
+End state.
+- [ ] something with no marker
+"""
+
+JOURNAL_GOAL_AND_EMPTY_DONE_WHEN = JOURNAL_GOAL_WITH_CHECK + """
+## Done when
+- [ ] something with no marker
+"""
+
+JOURNAL_GOAL_FENCED_CHECK = """---
+status: In Progress
+type: Decision
+date: 2026-09-11
+---
+# test
+
+## Journal goal
+```
+- [ ] something (step 1; CHECK: Checks t1)
 ```
 """
 
@@ -176,6 +234,36 @@ class PlanCheckGuardTest(unittest.TestCase):
             },
         )
         self.assertEqual(result.returncode, 0)
+
+    def test_denies_a_plan_with_neither_done_when_nor_journal_goal(self):
+        result = self.write_result("foo/008-plan.md", IN_PROGRESS_NO_DONE_WHEN)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('no "## Done when" heading', result.stderr)
+
+    def test_allows_an_edit_to_a_goal_whose_journal_goal_holds_check_ticks(self):
+        target = self.plan_root / "foo" / "001-goal.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(JOURNAL_GOAL_WITH_CHECK)
+        result = self.run_guard(
+            "Edit",
+            {"file_path": str(target), "old_string": "End state.", "new_string": "End state, edited."},
+        )
+        self.assertEqual(result.returncode, 0)
+
+    def test_denies_a_journal_goal_whose_ticks_carry_no_check(self):
+        result = self.write_result("foo/009-goal.md", JOURNAL_GOAL_PROSE_ONLY)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('"## Done when" heading', result.stderr)
+
+    def test_denies_an_empty_done_when_even_beside_a_journal_goal(self):
+        result = self.write_result("foo/011-goal.md", JOURNAL_GOAL_AND_EMPTY_DONE_WHEN)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("carries no (CHECK:", result.stderr)
+
+    def test_denies_a_journal_goal_tick_inside_a_code_fence(self):
+        result = self.write_result("foo/010-goal.md", JOURNAL_GOAL_FENCED_CHECK)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn('"## Done when" heading', result.stderr)
 
 
 if __name__ == "__main__":

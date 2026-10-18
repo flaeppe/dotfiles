@@ -90,6 +90,41 @@ def _heading(line: str) -> tuple[str, int] | None:
     return rest.strip(), level
 
 
+_JOURNAL_GOAL_RE: Final = re.compile(r"(?i)^journal goal$")
+# Goal ticks read `(step 1; CHECK: ...)`; check-file only sees a literal `(CHECK:`.
+_GOAL_TICK_RE: Final = re.compile(r"^- \[[ xX]\] .*\bCHECK:")
+# Appears in both done-when violations check-file can raise.
+_DONE_WHEN_VIOLATION: Final = '"## Done when" heading'
+
+
+def journal_goal_is_done_when(content: str) -> bool:
+    """Whether the plan's done-when list is its "## Journal goal" section: no
+    "Done when" heading anywhere, and a `- [ ]` tick carrying a `CHECK:`
+    marker under the Journal goal heading."""
+    goal_level = 0
+    has_goal_tick = False
+    in_fence = False
+    for line in content.split("\n"):
+        if line.strip().startswith("```"):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        heading = _heading(line)
+        if heading is None:
+            if goal_level and _GOAL_TICK_RE.match(line):
+                has_goal_tick = True
+            continue
+        text, level = heading
+        if _DONE_WHEN_RE.search(text):
+            return False
+        if _JOURNAL_GOAL_RE.match(text):
+            goal_level = level
+        elif goal_level and level <= goal_level:
+            goal_level = 0
+    return has_goal_tick
+
+
 def fenced_check_present(content: str) -> bool:
     """Whether a `(CHECK:` token sits under a "## Done when" heading but
     inside a fenced code block. The check-file scanner this guard defers to
@@ -176,6 +211,8 @@ def main() -> int:
 
     display = os.path.relpath(path, PLAN_ROOT)
     found = violations(me_bin, content, display)
+    if found and journal_goal_is_done_when(content):
+        found = [line for line in found if _DONE_WHEN_VIOLATION not in line]
     if not found:
         return 0
 
