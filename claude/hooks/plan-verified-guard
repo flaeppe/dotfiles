@@ -37,9 +37,13 @@ DISABLE: Final = "CLAUDE_SKIP_PLAN_GUARD"
 
 EDIT_TOOLS: Final = ("Edit", "Write", "MultiEdit")
 PLAN_ROOT: Final = os.path.expanduser("~/.plan")
-# Working data that lives in the tree but is not a plan: sweep artifacts,
-# audit output, backups. A `verified:` stamp means nothing on those.
-EXEMPT: Final = (os.path.join(PLAN_ROOT, "_private") + os.sep,)
+# Working data and tooling that live in the tree but are not plans: sweep
+# artifacts, audit output, backups, the search engine's own docs. A `verified:`
+# stamp means nothing on those.
+EXEMPT: Final = (
+    os.path.join(PLAN_ROOT, "_private") + os.sep,
+    os.path.join(PLAN_ROOT, ".index") + os.sep,
+)
 
 VERIFIED: Final = re.compile(r"^verified:\s*(\d{4}-\d{2}-\d{2})\s*$", re.M)
 REVIEW: Final = re.compile(r"^review:\s*\S", re.M)
@@ -160,7 +164,11 @@ def stale(path: str, incoming: str, today: str) -> str | None:
     if VERIFIED.search(incoming) or REVIEW.search(incoming):
         return None
 
-    current = VERIFIED.search(frontmatter(path))
+    current_frontmatter = frontmatter(path)
+    if REVIEW.search(current_frontmatter):
+        return None  # `review:` already records that the status is unverified
+
+    current = VERIFIED.search(current_frontmatter)
     if current and current.group(1) == today:
         return None  # already renewed earlier in the same day
 
