@@ -1,10 +1,16 @@
 # Create a worktree and make it usable rather than merely checked out.
 #
 #   wt new <name> [<branch>]
+#   wt new <name> <remote>/<ref>
 #
 # <branch> defaults to <name>. An existing branch is checked out, a remote one is tracked,
 # and anything else is created off the default branch -- fetched first, because a worktree
 # started from a stale base is something you discover an hour later.
+#
+# A remote-tracking ref in the <branch> slot is where to start from, not a branch to make: the
+# new branch is called <name> and begins at that ref. A local branch named `origin/main` would
+# shadow the remote-tracking one in every `git checkout`, so no spelling of the arguments
+# creates one.
 #
 # That fetch needs an `origin` to ask. Without one -- no remote at all, or a remote under
 # some other name -- there is nothing to fetch and no origin/HEAD to read, so the default
@@ -17,11 +23,33 @@
 #
 # Leaves the shell in the new worktree, since making one is never the thing you wanted.
 
+argparse -n 'wt new' h/help -- $argv
+or return 1
+
+if set -q _flag_help
+    echo "Usage: wt new <name> [<branch>]"
+    echo "       wt new <name> <remote>/<ref>"
+    echo
+    echo "  <branch>        checked out if it exists, tracked if origin has it, else created"
+    echo "                  off the default branch"
+    echo "  <remote>/<ref>  a remote-tracking ref: <name> is created starting from it"
+    return 0
+end
+
 set -l name $argv[1]
 if test -z "$name"
     echo "Usage: wt new <name> [<branch>]"
     return 1
 end
+
+# `--` lets a leading dash through argparse, and git would then read the name as an option.
+for arg in $argv[1..2]
+    if string match -q -- '-*' $arg
+        echo "wt new: '$arg' starts with '-' -- names and branches cannot"
+        return 1
+    end
+end
+
 set -l branch $argv[2]
 test -z "$branch"; and set branch $name
 
@@ -40,17 +68,38 @@ if test -e $tree
     return 1
 end
 
+# Decided by the remote's name rather than by whether the ref exists yet, because a remote
+# branch the fetch below is about to bring in would otherwise be taken for a new local one.
+set -l remotes (git -C $root remote)
+set -l start
+if string match -rq -- '^(?<remote>[^/]+)/.' "$argv[2]"; and contains -- $remote $remotes
+    set start $argv[2]
+    set branch $name
+end
+if string match -rq -- '^(?<remote>[^/]+)/.' "$branch"; and contains -- $remote $remotes
+    echo "wt new: '$branch' is a remote-tracking ref, so a local branch of that name would shadow it -- name the worktree something else"
+    return 1
+end
+if test -n "$start"
+    if git -C $root show-ref --verify --quiet "refs/heads/$branch"; or git -C $root show-ref --verify --quiet "refs/remotes/origin/$branch"
+        echo "wt new: branch $branch already exists, so it cannot be started from $start"
+        return 1
+    end
+end
+
 # Everything, not just the base: whether <branch> exists on the remote is about to be tested,
 # and the answer has to be current or a colleague's branch gets shadowed by a new local one
 # started from the wrong place. Prunes as it goes, which is what keeps `wt` honest.
-set -l base
+set -l base $start
 if git -C $root remote get-url origin >/dev/null 2>&1
     echo "wt new: fetching origin"
     if not git -C $root fetch -q origin
         echo "wt new: WARNING fetch origin failed, base may be stale"
     end
 
-    set base (git -C $root symbolic-ref -q --short refs/remotes/origin/HEAD)
+    if test -z "$base"
+        set base (git -C $root symbolic-ref -q --short refs/remotes/origin/HEAD)
+    end
     if test -z "$base"
         git -C $root remote set-head origin -a >/dev/null 2>&1
         set base (git -C $root symbolic-ref -q --short refs/remotes/origin/HEAD)
