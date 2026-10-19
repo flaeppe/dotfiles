@@ -216,7 +216,7 @@ worktree's copy, so one session means one `.review/`.
 
 | File | Written by | Contents |
 |---|---|---|
-| `session.json` | `review <pr>` | PR, role, pinned commits, stack branch, socket paths |
+| `session.json` | `review <pr>` | PR, title and body, role, pinned commits, stack branch, socket paths |
 | `order.json` | the session | the route through the PR: one entry per changed file |
 | `summary.md` | the session | the review as prose: answer first, then themes |
 | `anchors.json` | `review refresh` | the markers of the last refresh: where each was, where it went (`kept`, `stale`, `deleted`) |
@@ -355,7 +355,7 @@ review refresh <pr>
 Moves the head worktree onto the PR's current head after the author pushed, markers carried
 along, and prints the commits and `--stat` since the commit last reviewed. `session.json`'s
 `pr_head`, `pr_tip` and `merge_base` follow, so the sign column and `review post` measure
-against the new head; the old head is kept in `.review/previous_head`, and an editor serving
+against the new head, and `body` is read again, moved head or not; the old head is kept in `.review/previous_head`, and an editor serving
 on the session opens `:DiffviewOpen <old>..<new>`. The stack worktree is not moved: its
 suggestions are commits on the old head.
 

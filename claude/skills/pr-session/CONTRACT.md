@@ -143,7 +143,7 @@ history, not a manifest.
 
 | File | Written by | Contents |
 |---|---|---|
-| `session.json` | `review <pr>` | PR, role, pinned commits, stack branch, socket paths |
+| `session.json` | `review <pr>` | PR, title and body, role, pinned commits, stack branch, socket paths |
 | `order.json` | the session, from `order` | the route through the PR |
 | `summary.md` | the session, from `summary` | the review as prose |
 | `policy.json` | the session, from `policy` | constraints the assembled review honours |

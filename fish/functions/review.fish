@@ -125,6 +125,15 @@ set -l base_branch $fields[2]
 set -l title $fields[3]
 set -l url $fields[4]
 
+# A JSON string literal, not a field of the tab-separated read above: a body's newlines and
+# tabs would have to be escaped there and unescaped here. Empty when the read fails, since a
+# session without the body is still worth starting.
+set -l body_json (gh pr view $pr --json body --jq '.body | tojson' 2>/dev/null)
+or begin
+    echo "review $pr: WARNING could not read the PR body -- session.json will carry an empty one"
+    set body_json '""'
+end
+
 echo "review $pr: fetching pull/$pr/head"
 git fetch -q --force --no-prune origin "pull/$pr/head:refs/heads/pr/$pr"; or return 1
 git fetch -q origin "$base_branch"
@@ -209,6 +218,7 @@ for role in review stack
     printf '{\n' >"$tree/.review/session.json"
     printf '  "pr": %s,\n' $pr >>"$tree/.review/session.json"
     printf '  "title": "%s",\n' (string replace -a '"' '\\"' -- $title) >>"$tree/.review/session.json"
+    printf '  "body": %s,\n' $body_json >>"$tree/.review/session.json"
     printf '  "url": "%s",\n' $url >>"$tree/.review/session.json"
     printf '  "repo": "%s",\n' $repo >>"$tree/.review/session.json"
     printf '  "role": "%s",\n' $role >>"$tree/.review/session.json"

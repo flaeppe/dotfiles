@@ -59,6 +59,16 @@ set -l base_branch (jq -r .base_branch $session_json)
 git -C $root fetch -q --force --no-prune origin "pull/$pr/head:refs/heads/pr/$pr"; or return 1
 git -C $root fetch -q origin $base_branch; or return 1
 
+# Before the check for a moved head: the author can edit the description without pushing. A
+# failed read leaves the body the session already has.
+set -l body_json (gh pr view $pr --json body --jq '.body | tojson' 2>/dev/null)
+if test $status -eq 0
+    jq --argjson body $body_json '.body = $body' $session_json >"$session_json.tmp"
+    and mv "$session_json.tmp" $session_json
+else
+    echo "review $pr: WARNING could not re-read the PR body -- session.json keeps the one it had"
+end
+
 # The tree's own HEAD, not the ref as it stood before the fetch: a refresh that was refused
 # leaves `pr/<pr>` already moved, and the next attempt must still see a difference.
 set -l old (git -C $review_tree rev-parse HEAD)
