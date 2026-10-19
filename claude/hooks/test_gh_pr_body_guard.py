@@ -13,6 +13,7 @@ by the time the guard sees them.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 import unittest
@@ -25,9 +26,22 @@ CLEAN_BODY = "A one-line fix for a real bug.\n\n**Push back:** nothing risky her
 
 
 class GhPrBodyGuardTest(unittest.TestCase):
-    def run_guard(self, command, cwd="/tmp"):
+    def run_guard(self, command, cwd="/tmp", env=None):
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": cwd})
-        return subprocess.run([str(GUARD)], input=payload, capture_output=True, text=True, timeout=10)
+        return subprocess.run(
+            [str(GUARD)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env={**os.environ, **(env or {})},
+        )
+
+    def write_body_file(self, text):
+        with tempfile.NamedTemporaryFile("w", suffix=".md", delete=False) as handle:
+            handle.write(text)
+        self.addCleanup(Path(handle.name).unlink)
+        return handle.name
 
     def run_guard_with_body(self, flag, body, cwd="/tmp"):
         command = 'gh pr create --title t %s "%s"' % (flag, body)
@@ -118,6 +132,58 @@ class GhPrBodyGuardTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
         finally:
             Path(path).unlink()
+
+    def test_allows_pr_edit_that_sets_no_body(self):
+        for command in (
+            "gh pr edit 1 --add-reviewer octocat",
+            "gh pr edit 1 --title 'a new title'",
+        ):
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
+
+    def test_refuses_pr_edit_with_an_unmarked_body(self):
+        result = self.run_guard('gh pr edit 1 --add-reviewer octocat --body "no marker"')
+        self.assertEqual(result.returncode, 2)
+
+    def test_checks_body_file_named_by_a_variable_the_command_assigns(self):
+        clean = self.write_body_file(CLEAN_BODY)
+        unmarked = self.write_body_file("A fix, no marker.\n\n**Push back:** none.")
+        allowed = self.run_guard('BODY_PATH=%s; gh pr edit 1 --body-file "$BODY_PATH"' % clean)
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+        refused = self.run_guard("export BODY_PATH=%s && gh pr edit 1 --body-file $BODY_PATH" % unmarked)
+        self.assertEqual(refused.returncode, 2)
+
+    def test_checks_body_file_named_by_a_variable_in_the_hook_environment(self):
+        clean = self.write_body_file(CLEAN_BODY)
+        unmarked = self.write_body_file("A fix, no marker.\n\n**Push back:** none.")
+        allowed = self.run_guard("gh pr edit 1 --body-file ${GUARD_TEST_BODY}", env={"GUARD_TEST_BODY": clean})
+        self.assertEqual(allowed.returncode, 0, allowed.stderr)
+        refused = self.run_guard("gh pr edit 1 --body-file $GUARD_TEST_BODY", env={"GUARD_TEST_BODY": unmarked})
+        self.assertEqual(refused.returncode, 2)
+
+    def test_lets_through_a_body_file_variable_nothing_defines(self):
+        result = self.run_guard("gh pr edit 1 --body-file $GUARD_TEST_UNDEFINED")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("only the shell can resolve", result.stderr)
+
+    def test_lets_through_a_body_file_from_command_substitution(self):
+        for command in (
+            'gh pr create --title t --body-file "$(mktemp)"',
+            "gh pr create --title t --body-file $(mktemp)",
+        ):
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
+            self.assertIn("only the shell can resolve", result.stderr)
+
+    def test_lets_through_a_variable_path_to_a_file_not_yet_written(self):
+        result = self.run_guard("BODY_PATH=/no/such/file.md; gh pr create --title t --body-file $BODY_PATH")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("only the shell can resolve", result.stderr)
+
+    def test_lets_through_an_api_body_file_variable_nothing_defines(self):
+        command = 'gh api -X PATCH repos/example/example/pulls/1 -F "body=@$GUARD_TEST_UNDEFINED"'
+        result = self.run_guard(command)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_refuses_body_file_stdin(self):
         result = self.run_guard("gh pr create --title t --body-file -")

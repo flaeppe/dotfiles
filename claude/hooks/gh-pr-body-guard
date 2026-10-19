@@ -5,10 +5,15 @@ marker, and unless the marked body passes the skill's content rules.
 
 Two refusals:
 1. No marker (including a body this hook cannot read at all, e.g. `--fill`,
-   no body flag, or a `--body-file -`/`@-` stdin body): send the session to
-   the skill. The refusal never prints the marker itself, or a session would
-   paste it back without ever loading the skill.
+   `gh pr create` with no body flag, or a `--body-file -`/`@-` stdin body):
+   send the session to the skill. The refusal never prints the marker itself,
+   or a session would paste it back without ever loading the skill.
 2. Marker present, content lint fails: name the rule and quote the line.
+
+Two things pass without a check: a `gh pr edit` that sets no body at all
+(`--add-reviewer`, `--title`, ...), and a body file whose path only the shell
+can resolve (`--body-file "$(mktemp)"`, a `$VAR` nothing here defines). The
+second leaves a note on stderr, since the body goes unread.
 
 Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0
 -- a broken guard must never wedge a session.
@@ -77,13 +82,47 @@ API_VALUE_FLAGS: Final = frozenset(
 API_FIELD_FLAGS: Final = frozenset(("-f", "-F", "--field", "--raw-field"))
 API_METHOD_FLAGS: Final = frozenset(("-X", "--method"))
 
+# A `$VAR`, `${VAR}`, `$(...)` or backtick: a word the shell rewrites before gh sees it.
+SHELL_EXPANSION: Final = re.compile(r"[$`]")
+VARIABLE_REFERENCE: Final = re.compile(r"\$(\w+|\{\w+\})")
+
 # `gh` global flags that take a value, so the subcommand scan does not treat
 # a flag's argument (e.g. the repo of `-R owner/repo`) as the subcommand.
 GH_GLOBAL_FLAGS_WITH_VALUE: Final = frozenset(("-R", "--repo", "--hostname"))
 
 
+def assigned_variables(command: str) -> dict[str, str]:
+    """`NAME=value` words standing in front of a command, last one winning.
+
+    Ceiling: where in the command an assignment sits is ignored, so one that
+    follows its use still counts.
+    """
+    variables: dict[str, str] = {}
+    for segment in shellwords.sub_commands(shellwords.words_of(command)):
+        for word in segment:
+            if word == "export":
+                continue
+            if not shellwords.ASSIGNMENT.match(word):
+                break
+            name, value = word.split("=", 1)
+            variables[name] = value
+    return variables
+
+
+def expand_variables(path: str, variables: dict[str, str]) -> str:
+    """`path` with each `$VAR`/`${VAR}` replaced from the command's own
+    assignments, else from this hook's environment; one neither defines stays
+    as written."""
+
+    def value_of(reference: re.Match[str]) -> str:
+        name = reference.group(1).strip("{}")
+        return variables.get(name, os.environ.get(name, reference.group(0)))
+
+    return VARIABLE_REFERENCE.sub(value_of, path)
+
+
 def read_file(path: str, cwd: str) -> str | None:
-    expanded = os.path.expanduser(os.path.expandvars(path.strip("\"'")))
+    expanded = os.path.expanduser(path.strip("\"'"))
     absolute = expanded if os.path.isabs(expanded) else os.path.join(cwd, expanded)
     try:
         with open(absolute, encoding="utf-8", errors="replace") as handle:
@@ -92,17 +131,29 @@ def read_file(path: str, cwd: str) -> str | None:
         return None
 
 
-def resolve_body_source(value: str, cwd: str) -> tuple[str | None, str]:
+def resolve_body_source(
+    value: str, cwd: str, variables: dict[str, str]
+) -> tuple[str | None, str] | None:
     """(body text, description) for a --body-file/-F value or a `gh api`
-    `-f body=...` value. None means it could not be read -- refuse rather
-    than guess, per `-` / `@-` meaning stdin, which this hook cannot see."""
+    `-f body=...` value. A None text means it could not be read -- refuse
+    rather than guess, per `-` / `@-` meaning stdin, which this hook cannot see.
+    None instead of a pair means the path goes through a shell expansion this
+    hook cannot resolve to a readable file: the call is let through."""
     if value in ("-", "@-"):
         return None, "stdin body ('%s') can't be inspected" % value
     path = value[1:] if value.startswith("@") else value
-    text = read_file(path, cwd)
+    resolved = expand_variables(path, variables)
+    text = None if SHELL_EXPANSION.search(resolved) else read_file(resolved, cwd)
+    if text is None and SHELL_EXPANSION.search(path):
+        print(
+            "gh-pr-body-guard: body not checked, %s is a path only the shell can resolve"
+            % path,
+            file=sys.stderr,
+        )
+        return None
     if text is None:
         return None, "%s couldn't be read" % path
-    return text, path
+    return text, resolved
 
 
 def flag_value(segment: list[str], index: int) -> tuple[str | None, int]:
@@ -146,10 +197,18 @@ def literal_body(value: str) -> str:
     return match.group("text") if match else value
 
 
-def pr_body(segment: list[str], start: int, cwd: str) -> tuple[str | None, str]:
+def pr_body(
+    segment: list[str],
+    start: int,
+    cwd: str,
+    variables: dict[str, str],
+    creating: bool,
+) -> tuple[str | None, str] | None:
     """(body text, description) for a `gh pr create`/`edit` invocation.
-    None body means there is nothing to lint yet: --fill, no body flag at
-    all, or a body source that could not be read."""
+    None body means there is nothing to lint yet: --fill, no body flag on a
+    create, or a body source that could not be read. None instead of a pair
+    means the call needs no check: an edit that sets no body, or a body file
+    the shell resolves."""
     index = start
     while index < len(segment):
         word = segment[index]
@@ -163,14 +222,16 @@ def pr_body(segment: list[str], start: int, cwd: str) -> tuple[str | None, str]:
             value, _ = flag_value(segment, index)
             if value is None:
                 return None, "--body-file (empty)"
-            return resolve_body_source(value, cwd)
+            return resolve_body_source(value, cwd, variables)
         if word == "--fill" or word.startswith("--fill-"):
             return None, word
         index += 1
-    return None, "no body flag"
+    return (None, "no body flag") if creating else None
 
 
-def api_pr_body(segment: list[str], start: int) -> tuple[str | None, str] | None:
+def api_pr_body(
+    segment: list[str], start: int, variables: dict[str, str]
+) -> tuple[str | None, str] | None:
     """(body text, description) if this `gh api` call POSTs/PATCHes a `body`
     field onto the PR's own description endpoint (`.../pulls` or
     `.../pulls/<number>`), else None -- it's not a call this guard covers.
@@ -216,7 +277,7 @@ def api_pr_body(segment: list[str], start: int) -> tuple[str | None, str] | None
         return None
     # `-f key=value` is literal text; only `@file`/`@-` reads from disk/stdin.
     if body.startswith("@"):
-        return resolve_body_source(body, os.getcwd())
+        return resolve_body_source(body, os.getcwd(), variables)
     return body, endpoint
 
 
@@ -224,16 +285,20 @@ def pr_body_calls(command: str, cwd: str) -> list[tuple[str | None, str]]:
     """(body text or None, description) for every gh pr create/edit and
     body-bearing gh api .../pulls call in the command."""
     calls: list[tuple[str | None, str]] = []
+    variables = assigned_variables(command)
     for segment, gh_index in gh_calls(command):
         subcommand, sub_index = gh_subcommand(segment, gh_index)
         if subcommand == "pr" and sub_index + 1 < len(segment) and segment[
             sub_index + 1
         ] in ("create", "edit"):
-            calls.append(pr_body(segment, sub_index + 2, cwd))
+            creating = segment[sub_index + 1] == "create"
+            call = pr_body(segment, sub_index + 2, cwd, variables, creating)
         elif subcommand == "api":
-            call = api_pr_body(segment, sub_index + 1)
-            if call is not None:
-                calls.append(call)
+            call = api_pr_body(segment, sub_index + 1, variables)
+        else:
+            continue
+        if call is not None:
+            calls.append(call)
     return calls
 
 
