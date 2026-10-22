@@ -48,12 +48,13 @@ Every file starts with YAML frontmatter, before the title:
 
 ```markdown
 ---
-status: Draft | In Progress | Complete | Deferred | Superseded | Abandoned
 type: Research | Decision | Build | Review | Monitoring | Seed | Record | Reference
-summary: one line, at most 140 characters
+status: draft | stable | deprecated
+stage: Draft | In Progress | Complete | Deferred | Superseded | Abandoned
+description: one line, at most 140 characters
 journal: <journal-key>
 services: [repo, other-repo@6537]
-verified: YYYY-MM-DD
+verified: {by: claude-code/<your model id>, at: YYYY-MM-DD}
 date: YYYY-MM-DD
 builds_on: NNN-filename.md
 next: NNN-filename.md
@@ -64,15 +65,23 @@ next: NNN-filename.md
 
 | field | rule |
 | --- | --- |
-| `status` | one of those six words, nothing else — any nuance goes in `status_note` |
+| `stage` | one of those six words, nothing else — any nuance goes in `status_note` |
+| `status` | derived from `stage`, never chosen: Draft, In Progress and Deferred are `draft`; Complete is `stable`; Superseded and Abandoned are `deprecated` |
 | `type` | required; exactly one of the eight values, TitleCase. `category` is retired and refused, naming the `type` it maps to |
-| `summary` | optional; one line, at most 140 characters |
+| `description` | optional; one line, at most 140 characters. Older files call it `summary` |
 | `journal` | optional; the key of the journal the plan belongs to |
 | `services` | every repo the work touches, not just the one it is filed under |
 | `@<ref>` | the PR or SHA that carried it. Never a branch — branches get deleted |
-| `verified` | date the status was last checked against reality |
+| `verified` | who last checked the stage against reality, and when. `by` is `claude-code/<model id>` from a session (your own id), `process:<verb>` from a process; `at` is an ISO 8601 date |
 | `review` | why it could not be settled. Replaces `verified`; never sits beside it |
 
+- Change the stage with `me plans status <file> <Stage>`: it writes `stage` and
+  `status` together. Never edit one without the other.
+- Quote a value YAML would misread: one containing `: ` or ` #`, or reading as a
+  number or boolean (`"010"`, `"yes"`).
+- A file in the older shape (`status: <Stage>`, `summary:`, `verified:
+  YYYY-MM-DD`) still reads. When you edit its header, convert the whole header
+  in the same edit; a file never carries both shapes.
 - `type` says what the file is for. `Research` finds out, `Decision` chooses,
   `Build` changes code or config, `Review` answers a review, `Monitoring`
   watches something after a change, `Seed` is a prompt that starts a session,
@@ -83,8 +92,8 @@ next: NNN-filename.md
   closed set does not apply to them, and `me plans check-file` skips the check
   for those paths.
 - A ref hangs off its service because a PR number only resolves next to a repo.
-- `verified` is what makes drift detectable: a status is a claim, a status plus
-  a date is a claim with an age.
+- `verified` is what makes drift detectable: a stage is a claim, a stage plus
+  who checked it and when is a claim with an age.
 - **Every write restamps `verified` to today** — a PreToolUse hook refuses the
   edit otherwise. Touching the file means you read it, so say what you found.
 
@@ -130,7 +139,7 @@ The awk shape fixes the first two. Picking markers new to the work is yours.
 - **Rewrite exception:** revise a file in place only on explicit approval —
   the default stays append-only
 - **New file for:** new phase, new discovery, significant pivot, execution findings
-- **Same file for:** minor status updates only
+- **Same file for:** minor stage updates only
 - Cross-reference between files using relative filenames
 
 ## The Decomposition Procedure
@@ -244,6 +253,6 @@ themselves, highest number first. Then:
 1. Understand what's been completed and what remains
 2. Add a new file for the next phase of work
 3. Reference what it builds on
-4. Restamp `verified` on any file whose status you checked along the way —
-   including ones you did not otherwise change. A status you confirmed is a
-   result worth recording, not just a status you corrected.
+4. Restamp `verified` on any file whose stage you checked along the way —
+   including ones you did not otherwise change. A stage you confirmed is a
+   result worth recording, not just a stage you corrected.

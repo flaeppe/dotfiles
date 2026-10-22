@@ -6,8 +6,9 @@ Status drift is what makes a plan file lie: the work moves on, the header does
 not, and nothing catches it because nothing is checkable. Whether a status is
 *correct* cannot be enforced mechanically. Whether someone looked at it today
 can. `verified:` is that claim, and this refuses the write when the claim is
-not renewed. It is a plain ISO date, or a {by, at} mapping (flow, block or a
-list of them) compared by its `at` date -- the latest one of a list.
+not renewed. It is a {by, at} mapping (flow, block or a list of them) compared
+by its `at` date -- the latest one of a list -- or the older plain ISO date. A
+refusal asks for the mapping; the plain date is still accepted.
 
 Also refuses the other half of the same lie (plan-tree-hygiene/009): a write
 that stamps `verified: <today>` while the body still carries the
@@ -56,6 +57,11 @@ REVIEW: Final = re.compile(r"^review:\s*\S", re.M)
 # Mirrors tools/me/cmd/me/plans_taint.go's taintBannerRe byte for byte --
 # the em dash is U+2014, not a hyphen.
 BANNER: Final = re.compile(r"^> \*\*UNVERIFIED\*\* — .+\. Resolve before relying on this file\.$", re.M)
+
+
+# What a refusal asks the writer to put in the file. `by` is the writer's own
+# model id (claude-code/<model id>); a process names itself process:<verb>.
+VERIFIED_FORM: Final = "verified: {{by: claude-code/<your model id>, at: {today}}}"
 
 
 def verified_dates(text: str, is_fragment: bool = False) -> list[str]:
@@ -195,7 +201,7 @@ def stale(path: str, incoming: str, today: str) -> str | None:
     if not os.path.exists(path):
         if verified_date(incoming, is_fragment=True) or REVIEW.search(incoming):
             return None
-        return "a new plan file must carry `verified: %s` (or a `review:` reason)" % today
+        return "a new plan file must carry `%s` (or a `review:` reason)" % VERIFIED_FORM.format(today=today)
 
     if verified_date(incoming, is_fragment=True) or REVIEW.search(incoming):
         return None
@@ -211,8 +217,9 @@ def stale(path: str, incoming: str, today: str) -> str | None:
     was = current or "absent"
     return (
         "this edit does not restamp `verified:` (currently %s, today is %s).\n"
-        "Set it to today in the same edit, or set `review:` with a reason if the\n"
-        "status is known-wrong and you are not fixing it now." % (was, today)
+        "Set `%s` in the same edit, or set `review:` with a\n"
+        "reason if the status is known-wrong and you are not fixing it now."
+        % (was, today, VERIFIED_FORM.format(today=today))
     )
 
 

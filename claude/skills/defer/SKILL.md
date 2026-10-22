@@ -68,7 +68,8 @@ for where the file goes and what the header looks like. Resolve single- vs
 multi-repo from the current branch/repo and pick the next `NNN` the same way
 planning does.
 
-The only fixed difference: a deferred file always starts at **Status: Draft**.
+The only fixed difference: a deferred file always starts at **`stage: Draft`**
+(`status: draft`).
 
 ## What to capture
 
@@ -95,6 +96,6 @@ look thorough.
    let me choose extend/amend/separate (recommend one); only continue to a new
    file if it's clean or I pick separate.
 2. Resolve current branch/repo to pick the location and next `NNN` (per planning).
-3. Write the one file with planning's header block, Status: Draft.
+3. Write the one file with planning's header block, `stage: Draft`, `status: draft`.
 4. Report the path. The file alone must be enough to resume in a clean session —
    if you couldn't resume from it cold, add the missing load-bearing detail.

@@ -141,6 +141,30 @@ class PlanVerifiedGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("does not restamp `verified:`", result.stderr)
 
+    def test_a_refusal_asks_for_the_by_and_at_mapping(self):
+        result = self.tick_checkbox("proj/001-plan.md", STALE_PLAN)
+        self.assertIn("verified: {by: claude-code/<your model id>, at: %s}" % TODAY, result.stderr)
+
+    def write_new(self, rel_path, content):
+        target = self.plan_root / rel_path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        env = dict(os.environ, HOME=str(self.home))
+        payload = json.dumps({"tool_name": "Write", "tool_input": {"file_path": str(target), "content": content}})
+        return subprocess.run(
+            [sys.executable, str(GUARD)], input=payload, capture_output=True, text=True, env=env, timeout=10
+        )
+
+    def test_refuses_a_new_plan_without_verified_and_names_the_mapping(self):
+        result = self.write_new("proj/002-plan.md", "---\ntype: Plan\n---\n# new\n")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("verified: {by: claude-code/<your model id>, at: %s}" % TODAY, result.stderr)
+
+    def test_allows_a_new_plan_stamped_in_either_form(self):
+        for form in (FLOW_VERIFIED % TODAY, "verified: %s" % TODAY):
+            with self.subTest(form=form):
+                result = self.write_new("proj/003-plan.md", mapped_plan(form))
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_allows_a_body_edit_of_a_plan_carrying_review(self):
         result = self.tick_checkbox("proj/001-plan.md", STALE_PLAN_WITH_REVIEW)
         self.assertEqual(result.returncode, 0, result.stderr)
