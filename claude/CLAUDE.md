@@ -120,6 +120,7 @@ should be trivial — just parsing and error mapping, no logic duplication.
 
 ### Naming
 - Descriptive names over abbreviations (`i`/`j` loop counters and `x` lambdas excepted, but avoid otherwise).
+- A boolean, or a function returning one, reads as a yes/no question: `is`, `has`, `can` or `should` prefix (`isSettled`, `hasAmount`), never a bare verb or noun (`books`, `valid`).
 
 ### Testing
 - Write tests for new functionality when a test framework exists; integration over unit
