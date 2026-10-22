@@ -6,7 +6,8 @@ Status drift is what makes a plan file lie: the work moves on, the header does
 not, and nothing catches it because nothing is checkable. Whether a status is
 *correct* cannot be enforced mechanically. Whether someone looked at it today
 can. `verified:` is that claim, and this refuses the write when the claim is
-not renewed.
+not renewed. It is a plain ISO date, or a {by, at} mapping (flow, block or a
+list of them) compared by its `at` date -- the latest one of a list.
 
 Also refuses the other half of the same lie (plan-tree-hygiene/009): a write
 that stamps `verified: <today>` while the body still carries the
@@ -45,11 +46,47 @@ EXEMPT: Final = (
     os.path.join(PLAN_ROOT, ".index") + os.sep,
 )
 
-VERIFIED: Final = re.compile(r"^verified:\s*(\d{4}-\d{2}-\d{2})\s*$", re.M)
+# `verified:` is a plain ISO date, or a {by, at} mapping (flow, block) or a list
+# of them; the stamp's date is the `at` of a mapping, the latest one of a list.
+VERIFIED_PLAIN: Final = re.compile(r"^verified:\s*[\"']?(\d{4}-\d{2}-\d{2})[\"']?\s*$")
+VERIFIED_FLOW: Final = re.compile(r"^verified:\s*[\[{]")
+VERIFIED_BLOCK: Final = re.compile(r"^verified:\s*$")
+AT_DATE: Final = re.compile(r"\bat:\s*[\"']?(\d{4}-\d{2}-\d{2})")
 REVIEW: Final = re.compile(r"^review:\s*\S", re.M)
 # Mirrors tools/me/cmd/me/plans_taint.go's taintBannerRe byte for byte --
 # the em dash is U+2014, not a hyphen.
 BANNER: Final = re.compile(r"^> \*\*UNVERIFIED\*\* — .+\. Resolve before relying on this file\.$", re.M)
+
+
+def verified_dates(text: str, is_fragment: bool = False) -> list[str]:
+    """Every ISO date `verified:` stamps in text, in the plain, flow, block and
+    list forms. A fragment (an Edit's new_string) may carry only an `at:` line
+    of a block it edits, so those count too."""
+    dates: list[str] = []
+    is_in_block = False
+    for line in text.split("\n"):
+        plain = VERIFIED_PLAIN.match(line)
+        if plain:
+            dates.append(plain.group(1))
+            is_in_block = False
+        elif VERIFIED_FLOW.match(line):
+            dates.extend(AT_DATE.findall(line))
+            is_in_block = False
+        elif VERIFIED_BLOCK.match(line):
+            is_in_block = True
+        elif is_in_block and (line == "" or line[0] in " \t" or line.startswith("- ")):
+            dates.extend(AT_DATE.findall(line))
+        else:
+            is_in_block = False
+            if is_fragment and re.match(r"^\s+(?:- )?at:", line):
+                dates.extend(AT_DATE.findall(line))
+    return dates
+
+
+def verified_date(text: str, is_fragment: bool = False) -> str | None:
+    """The latest date `verified:` stamps in text, or None."""
+    dates = verified_dates(text, is_fragment)
+    return max(dates) if dates else None
 
 
 def is_reasoning_note(path: str) -> bool:
@@ -140,8 +177,7 @@ def banner_contradiction(path: str, tool_name: str, tool_input: dict, today: str
     text = resulting_text(tool_name, tool_input, path)
     if text is None:
         return None
-    verified = VERIFIED.search(frontmatter_of(text))
-    if not verified or verified.group(1) != today:
+    if verified_date(frontmatter_of(text)) != today:
         return None
     if not BANNER.search(text):
         return None
@@ -157,22 +193,22 @@ def stale(path: str, incoming: str, today: str) -> str | None:
     """Why this write should be refused, or None to allow it."""
     # A new file must arrive already stamped; there is nothing on disk to renew.
     if not os.path.exists(path):
-        if VERIFIED.search(incoming) or REVIEW.search(incoming):
+        if verified_date(incoming, is_fragment=True) or REVIEW.search(incoming):
             return None
         return "a new plan file must carry `verified: %s` (or a `review:` reason)" % today
 
-    if VERIFIED.search(incoming) or REVIEW.search(incoming):
+    if verified_date(incoming, is_fragment=True) or REVIEW.search(incoming):
         return None
 
     current_frontmatter = frontmatter(path)
     if REVIEW.search(current_frontmatter):
         return None  # `review:` already records that the status is unverified
 
-    current = VERIFIED.search(current_frontmatter)
-    if current and current.group(1) == today:
+    current = verified_date(current_frontmatter)
+    if current == today:
         return None  # already renewed earlier in the same day
 
-    was = current.group(1) if current else "absent"
+    was = current or "absent"
     return (
         "this edit does not restamp `verified:` (currently %s, today is %s).\n"
         "Set it to today in the same edit, or set `review:` with a reason if the\n"
