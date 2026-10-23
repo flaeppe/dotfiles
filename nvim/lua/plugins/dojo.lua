@@ -355,7 +355,7 @@ local ENTRIES = {
     },
     {
         group = "note",
-        keys = "me reasoning scribbles",
+        keys = "me codenotes scribbles",
         desc = "The later half: the draft pile, --next to serve one, --done <id> once it is written up",
         added = "2026-09-16",
         run = false,

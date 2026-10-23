@@ -28,7 +28,7 @@
 -- Three terminal-or-not decisions, not two: kept and dropped never resurface;
 -- deferred does, but only once every undecided candidate is exhausted:
 --
---   :NoteNext [args]   open the next candidate (`reasoning-queue next -n 1
+--   :NoteNext [args]   open the next candidate (`codenotes-queue next -n 1
 --                      --json <args>`, args passed through verbatim; a bare
 --                      non-flag argument is shorthand for `--feed <arg>`),
 --                      prefilled with an id: prefix (the slug is yours to add;
@@ -37,13 +37,13 @@
 --                      | `leaning` | `firm`, dropped on write if left blank),
 --                      then its body
 --   :wq                non-empty body: writes the note as usual, then
---                      `reasoning-queue decide <id> kept`. Empty body (a
+--                      `codenotes-queue decide <id> kept`. Empty body (a
 --                      candidate-backed buffer only -- nothing after the
 --                      header block but whitespace): writes nothing,
---                      `reasoning-queue decide <id> dropped`
---   :NoteSkip          `reasoning-queue decide <id> deferred`, discard the
+--                      `codenotes-queue decide <id> dropped`
+--   :NoteSkip          `codenotes-queue decide <id> deferred`, discard the
 --                      buffer, open the next candidate with the same args
---   :NoteDrop          `reasoning-queue decide <id> dropped`, discard the
+--   :NoteDrop          `codenotes-queue decide <id> dropped`, discard the
 --                      buffer without writing, open the next candidate with
 --                      the same args
 --
@@ -60,29 +60,32 @@ local rebuild_index, apply_indicators
 
 -- Root and repo resolution -------------------------------------------------
 
---- The notes tree, read from `~/.config/reasoning-root` when that file
---- exists. The path is a property of the machine, not of this config, so it
---- lives outside the repo -- the same arrangement `~/.config/me-home` uses.
+--- The notes tree, read from `~/.config/codenotes-root` when that file
+--- exists, else from the older `~/.config/reasoning-root`. The path is a
+--- property of the machine, not of this config, so it lives outside the repo
+--- -- the same arrangement `~/.config/me-home` uses.
 --- Read fresh on every call: nothing here may cache it, or an override set
 --- after this file loads would be invisible to it.
 local function notes_root()
     if vim.g.reasoning_notes_root then
         return vim.fn.expand(vim.g.reasoning_notes_root)
     end
-    local pointer = vim.fn.expand("~/.config/reasoning-root")
-    if vim.fn.filereadable(pointer) == 1 then
-        local line = vim.fn.readfile(pointer, "", 1)[1]
-        if line and line ~= "" then
-            return vim.fn.expand(vim.trim(line))
+    for _, name in ipairs({ "codenotes-root", "reasoning-root" }) do
+        local pointer = vim.fn.expand("~/.config/" .. name)
+        if vim.fn.filereadable(pointer) == 1 then
+            local line = vim.fn.readfile(pointer, "", 1)[1]
+            if line and line ~= "" then
+                return vim.fn.expand(vim.trim(line))
+            end
         end
     end
     return vim.fn.expand("~/.plan")
 end
 
---- Same override pattern as `notes_root`, for the `reasoning-queue` binary
+--- Same override pattern as `notes_root`, for the `codenotes-queue` binary
 --- `:NoteNext`/`:NoteSkip` shell out to.
 local function queue_bin()
-    return vim.fn.expand(vim.g.reasoning_queue_bin or (notes_root() .. "/bin/reasoning-queue"))
+    return vim.fn.expand(vim.g.reasoning_queue_bin or (notes_root() .. "/bin/codenotes-queue"))
 end
 
 local function run(cmd, cwd)
@@ -299,7 +302,7 @@ local authoring = {}
 authoring.CUTLINE = "# ---------------------- >8 ----------------------"
 
 --- A name as a kebab-case id fragment: `journalAnswer` becomes
---- `journal-answer`. Mirrors the prefix `reasoning check` expects, so a
+--- `journal-answer`. Mirrors the prefix `codenotes check` expects, so a
 --- difference shows up there as an ID-PREFIX warning.
 function authoring.kebab(name)
     local spaced = name:gsub("([a-z0-9])([A-Z])", "%1-%2")
@@ -328,7 +331,7 @@ function authoring.id_prefix(relpath)
 end
 
 --- The trait vocabulary, as `{ term, meaning }` pairs, read from the closed
---- term list itself so the card cannot drift from what `me reasoning` will
+--- term list itself so the card cannot drift from what `me codenotes` will
 --- accept. An unreadable list yields none and the card omits that section.
 function authoring.vocabulary_terms()
     local path = notes_root() .. "/traits/vocabulary"
@@ -558,7 +561,7 @@ function M.scribble()
         end
         local target = ("%s:%d-%d"):format(file, first, last)
         local result = vim.system(
-            { "me", "reasoning", "scribble", target, "--ref", ref.token, text },
+            { "me", "codenotes", "scribble", target, "--ref", ref.token, text },
             { text = true }
         ):wait()
         if result.code ~= 0 then
@@ -779,8 +782,8 @@ local function body_is_blank(body)
     return true
 end
 
---- `reasoning-queue decide <id> <decision>`. On success, notifies
---- `<decision> · <stdout>` -- reasoning-queue's own daily-progress line
+--- `codenotes-queue decide <id> <decision>`. On success, notifies
+--- `<decision> · <stdout>` -- codenotes-queue's own daily-progress line
 --- (decision count against target, weekday streak, remaining) -- so
 --- progress toward today's target surfaces without a separate check; on
 --- failure notifies the error instead (not raising) -- the caller decides
@@ -792,7 +795,7 @@ local function queue_decide(id, decision, note_path)
     end
     local result = vim.system(cmd, { text = true }):wait()
     if result.code ~= 0 then
-        vim.notify("Notes: reasoning-queue decide failed: " .. vim.trim(result.stderr or ""), vim.log.levels.ERROR)
+        vim.notify("Notes: codenotes-queue decide failed: " .. vim.trim(result.stderr or ""), vim.log.levels.ERROR)
         return false
     end
     vim.notify(decision .. " · " .. vim.trim(result.stdout or ""), vim.log.levels.INFO)
@@ -818,7 +821,7 @@ end
 --- create it with frontmatter or append a section to it, rewrite its
 --- `services:` union, then close the compose buffer. A candidate-backed
 --- buffer (`:NoteNext`) additionally marks the candidate `kept` in
---- `reasoning-queue` once the file is written -- or, with an empty body,
+--- `codenotes-queue` once the file is written -- or, with an empty body,
 --- takes the `drop_candidate` path instead and never gets this far. A plain
 --- A hand-started buffer has no candidate to drop, so an empty body there is
 --- just another refusal.
@@ -946,7 +949,7 @@ end
 
 -- Candidate queue: :NoteNext / :NoteSkip ------------------------------------
 
---- Open a compose buffer prefilled from a `reasoning-queue next --json`
+--- Open a compose buffer prefilled from a `codenotes-queue next --json`
 --- candidate: one `ref:` per entry in `candidate.refs` (or the placeholder
 --- when it is empty), `at:`, `source:` (omitted when the candidate has none),
 --- `captured:` = the candidate's own date, `strength:` blank, then its body.
@@ -954,7 +957,7 @@ end
 --- `heading_part` rather than the candidate's `title`,
 --- which is only a fallback for the refs-empty case (there is no ref to
 --- derive a heading from). Same acwrite/bufhidden pattern the pile uses.
---- `args` is the (normalized) argument string `reasoning-queue next` was
+--- `args` is the (normalized) argument string `codenotes-queue next` was
 --- called with, remembered on the buffer so `:NoteSkip`/`:NoteDrop` fetch
 --- the next candidate under the same filter.
 local function open_candidate_buffer(candidate, args)
@@ -1035,9 +1038,9 @@ end
 --- A bare single token with no leading dash is the legacy `:NoteNext <feed>`
 --- shorthand, rewritten to `--feed <feed>`; anything else -- already flagged
 --- (`--repo api --min-score 2`), or empty -- passes through unchanged for
---- `reasoning-queue` to interpret (or reject). This file does not track
+--- `codenotes-queue` to interpret (or reject). This file does not track
 --- which flags the script supports; a rejected flag surfaces as a failed
---- command below, same as any other `reasoning-queue` error.
+--- command below, same as any other `codenotes-queue` error.
 local function normalize_next_args(args)
     if not args then
         return nil
@@ -1052,7 +1055,7 @@ local function normalize_next_args(args)
     return trimmed
 end
 
---- `reasoning-queue next -n 1 --json <args>`, opened as a candidate compose
+--- `codenotes-queue next -n 1 --json <args>`, opened as a candidate compose
 --- buffer. Refuses when one is already open; reports the
 --- queue drained (`nothing left`) rather than opening anything.
 function M.note_next(args)
@@ -1068,7 +1071,7 @@ function M.note_next(args)
     end
     local result = vim.system(cmd, { text = true }):wait()
     if result.code ~= 0 then
-        vim.notify("Notes: reasoning-queue next failed: " .. vim.trim(result.stderr or ""), vim.log.levels.ERROR)
+        vim.notify("Notes: codenotes-queue next failed: " .. vim.trim(result.stderr or ""), vim.log.levels.ERROR)
         return
     end
 
@@ -1080,7 +1083,7 @@ function M.note_next(args)
 
     local ok, candidate = pcall(vim.json.decode, vim.split(out, "\n", { plain = true })[1])
     if not ok or type(candidate) ~= "table" then
-        vim.notify("Notes: could not parse reasoning-queue output", vim.log.levels.ERROR)
+        vim.notify("Notes: could not parse codenotes-queue output", vim.log.levels.ERROR)
         return
     end
 
@@ -1138,7 +1141,7 @@ end
 
 vim.api.nvim_create_user_command("NoteNext", function(cmd_opts)
     M.note_next(cmd_opts.args ~= "" and cmd_opts.args or nil)
-end, { nargs = "*", desc = "Notes: open the next undecided (or deferred) reasoning-queue candidate, args passed to reasoning-queue next" })
+end, { nargs = "*", desc = "Notes: open the next undecided (or deferred) codenotes-queue candidate, args passed to codenotes-queue next" })
 
 vim.api.nvim_create_user_command("NoteSkip", function()
     M.note_defer()
