@@ -74,6 +74,7 @@
               ./codex/codex.nix
               ./fish/fish.nix
               ./git/git.nix
+              ./go-cache/go-cache.nix
               ./nvim/nvim.nix
             ];
           };
