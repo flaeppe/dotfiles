@@ -35,8 +35,8 @@ code. It documents; it does not refactor the code it documents.
 - History lives in git (commit messages + `git log`) — no changelog file here.
 
 **Size budget:** 14000 chars, worst-path load. Single-file skill (no leaves),
-so worst-path = SKILL.md. Currently 13898; measure with skill-improver's
-`scripts/measure.sh`.
+so worst-path = SKILL.md. Currently 13898; measure with
+`wc -c SKILL.md`.
 
 **Rehaul threshold:** a change touching >25% of SKILL.md lines (~75), or the
 frontmatter description, or the section structure — do it as its own rewrite
