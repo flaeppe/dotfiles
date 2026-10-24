@@ -150,8 +150,8 @@ Treat me as experienced - skip beginner explanations.
 
 `me --help` lists every verb; each has its own `--help`. Check it before assuming a
 capability doesn't exist, and prefer a verb over hand-rolling the equivalent (board,
-inbox, notes, sessions, PRs, worktrees, review). Every verb is safe to run without
-sign-off — an unsafe one is a tool bug. Brief subagents with the verb (`me wt new
+inbox, notes, sessions, PRs, worktrees, review). Every verb is safe to run from
+any session; scheduled commands are launchd's, never run by hand. An unsafe one is a tool bug. Brief subagents with the verb (`me wt new
 <name>`, `me dirty`, `me brief`), not a restatement of it.
 
 ---
