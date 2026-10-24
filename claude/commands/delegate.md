@@ -1,5 +1,5 @@
 Delegate and orchestrate. You have $ARGUMENTS agents at your disposal (if no
-number was given, assume 4). You act as the glue, capturing anything that
+number was given, use the cap your project instructions give). You act as the glue, capturing anything that
 comes in between.
 
 Sonnet is the default for every agent. Reach for opus only when the brief
