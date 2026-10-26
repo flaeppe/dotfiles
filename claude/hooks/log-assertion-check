@@ -11,17 +11,9 @@ Three invocation modes, one detector:
       hook: the same staged-versus-HEAD comparison, findings on stderr,
       exit 1 if any.
 
-Detects a log capture plus a read of that capture in the same file, in Go,
-Python and TypeScript/JavaScript test files. Only hits the change adds are
-reported: a file's existing log assertions are compared away, never blocked.
-Heuristic line matching, not a parser. Ceilings:
-  - a capture reached through a helper in another file is not seen;
-  - a read assigned to a differently named variable is not followed;
-  - git commit with -a, -C <dir> or a preceding `cd` checks the hook's cwd.
-
-A test whose subject is the logging itself is a legitimate exception, and a
-human decides it: the deny message tells the agent to stop and ask the owner,
-and offers no switch to turn the check off.
+Flags a log capture plus a read of that capture in the same Go, Python or
+TypeScript/JavaScript test file. Only hits the change adds are reported; a
+file's existing log assertions never block an edit.
 """
 
 from __future__ import annotations
@@ -45,6 +37,9 @@ RULE_NOTE: Final = (
     "logging itself. A decision whose only trace is a log line is a design "
     "hole: return it as a value and assert that."
 )
+# A test whose subject is the logging itself is a legitimate exception that a
+# human decides, so the agent is told to hand it over; no switch turns the
+# check off.
 WRITE_EXCEPTION: Final = (
     "If the subject of this test is the logging itself (logger package, "
     "formatter, redaction, level mapping), stop and tell the owner; they "
@@ -78,7 +73,7 @@ def is_comment(line: str) -> bool:
 
 
 def compile_name_reads(names: set[str], template: str) -> re.Pattern[str] | None:
-    """`template` with NAME replaced by an alternation of `names`."""
+    """Regex matching `template` with NAME standing for any of `names`; None when there are none."""
     if not names:
         return None
     alternation = "|".join(sorted((re.escape(name) for name in names), key=len, reverse=True))
@@ -303,7 +298,7 @@ def is_log_sink_write(lines: list[str], index: int) -> bool:
 
 
 def add_aliases(lines: list[str], spies: dict[str, int]) -> None:
-    """`const calls = readCalls(spy)`: the new name reads the spy too."""
+    """Adds names assigned from an expression that uses a spy; reading them reads the spy."""
     captured_at = dict(spies)
     for name, defined_at in captured_at.items():
         usage = re.compile(rf"\b{re.escape(name)}\b")
@@ -319,7 +314,7 @@ def reads_of_captures(
     captured: dict[str, dict[str, int]],
     read_templates: tuple[tuple[str, str], ...],
 ) -> list[Hit]:
-    """Lines after a capture that read it: pattern name -> {captured name: capture line}."""
+    """Hits for lines after a capture that read it; `captured` maps pattern -> {name: capture line}."""
     readers = [
         (pattern, names, compile_name_reads(set(names), template))
         for pattern, template in read_templates
@@ -365,6 +360,10 @@ def language_of(path: str) -> str | None:
     return None
 
 
+# Ceilings: heuristic line matching, not a parser. A capture reached through a
+# helper in another file is not seen, and a read assigned to a differently
+# named variable is not followed. `git commit` with -a, -C <dir> or a
+# preceding `cd` is checked against the hook's own cwd.
 def find_hits(path: str, text: str) -> list[Hit]:
     language = language_of(path)
     if language is None:
