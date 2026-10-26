@@ -396,11 +396,7 @@ def find_hits(path: str, text: str) -> list[Hit]:
 
 
 def new_hits(path: str, before: str, after: str) -> list[Hit]:
-    """Hits in `after` the write adds.
-
-    A hit matches a `before` hit of the same pattern and text, or else any
-    `before` hit of the same pattern (an existing assertion that was edited).
-    """
+    """Hits in `after` that the write adds; a reworded existing assertion is not one."""
     remaining = collections.Counter(hit.key for hit in find_hits(path, before))
     unmatched = []
     for hit in find_hits(path, after):
@@ -408,6 +404,7 @@ def new_hits(path: str, before: str, after: str) -> list[Hit]:
             remaining[hit.key] -= 1
             continue
         unmatched.append(hit)
+    # A leftover hit pairs with any unmatched `before` hit of its pattern: the line was edited, not added.
     reworded = collections.Counter()
     for (pattern, _text), count in remaining.items():
         reworded[pattern] += count
