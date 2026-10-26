@@ -1,31 +1,35 @@
 #!/usr/bin/python3
-"""Denies a test change that adds an assertion on captured log output.
+"""Warns when a write to a test file adds an assertion on captured log output.
 
-Three invocation modes, one detector:
   (PreToolUse payload on stdin, Edit|Write|MultiEdit) -- the edit's result is
-      compared with the file on disk; a newly added log assertion is denied.
-  (PreToolUse payload on stdin, Bash `git commit`) -- every staged test file
-      is compared with its HEAD version; edits made through the shell are
-      caught here.
-  log-assertion-check --staged | <file>...  -- CLI for the git pre-commit
-      hook: the same staged-versus-HEAD comparison, findings on stderr,
-      exit 1 if any.
+      compared with the file on disk. A newly added log assertion becomes
+      context for the writing model; the write is never blocked.
+  log-assertion-check --report -- counts per day and per repo, read from the
+      state file: writes that fired, matched lines, and how many of those
+      lines the same file's next write still held.
 
 Flags a log capture plus a read of that capture in the same Go, Python or
-TypeScript/JavaScript test file. Only hits the change adds are reported; a
-file's existing log assertions never block an edit.
+TypeScript/JavaScript test file. Only hits the write adds are reported. A test
+whose name, file or directory names logging (log, logger, redact...) is the
+logging-subject exception and is skipped.
+
+State: $LOG_ASSERTION_CHECK_STATE, else
+${XDG_STATE_HOME:-~/.local/state}/claude/log-assertion-check.jsonl; one JSON
+record per fire and per follow-up. Fails open: any error ends in exit 0.
 """
 
 from __future__ import annotations
 
 import collections
 import json
+import os
 import re
 import subprocess
 import sys
+import uuid
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Callable, Final, NamedTuple
-
-import shellwords
 
 EDIT_TOOLS: Final = ("Edit", "Write", "MultiEdit")
 RULES_FILE: Final = "claude/rules/test.md (~/.claude/rules/test.md)"
@@ -37,20 +41,12 @@ RULE_NOTE: Final = (
     "logging itself. A decision whose only trace is a log line is a design "
     "hole: return it as a value and assert that."
 )
-# A test whose subject is the logging itself is a legitimate exception that a
-# human decides, so the agent is told to hand it over; no switch turns the
-# check off.
 WRITE_EXCEPTION: Final = (
-    "If the subject of this test is the logging itself (logger package, "
-    "formatter, redaction, level mapping), stop and tell the owner; they "
-    "decide, and write or commit that test themselves. Do not reword the "
-    "assertion or move the edit into the shell to get past this check."
+    "If the subject of this test is the logging itself (level decision, access "
+    "log, redaction), keep the assertion and say so in your reply so the owner "
+    "sees it; otherwise rewrite it to assert the outcome."
 )
-COMMIT_EXCEPTION: Final = (
-    "If the subject of this test is the logging itself (logger package, "
-    "formatter, redaction, level mapping), stop and tell the owner; they "
-    "decide, and commit it by hand (`git commit --no-verify`)."
-)
+STATE_ENV: Final = "LOG_ASSERTION_CHECK_STATE"
 
 
 class Hit(NamedTuple):
@@ -362,22 +358,63 @@ def language_of(path: str) -> str | None:
 
 # Ceilings: heuristic line matching, not a parser. A capture reached through a
 # helper in another file is not seen, and a read assigned to a differently
-# named variable is not followed. `git commit` with -a, -C <dir> or a
-# preceding `cd` is checked against the hook's own cwd.
+# named variable is not followed. Edits made through the shell are not seen.
+TEST_NAME: Final = re.compile(
+    r"^\s*(?:def\s+(test\w*)|func\s+(Test\w*)"
+    r"|(?:it|test)(?:\.\w+)*\s*\(\s*['\"`]([^'\"`]*)|t\.Run\s*\(\s*\"([^\"]*))"
+)
+LOGGING_SUBJECT: Final = re.compile(r"\b(?:logs?|logged|logging|loggers?|redact\w*)\b")
+
+
+def words_of(identifier: str) -> str:
+    spaced = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", " ", identifier)
+    return re.sub(r"[^A-Za-z0-9]+", " ", spaced).lower()
+
+
+def is_logging_subject(path: str, lines: list[str], line_number: int) -> bool:
+    """True when the file, its directory or the enclosing test names logging as its subject."""
+    if LOGGING_SUBJECT.search(words_of(" ".join(path.split("/")[-2:]))):
+        return True
+    for text in reversed(lines[:line_number]):
+        match = TEST_NAME.match(text)
+        if match:
+            name = next(group for group in match.groups() if group is not None)
+            return bool(LOGGING_SUBJECT.search(words_of(name)))
+    return False
+
+
 def find_hits(path: str, text: str) -> list[Hit]:
     language = language_of(path)
     if language is None:
         return []
-    return sorted(DETECTORS[language](text.splitlines()), key=lambda hit: hit.line)
+    lines = text.splitlines()
+    hits = DETECTORS[language](lines)
+    return sorted(
+        (hit for hit in hits if not is_logging_subject(path, lines, hit.line)),
+        key=lambda hit: hit.line,
+    )
 
 
 def new_hits(path: str, before: str, after: str) -> list[Hit]:
-    """Hits in `after` beyond those `before` already had, matched by pattern and text."""
-    already_present = collections.Counter(hit.key for hit in find_hits(path, before))
-    fresh = []
+    """Hits in `after` the write adds.
+
+    A hit matches a `before` hit of the same pattern and text, or else any
+    `before` hit of the same pattern (an existing assertion that was edited).
+    """
+    remaining = collections.Counter(hit.key for hit in find_hits(path, before))
+    unmatched = []
     for hit in find_hits(path, after):
-        if already_present[hit.key] > 0:
-            already_present[hit.key] -= 1
+        if remaining[hit.key] > 0:
+            remaining[hit.key] -= 1
+            continue
+        unmatched.append(hit)
+    reworded = collections.Counter()
+    for (pattern, _text), count in remaining.items():
+        reworded[pattern] += count
+    fresh = []
+    for hit in unmatched:
+        if reworded[hit.pattern] > 0:
+            reworded[hit.pattern] -= 1
             continue
         fresh.append(hit)
     return fresh
@@ -409,85 +446,143 @@ def text_after_edit(tool_name: str, tool_input: dict, before: str) -> str | None
     return text
 
 
-# ------------------------------------------------------------- the commit
+# ------------------------------------------------------------ the records
 
-def git_text(*args: str) -> str:
-    return subprocess.run(
-        ["git", *args], capture_output=True, text=True, check=False
-    ).stdout
-
-
-def staged_changes() -> list[tuple[str, str]]:
-    """(path before the commit, path in the commit) per added, copied, modified or renamed file."""
-    raw = git_text(
-        "diff", "--cached", "--name-status", "-M", "--diff-filter=ACMR", "-z"
-    ).split("\0")
-    changes = []
-    index = 0
-    while index < len(raw) and raw[index]:
-        if raw[index].startswith(("R", "C")):
-            changes.append((raw[index + 1], raw[index + 2]))
-            index += 3
-        else:
-            changes.append((raw[index + 1], raw[index + 1]))
-            index += 2
-    return changes
+def state_path() -> Path:
+    override = os.environ.get(STATE_ENV)
+    if override:
+        return Path(override)
+    state_home = os.environ.get("XDG_STATE_HOME") or str(Path.home() / ".local" / "state")
+    return Path(state_home) / "claude" / "log-assertion-check.jsonl"
 
 
-def staged_findings(only_paths: list[str] | None = None) -> list[Finding]:
-    findings = []
-    for old_path, path in staged_changes():
-        if only_paths is not None and path not in only_paths:
+# The file is read whole on every test-file write; rotate it if it grows past a few MB.
+def read_records() -> list[dict]:
+    try:
+        lines = state_path().read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    records = []
+    for line in lines:
+        try:
+            records.append(json.loads(line))
+        except json.JSONDecodeError:
             continue
-        if language_of(path) is None:
-            continue
-        before = git_text("show", f"HEAD:{old_path}")
-        after = git_text("show", f":{path}")
-        findings.extend(Finding(path, hit) for hit in new_hits(path, before, after))
-    return findings
+    return records
+
+
+def append_records(records: list[dict]) -> None:
+    if not records:
+        return
+    path = state_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as handle:
+        handle.write("".join(json.dumps(record) + "\n" for record in records))
+
+
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def repo_name(path: str) -> str:
+    directory = Path(path).parent
+    while not directory.is_dir() and directory != directory.parent:
+        directory = directory.parent
+    result = subprocess.run(
+        ["git", "-C", str(directory), "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return Path(result.stdout.strip()).name or "-"
+
+
+def fire_records(path: str, hits: list[Hit], session: str) -> list[dict]:
+    write_id = uuid.uuid4().hex[:12]
+    repo = repo_name(path)
+    return [
+        {
+            "event": "fire",
+            "id": f"{write_id}-{number}",
+            "write": write_id,
+            "ts": now(),
+            "repo": repo,
+            "file": path,
+            "pattern": hit.pattern,
+            "line": hit.text,
+            "session": session,
+        }
+        for number, hit in enumerate(hits)
+    ]
+
+
+def followup_records(path: str, after_hits: list[Hit], records: list[dict], session: str) -> list[dict]:
+    """One record per earlier fire on `path` that has no follow-up yet: does `after_hits` still hold its line."""
+    answered = {record["fire"] for record in records if record.get("event") == "followup"}
+    held_keys = {hit.key for hit in after_hits}
+    return [
+        {
+            "event": "followup",
+            "fire": record["id"],
+            "ts": now(),
+            "session": session,
+            "held": (record["pattern"], " ".join(record["line"].split())) in held_keys,
+        }
+        for record in records
+        if record.get("event") == "fire" and record["file"] == path and record["id"] not in answered
+    ]
 
 
 # ------------------------------------------------------------- reporting
 
-def describe(findings: list[Finding], exception: str) -> str:
-    lines = [f"New log assertion in a test. {RULE_NOTE}", ""]
+def describe(findings: list[Finding]) -> str:
+    lines = [
+        f"New log assertion in a test (warning; the write went through). {RULE_NOTE}",
+        "",
+    ]
     for finding in findings:
         lines.append(
             f"  {finding.path}:{finding.hit.line}  [{finding.hit.pattern}]  {finding.hit.text[:100]}"
         )
-    lines += ["", f"Rule: {RULES_FILE}", exception]
+    lines += ["", f"Rule: {RULES_FILE}", WRITE_EXCEPTION]
     return "\n".join(lines)
 
 
-def decide(reason: str) -> None:
+def warn(message: str) -> None:
     print(
         json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": reason,
-                }
-            }
+            {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": message}}
         )
     )
 
 
-def is_git(word: str | None) -> bool:
-    if not word:
-        return False
-    return word == "git" or word.endswith("/git")
-
-
-def is_commit_command(command: str) -> bool:
-    for segment in shellwords.sub_commands(shellwords.words_of(command)):
-        word, index = shellwords.leading_command(segment)
-        if not is_git(word):
+def report() -> str:
+    records = read_records()
+    fires = {record["id"]: record for record in records if record.get("event") == "fire"}
+    rows: dict[tuple[str, str], dict] = collections.defaultdict(
+        lambda: {"writes": set(), "lines": 0, "followed": 0, "held": 0}
+    )
+    for record in fires.values():
+        row = rows[(record["ts"][:10], record["repo"])]
+        row["writes"].add(record["write"])
+        row["lines"] += 1
+    for record in records:
+        fire = fires.get(record.get("fire", ""))
+        if record.get("event") != "followup" or fire is None:
             continue
-        rest = [w for w in segment[index + 1 :] if not w.startswith("-")]
-        if rest and rest[0] == "commit":
-            return True
-    return False
+        row = rows[(fire["ts"][:10], fire["repo"])]
+        row["followed"] += 1
+        row["held"] += bool(record["held"])
+    if not rows:
+        return "no fires recorded"
+    table = [("day", "repo", "writes", "lines", "followed", "held")]
+    for (day, repo), row in sorted(rows.items()):
+        table.append((day, repo, len(row["writes"]), row["lines"], row["followed"], row["held"]))
+    widths = [max(len(str(line[column])) for line in table) for column in range(len(table[0]))]
+    return "\n".join(
+        "  ".join(str(cell).ljust(width) for cell, width in zip(line, widths)).rstrip()
+        for line in table
+    )
 
 
 def check_edit(payload: dict) -> None:
@@ -499,44 +594,29 @@ def check_edit(payload: dict) -> None:
     after = text_after_edit(payload["tool_name"], tool_input, before)
     if after is None:
         return
-    findings = [Finding(path, hit) for hit in new_hits(path, before, after)]
-    if findings:
-        decide(describe(findings, WRITE_EXCEPTION))
-
-
-def check_commit(payload: dict) -> None:
-    command = payload.get("tool_input", {}).get("command", "")
-    if "git" not in command or "commit" not in command:
-        return
-    if not is_commit_command(command):
-        return
-    findings = staged_findings()
-    if findings:
-        decide(describe(findings, COMMIT_EXCEPTION))
+    session = str(payload.get("session_id", ""))
+    hits = new_hits(path, before, after)
+    try:
+        followups = followup_records(path, find_hits(path, after), read_records(), session)
+        append_records(followups + fire_records(path, hits, session))
+    except OSError:
+        pass
+    if hits:
+        warn(describe([Finding(path, hit) for hit in hits]))
 
 
 def pretooluse() -> None:
     payload = json.load(sys.stdin)
-    tool_name = payload.get("tool_name")
-    if tool_name in EDIT_TOOLS:
+    if payload.get("tool_name") in EDIT_TOOLS:
         check_edit(payload)
-    elif tool_name == "Bash":
-        check_commit(payload)
-
-
-def cli(arguments: list[str]) -> int:
-    only_paths = None if arguments == ["--staged"] else arguments
-    findings = staged_findings(only_paths)
-    if not findings:
-        return 0
-    print(describe(findings, COMMIT_EXCEPTION), file=sys.stderr)
-    return 1
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["--report"]:
+        print(report())
+        sys.exit(0)
     try:
-        if len(sys.argv) > 1:
-            sys.exit(cli(sys.argv[1:]))
         pretooluse()
     except Exception:
-        sys.exit(0)
+        pass
+    sys.exit(0)

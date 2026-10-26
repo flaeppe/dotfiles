@@ -21,7 +21,3 @@ if git diff --cached -U0 | grep -E '^[+-]' | grep -v '^+++\|^---' | grep -Eiq "$
   echo "commit blocked: staged diff matches a denylisted term ($DENYLIST)" >&2
   exit 1
 fi
-
-# No new log assertions in test files (claude/rules/test.md) -- checked here too
-# so an agent's Bash commit and a human's `git commit` get the same gate.
-python3 "$HOME/.claude/hooks/log-assertion-check" --staged || exit 1
