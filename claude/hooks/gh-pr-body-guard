@@ -366,8 +366,8 @@ def lint_findings(body: str) -> list[tuple[str, str]]:
             if stripped.startswith(heading):
                 findings.append(("`%s` heading is not allowed" % heading, stripped))
 
-    # Capped per paragraph rather than per body: a body-wide line count rewards
-    # packing more into each line, which is what makes a body unreadable.
+    # Capped per paragraph as well as per body: a body within its word budget is
+    # still a wall when it arrives as one or two dense paragraphs.
     for paragraph in prose_paragraphs(lines):
         word_count = len(paragraph.split())
         if word_count > MAX_PARAGRAPH_WORDS:
