@@ -14,38 +14,46 @@ repeated here.
 
 ## Description
 
-Three things, in this order, and nothing else:
+Write for a reviewer who knows the codebase but not this corner of it. They read
+top-down and stop once they know enough, so order decides what gets read:
 
-1. **What changed** — a sentence or two. If the diff says it, don't repeat it.
-2. **Why it had to change** — with evidence: a `file:line`, the error string, a
-   count. Quote the error, don't describe it.
-3. **The one thing a reviewer should push back on** — the risky call, the
-   assumption you'd defend. If there honestly isn't one, write nothing.
+1. **Summary** — two to four plain-English sentences: what changes and why it
+   matters, in words someone new to the area follows. No `file:line`, no counts.
+   A merge order, breaking change or migration step goes here.
+2. **Context** — what the reader needs before the diff makes sense: how this
+   part of the system behaves, what goes wrong today, why this approach.
+3. **Evidence** — the `file:line`s, error strings, counts and timestamps behind
+   the claims above. Quote the error, don't describe it. A table beats six
+   one-line bullets.
+4. **Push back on** — the risky call, the assumption you'd defend. If there
+   honestly isn't one, write nothing.
 
-**Hard ceiling: 10 lines, and the body must be SMALLER THAN THE DIFF.** Not a
-default, not a target — a gate. Length tracks the change, never how long the
-work took.
+Give each its `##` heading (`## Summary`, `## Context`, `## Evidence`,
+`## Push back on`). A change the summary fully explains — a one-line fix — is
+one paragraph plus the push-back line, no headings: a heading over one sentence
+is noise.
 
-Check it before `gh pr create`, and state both numbers when reporting the PR:
+**A normal PR is a two-to-three-minute read: 300-450 words is the ceiling, the
+body stays smaller than the diff, and no paragraph runs past 80 words.** It is a
+summary, not a report or a transcript. Length tracks the change, never how long
+the work took. Check before creating:
 
 ```sh
-wc -l < body.md                        # must be <= 10
+wc -w < body.md                        # must be <= 450
 wc -c < body.md                        # must be < the diff's byte count
 git diff origin/<base>...HEAD | wc -c
 ```
 
-If either fails, cut. Do not justify the length. The commonest overrun is a body
-that argues for the change — the diff plus one `file:line` already does that.
+Over budget, cut in this order: Evidence first — keep the one number or
+`file:line` that decides each claim and move the rest (full tables,
+derivations) to a PR comment, or drop it; then Context. Never the Summary or the
+push-back line, and never by packing more into each line.
 
-**A body larger than its own diff is the failure this gate exists to catch.**
-
-Two that hit it, both one file:
+Two short ones, both one file:
 
 > Alert and check-dialog links built from `BOARD_URL` pointed at
 > `/apps/eng-monitoring`, but the host mounts apps at `/apps/:team/:name` — every
 > link 404'd. One-line constant fix: `/apps/dev/eng-monitoring`.
->
-> Found by clicking an alert link from the first production rollout.
 
 > Two pushes to master 30 seconds apart ran concurrent deploys whose applies
 > interleaved. Production ended on the **older** commit — `adefc14` applied
@@ -53,6 +61,26 @@ Two that hit it, both one file:
 >
 > **Push back on `cancel-in-progress: false`** — it does not fix the false
 > `rolled_out=success`, which lives elsewhere.
+
+One that needs the headings:
+
+> ## Summary
+> When a large batch of events arrives, the worker takes far more messages than
+> it has database connections, so most time out and are redelivered. This caps
+> each pod at one message per connection; the rest wait in the queue.
+>
+> ## Context
+> Each handler holds one connection at a time, so 20 connections serve 20
+> handlers with no waiting. The queue redelivers what times out.
+>
+> ## Evidence
+> | | before | after |
+> |---|---|---|
+> | messages held per pod | 1,000 | 20 |
+> | deliveries per message, last burst | 10.8 | ~1 (expected) |
+>
+> ## Push back on
+> Expecting speed: the database CPU at 99% bounds the drain, not this cap.
 
 ### Never write
 
@@ -65,13 +93,9 @@ Two that hit it, both one file:
   `## Test plan`, `## Testing`, `## Verification`, `- [x] tests pass`: all go,
   including the ones carrying real counts. The checks report themselves on the
   PR, so saying it is bloat when true and a lie before they finish.
-- **A heading over a one-line section.** Headings earn their place only when two
-  or more real sections survive; most PRs are prose with no headings at all.
 - **A file-by-file walk of the diff.**
 - **The journey, or the brief restated.** Only the landed approach exists, and
   ruling out an alternative is a clause, not a section.
-- **`## Summary` as an opener.** The body IS the summary. A heading that labels
-  the body costs a line and says nothing.
 - **What you learned while building it.** Real findings go to `me note` or the
   plan file, where they outlive the PR — not the description, where they double
   its length and reach only whoever reviews this diff. This is the pressure that
@@ -80,9 +104,6 @@ Two that hit it, both one file:
 - **A section arguing the change is safe** — "what this is not", "why this is
   not a fallback". If a reviewer could misread the diff that way, one clause
   prevents it; a heading invites the argument.
-
-Breaking changes and migration steps are content, not a section: put them in the
-first two sentences. A table beats six one-line bullets.
 
 ## Plain language
 

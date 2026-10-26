@@ -67,10 +67,10 @@ class GhPrBodyGuardTest(unittest.TestCase):
         self.assertIn("load the pr skill", result.stderr.lower())
 
     def test_lints_a_heredoc_body(self):
-        body = "## Summary\n\n**Push back:** none.\n" + MARKER
+        body = "## Testing\n\n**Push back:** none.\n" + MARKER
         result = self.run_guard_with_heredoc_body(body)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("## Summary", result.stderr)
+        self.assertIn("## Testing", result.stderr)
 
     def test_refuses_a_heredoc_with_an_unquoted_delimiter(self):
         # Unquoted, the shell expands the text, so the hook cannot know what gh receives.
@@ -99,21 +99,45 @@ class GhPrBodyGuardTest(unittest.TestCase):
         self.assertIn(".plan/", result.stderr)
 
     def test_refuses_forbidden_heading(self):
-        body = "## Summary\nDid a thing.\n\n**Push back:** none.\n" + MARKER
+        body = "## Testing\nRan the suite.\n\n**Push back:** none.\n" + MARKER
         result = self.run_guard_with_body("--body", body)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("## Summary", result.stderr)
+        self.assertIn("## Testing", result.stderr)
 
-    def test_refuses_over_line_cap(self):
-        lines = "\n".join("line %d" % i for i in range(13))
-        body = lines + "\n\n**Push back:** none.\n" + MARKER
+    def test_allows_a_headed_body_with_summary_first(self):
+        paragraph = " ".join(["word"] * 60)
+        sections = ("## Summary", "## Context", "## Evidence")
+        body = "\n\n".join("%s\n%s" % (heading, paragraph) for heading in sections)
+        body += "\n\n## Push back on\nThe cap.\n" + MARKER
+        result = self.run_guard_with_body("--body", body)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_refuses_a_paragraph_over_the_word_cap(self):
+        paragraph = " ".join(["word"] * 81)
+        body = paragraph + "\n\n**Push back:** none.\n" + MARKER
         result = self.run_guard_with_body("--body", body)
         self.assertEqual(result.returncode, 2)
-        self.assertIn("line cap", result.stderr)
+        self.assertIn("81 words", result.stderr)
 
-    def test_allows_table_rows_beyond_line_cap(self):
+    def test_counts_a_soft_wrapped_paragraph_as_one(self):
+        wrapped = "\n".join(" ".join(["word"] * 10) for _ in range(9))
+        body = wrapped + "\n\n**Push back:** none.\n" + MARKER
+        result = self.run_guard_with_body("--body", body)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("90 words", result.stderr)
+
+    def test_refuses_a_body_over_the_word_cap(self):
+        paragraphs = "\n\n".join(" ".join(["word"] * 70) for _ in range(7))
+        body = paragraphs + "\n\n**Push back:** none.\n" + MARKER
+        result = self.run_guard_with_body("--body", body)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("493 words", result.stderr)
+
+    def test_allows_list_items_tables_and_code_beyond_the_paragraph_cap(self):
+        items = "\n".join("- " + " ".join(["word"] * 30) for _ in range(5))
         table = "| area | lines |\n|---|---|\n" + "\n".join("| row %d | %d |" % (i, i) for i in range(20))
-        body = "One line of prose.\n\n" + table + "\n\n**Push back:** none.\n" + MARKER
+        code = "```\n" + "\n".join(" ".join(["token"] * 10) for _ in range(10)) + "\n```"
+        body = "\n\n".join(("One line of prose.", items, table, code, "**Push back:** none.\n" + MARKER))
         result = self.run_guard_with_body("--body", body)
         self.assertEqual(result.returncode, 0, result.stderr)
 

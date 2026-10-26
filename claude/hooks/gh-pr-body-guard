@@ -54,9 +54,15 @@ LOCAL_ONLY_FRAGMENTS: Final = (
 )
 
 # Matched as a line prefix (after stripping leading whitespace).
-FORBIDDEN_HEADINGS: Final = ("## Test plan", "## Testing", "## Summary")
+FORBIDDEN_HEADINGS: Final = ("## Test plan", "## Testing")
 
-MAX_BODY_LINES: Final = 12
+MAX_PARAGRAPH_WORDS: Final = 80
+
+# Two to three minutes of reading; detail past it belongs in a PR comment.
+MAX_BODY_WORDS: Final = 450
+
+# A line that opens a new markdown block, so it never continues the paragraph above it.
+LIST_ITEM: Final = re.compile(r"([-*+]|\d+[.)])\s")
 
 # `"$(cat <<'TAG' ... TAG)"`, the heredoc the pr skill writes its body with. A quoted
 # delimiter turns expansion off, so the text between the markers is exactly what the
@@ -308,9 +314,36 @@ def has_trailing_marker(body: str) -> bool:
 
 
 def is_push_back_line(line: str) -> bool:
-    # Normalize "Push back", "**Push back**" and "**Push back on:**" alike --
+    # Normalize "Push back", "**Push back on:**" and "## Push back on" alike --
     # all three name the same required line in practice.
-    return line.strip().lstrip("*").strip().lower().startswith("push back")
+    return line.strip().lstrip("#*").strip().lower().startswith("push back")
+
+
+def prose_paragraphs(lines: list[str]) -> list[str]:
+    """Each prose paragraph of a markdown body as one string. Headings, table
+    rows and fenced code are not prose; a list item is a paragraph of its own."""
+    paragraphs: list[list[str]] = []
+    current: list[str] = []
+    is_in_fence = False
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            is_in_fence = not is_in_fence
+        is_boundary = (
+            is_in_fence
+            or stripped.startswith("```")
+            or not stripped
+            or stripped.startswith(("#", "|", "<!--"))
+        )
+        if is_boundary or LIST_ITEM.match(stripped):
+            if current:
+                paragraphs.append(current)
+            current = [] if is_boundary else [stripped]
+            continue
+        current.append(stripped)
+    if current:
+        paragraphs.append(current)
+    return [" ".join(paragraph) for paragraph in paragraphs]
 
 
 def lint_findings(body: str) -> list[tuple[str, str]]:
@@ -318,8 +351,6 @@ def lint_findings(body: str) -> list[tuple[str, str]]:
     an already-marked body."""
     findings: list[tuple[str, str]] = []
     lines = body.splitlines()
-    # Table rows are data, not prose: the cap bounds reading, and a table scans at a glance.
-    non_blank = [line for line in lines if line.strip() and not line.strip().startswith("|")]
 
     for fragment in LOCAL_ONLY_FRAGMENTS:
         for line in lines:
@@ -335,19 +366,31 @@ def lint_findings(body: str) -> list[tuple[str, str]]:
             if stripped.startswith(heading):
                 findings.append(("`%s` heading is not allowed" % heading, stripped))
 
-    if len(non_blank) > MAX_BODY_LINES:
+    # Capped per paragraph rather than per body: a body-wide line count rewards
+    # packing more into each line, which is what makes a body unreadable.
+    for paragraph in prose_paragraphs(lines):
+        word_count = len(paragraph.split())
+        if word_count > MAX_PARAGRAPH_WORDS:
+            findings.append(
+                (
+                    "paragraph is %d words, over the %d-word cap -- split it or move "
+                    "its numbers to a table" % (word_count, MAX_PARAGRAPH_WORDS),
+                    paragraph[:120] + "...",
+                )
+            )
+
+    body_word_count = len(body.replace(MARKER, "").split())
+    if body_word_count > MAX_BODY_WORDS:
         findings.append(
             (
-                "body is %d non-blank lines, over the %d-line cap"
-                % (len(non_blank), MAX_BODY_LINES),
-                non_blank[-1],
+                "body is %d words, over the %d-word cap -- move detail to a PR comment"
+                % (body_word_count, MAX_BODY_WORDS),
+                "",
             )
         )
 
     if not any(is_push_back_line(line) for line in lines):
-        findings.append(
-            ("no line states what to push back on", non_blank[-1] if non_blank else "")
-        )
+        findings.append(("no line states what to push back on", ""))
 
     return findings
 
