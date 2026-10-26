@@ -128,6 +128,12 @@ should be trivial — just parsing and error mapping, no logic duplication.
 - Don't mock. Inject at the component level — a client, a gateway, a service that may own
   a database — never the database itself: business logic runs against the real one so
   transactions stay real. A 1:1 interface over queries is a mock.
+- Assert on outcomes, never on logs. A log is a side effect of the logic: a test that
+  checks a log line, its level or its fields to prove the logic worked lets either side
+  drift unnoticed. Assert what the code returns, writes, publishes or calls. Log content
+  is asserted only in a test whose subject is the logging itself.
+- A decision whose only observable trace is a log line is a design hole, not a testing
+  problem: return it as a value, then assert on that.
 
 ### Working in Existing Codebases
 
