@@ -1,86 +1,477 @@
 #!/usr/bin/python3
-"""Flags test assertions whose subject is a captured-log collection.
+"""Denies a test change that adds an assertion on captured log output.
 
-Two invocation modes, same detection logic:
-  log-assertion-check <file>...   -- CLI: check these paths' staged content,
-                                      print findings, exit 1 if any (for the
-                                      git pre-commit hook).
-  (no args, a PreToolUse payload on stdin) -- Claude Code hook: on a `git
-                                      commit` Bash invocation, check that
-                                      commit's staged *.{test,spec}.{ts,tsx,
-                                      js,jsx} files and deny if any match.
+Three invocation modes, one detector:
+  (PreToolUse payload on stdin, Edit|Write|MultiEdit) -- the edit's result is
+      compared with the file on disk; a newly added log assertion is denied.
+  (PreToolUse payload on stdin, Bash `git commit`) -- every staged test file
+      is compared with its HEAD version; edits made through the shell are
+      caught here.
+  log-assertion-check --staged | <file>...  -- CLI for the git pre-commit
+      hook: the same staged-versus-HEAD comparison, findings on stderr,
+      exit 1 if any.
 
-Heuristic, not a parser: a test that captures emitted log lines into an
-array (`(line) => sink.push(line)`) and later asserts on that array's
-content (`expect(sink...)`, `sink.join(...)`) gets flagged. Testing the
-logger itself -- record shape, field presence, level mapping, redaction --
-is not this shape and is not flagged; a genuine case that still trips this
-is a human call, which the deny message defers to rather than trying to
-carve out automatically.
+Detects a log capture plus a read of that capture in the same file, in Go,
+Python and TypeScript/JavaScript test files. Only hits the change adds are
+reported: a file's existing log assertions are compared away, never blocked.
+Heuristic line matching, not a parser. Ceilings:
+  - a capture reached through a helper in another file is not seen;
+  - a read assigned to a differently named variable is not followed;
+  - git commit with -a, -C <dir> or a preceding `cd` checks the hook's cwd.
+
+A test whose subject is the logging itself is a legitimate exception, and a
+human decides it: the deny message tells the agent to stop and ask the owner,
+and offers no switch to turn the check off.
 """
 
 from __future__ import annotations
 
+import collections
 import json
 import re
 import subprocess
 import sys
-from typing import Final
+from typing import Callable, Final, NamedTuple
 
 import shellwords
 
-TEST_FILE: Final = re.compile(r"\.(test|spec)\.(ts|tsx|js|jsx)$")
-SINK_DEF: Final = re.compile(r"=>\s*([A-Za-z_$][\w$]*)\.push\(")
+EDIT_TOOLS: Final = ("Edit", "Write", "MultiEdit")
+RULES_FILE: Final = "claude/rules/test.md (~/.claude/rules/test.md)"
 
 RULE_NOTE: Final = (
-    "test asserts on a captured-log collection (claude/rules/test.md: no log "
-    "assertions -- assert the business logic outcome instead). If this is "
-    "actually testing the logger itself (field presence, level mapping, "
-    "redaction), that is a legitimate exception: commit past this by hand."
+    "Assert the business outcome: what the code returns, writes, publishes or "
+    "calls. Logs are a side effect, and either side can drift without the test "
+    "noticing; log content is asserted only in a test whose subject is the "
+    "logging itself. A decision whose only trace is a log line is a design "
+    "hole: return it as a value and assert that."
+)
+WRITE_EXCEPTION: Final = (
+    "If the subject of this test is the logging itself (logger package, "
+    "formatter, redaction, level mapping), stop and tell the owner; they "
+    "decide, and write or commit that test themselves. Do not reword the "
+    "assertion or move the edit into the shell to get past this check."
+)
+COMMIT_EXCEPTION: Final = (
+    "If the subject of this test is the logging itself (logger package, "
+    "formatter, redaction, level mapping), stop and tell the owner; they "
+    "decide, and commit it by hand (`git commit --no-verify`)."
 )
 
 
-def find_violations(text: str) -> list[int]:
-    sinks = set(SINK_DEF.findall(text))
-    if not sinks:
-        return []
-    lines = text.splitlines()
-    hits: set[int] = set()
-    for name in sinks:
-        pattern = re.compile(
-            rf"expect\(\s*{re.escape(name)}\b|\b{re.escape(name)}\.join\("
-        )
-        for lineno, line in enumerate(lines, start=1):
-            if pattern.search(line):
-                hits.add(lineno)
-    return sorted(hits)
+class Hit(NamedTuple):
+    line: int
+    pattern: str
+    text: str
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return (self.pattern, " ".join(self.text.split()))
 
 
-def staged_content(path: str) -> str:
-    result = subprocess.run(
-        ["git", "show", f":{path}"], capture_output=True, text=True, check=False
-    )
-    return result.stdout
+class Finding(NamedTuple):
+    path: str
+    hit: Hit
 
 
-def findings_for(paths: list[str]) -> list[str]:
-    findings = []
-    for path in paths:
-        if not TEST_FILE.search(path):
+def is_comment(line: str) -> bool:
+    return line.lstrip().startswith(("#", "//", "*", "/*"))
+
+
+def compile_name_reads(names: set[str], template: str) -> re.Pattern[str] | None:
+    """`template` with NAME replaced by an alternation of `names`."""
+    if not names:
+        return None
+    alternation = "|".join(sorted((re.escape(name) for name in names), key=len, reverse=True))
+    return re.compile(template.replace("NAME", "(?:" + alternation + ")"))
+
+
+# ----------------------------------------------------------------- Python
+
+PYTHON_CAPLOG_READ: Final = re.compile(r"\bcaplog\.(?:text|records|record_tuples|messages)\b")
+PYTHON_ASSERT_LOGS: Final = re.compile(r"\bassert(?:No)?Logs\s*\(")
+PYTHON_NAMED_CAPTURES: Final = (
+    ("capture_logs", re.compile(r"\bcapture_logs\s*\([^)]*\)\s*as\s+(\w+)")),
+    ("LogCapture", re.compile(r"\bLogCapture\s*\([^)]*\)\s*as\s+(\w+)")),
+    ("LogCapture", re.compile(r"\b(\w+)\s*=\s*(?:[\w.]*\.)?LogCapture\s*\(")),
+)
+PYTHON_PATCHED_LOGGER: Final = re.compile(
+    r"""patch(?:\.object)?\([^)]*["'][\w.]*\b(?:log|logger|logging)["']""",
+)
+PYTHON_PATCH_AS: Final = (
+    re.compile(r"\bas\s+(\w+)\s*:"),
+    re.compile(r"\b(\w+)\s*=\s*(?:mocker\.)?patch"),
+)
+PYTHON_LOGGER_MOCK_ASSERT: Final = re.compile(
+    r"(?<!\w)(?:(?:mock|mocked|patched|fake|stub)_)?(?:logger|logging|log)"
+    r"(?:_(?:mock|patch|patched))?(?:\.\w+)*"
+    r"\.(?:assert_\w+|call_args\w*|call_count|mock_calls)\b"
+)
+PYTHON_CAPTURE_LIFECYCLE: Final = re.compile(r"\.(?:install|uninstall|uninstall_all|clear)\b")
+
+
+def python_hits(lines: list[str]) -> list[Hit]:
+    named_captures: dict[str, tuple[str, int]] = {}
+    patched_names: dict[str, int] = {}
+    for number, line in enumerate(lines, start=1):
+        if is_comment(line):
             continue
-        for lineno in find_violations(staged_content(path)):
-            findings.append(f"{path}:{lineno}")
+        for pattern, regex in PYTHON_NAMED_CAPTURES:
+            match = regex.search(line)
+            if match:
+                named_captures.setdefault(match.group(1), (pattern, number))
+        if PYTHON_PATCHED_LOGGER.search(line):
+            for regex in PYTHON_PATCH_AS:
+                match = regex.search(line)
+                if match:
+                    patched_names.setdefault(match.group(1), number)
+
+    patched_assert = compile_name_reads(
+        set(patched_names),
+        r"\bNAME(?:\.\w+)*\.(?:assert_\w+|call_args\w*|call_count|mock_calls)\b",
+    )
+    hits: list[Hit] = []
+    for number, line in enumerate(lines, start=1):
+        if is_comment(line):
+            continue
+        text = line.strip()
+        if PYTHON_CAPLOG_READ.search(line):
+            hits.append(Hit(number, "caplog", text))
+        elif PYTHON_ASSERT_LOGS.search(line):
+            hits.append(Hit(number, "assertLogs", text))
+        elif PYTHON_LOGGER_MOCK_ASSERT.search(line):
+            hits.append(Hit(number, "logger_mock", text))
+        elif patched_assert and patched_assert.search(line):
+            hits.append(Hit(number, "logger_mock", text))
+        else:
+            for name, (pattern, defined_at) in named_captures.items():
+                if number <= defined_at or not re.search(rf"\b{re.escape(name)}\b", line):
+                    continue
+                if PYTHON_CAPTURE_LIFECYCLE.search(line):
+                    continue
+                hits.append(Hit(number, pattern, text))
+                break
+    return hits
+
+
+# --------------------------------------------------------------------- Go
+
+GO_IGNORED_SINKS: Final = ("os.", "io.", "ioutil.", "zerolog.", "nil")
+GO_BUFFER_CAPTURES: Final = (
+    re.compile(r"\bzerolog\.New\(\s*(?:zerolog\.SyncWriter\()?&?([\w.]+)\s*[,)]"),
+    re.compile(r"\bConsoleWriter\s*\{[^}]*\bOut:\s*&?([\w.]+)\s*[,}]"),
+    re.compile(r"\bslog\.New(?:JSON|Text)Handler\(\s*&?([\w.]+)\s*[,)]"),
+    re.compile(r"\blog\.New\(\s*&?([\w.]+)\s*,"),
+    re.compile(r"\b\w*[Ll]og\w*\.SetOutput\(\s*&?([\w.]+)\s*\)"),
+    re.compile(r"\bzapcore\.AddSync\(\s*&?([\w.]+)\s*\)"),
+)
+GO_LOGRUS_HOOK_IMPORT: Final = "logrus/hooks/test"
+GO_LOGRUS_PAIR: Final = re.compile(r"\b(\w+)\s*,\s*(\w+)\s*:?=\s*\w+\.NewNullLogger\(\)")
+GO_LOGRUS_GLOBAL: Final = re.compile(r"\b(\w+)\s*:?=\s*\w+\.NewGlobal\(\)")
+GO_ZAP_OBSERVER: Final = re.compile(r"\b\w+\s*,\s*(\w+)\s*:?=\s*observer\.New(?:Logger)?\(")
+GO_READS: Final = (
+    (
+        "log_buffer",
+        r"\bNAME\.(?:String|Bytes|Len|ReadString|ReadBytes|Next)\("
+        r"|\b(?:NewDecoder|NewScanner|NewReader|Split|Contains)\w*\(\s*&?NAME\b",
+    ),
+    ("logrus_hook", r"\bNAME\.(?:Entries|AllEntries|LastEntry)\b"),
+    (
+        "zap_observer",
+        r"\bNAME\.(?:All|AllUntimed|TakeAll|Len|FilterMessage\w*|FilterField|FilterLevelExact|FilterLoggerName)\(",
+    ),
+)
+
+
+def go_hits(lines: list[str]) -> list[Hit]:
+    has_logrus_hooks = GO_LOGRUS_HOOK_IMPORT in "\n".join(lines)
+    captured: dict[str, dict[str, int]] = {"log_buffer": {}, "logrus_hook": {}, "zap_observer": {}}
+    for number, line in enumerate(lines, start=1):
+        if is_comment(line):
+            continue
+        for regex in GO_BUFFER_CAPTURES:
+            match = regex.search(line)
+            if match and not match.group(1).startswith(GO_IGNORED_SINKS):
+                captured["log_buffer"].setdefault(match.group(1), number)
+        if has_logrus_hooks:
+            pair = GO_LOGRUS_PAIR.search(line)
+            if pair:
+                captured["logrus_hook"].setdefault(pair.group(2), number)
+            single = GO_LOGRUS_GLOBAL.search(line)
+            if single:
+                captured["logrus_hook"].setdefault(single.group(1), number)
+        observer = GO_ZAP_OBSERVER.search(line)
+        if observer:
+            captured["zap_observer"].setdefault(observer.group(1), number)
+    return reads_of_captures(lines, captured, GO_READS)
+
+
+# ------------------------------------------------------- TypeScript / JS
+
+TS_LOGGER_REF: Final = (
+    r"(?:console|(?:[\w$]+\.)*(?:log|logs|[\w$]*[Ll]ogger[\w$]*|[\w$]+Log))"
+)
+TS_METHOD: Final = r"(?:info|warn|warning|error|debug|trace|log|fatal)"
+TS_SPY_CAPTURES: Final = (
+    re.compile(
+        rf"\b(?:jest|vi|sinon)\s*\.\s*(?:spyOn|spy|stub)\(\s*({TS_LOGGER_REF})\s*,\s*['\"`](\w+)['\"`]"
+    ),
+    re.compile(rf"\bmock\.method\(\s*({TS_LOGGER_REF})\s*,\s*['\"`](\w+)['\"`]"),
+    re.compile(rf"\b({TS_LOGGER_REF})\.(\w+)\s*=\s*(?:jest|vi)\.fn\b"),
+)
+TS_SPY_VARIABLE: Final = re.compile(
+    r"\b(?:(?:const|let|var)\s+)?([\w$]+)\s*(?::[^=\n]+)?=\s*(?:jest|vi|sinon)\b"
+)
+TS_ALIAS_DECLARATION: Final = re.compile(r"\b(?:const|let|var)\s+([\w$]+)\s*(?::[^=\n]+)?=\s*(.*)")
+TS_FAKE_FIELD: Final = re.compile(rf"\b{TS_METHOD}\s*:\s*(?:jest\.fn|vi\.fn|sinon\.(?:stub|spy))\b")
+TS_OBJECT_DECLARATION: Final = re.compile(
+    r"\b(?:(?:const|let|var)\s+)?([\w$]+)\s*(?::[^=\n]+)?=\s*(?:\(\s*)?\{"
+)
+TS_MOCKED_LOGGER_MODULE: Final = re.compile(
+    r"\b(?:jest|vi)\.mock\(\s*['\"`](?:[^'\"`]*/)?(?:log|logging|[\w.-]*ogger[\w.-]*)(?:\.\w+)?['\"`]"
+)
+TS_ARROW_SINK: Final = re.compile(r"=>\s*([\w$]+)\.push\(")
+TS_PUSH: Final = re.compile(r"\b([\w$]+)\.push\(")
+TS_WRITE: Final = re.compile(r"\bwrite\b")
+TS_SINK_CONTEXT: Final = re.compile(
+    r"(?i)pino|winston|bunyan|\blog(?:ger|s|ging)?\b|logger|Writable|destination|transport|stream"
+)
+TS_READS: Final = (
+    (
+        "spy_logger",
+        r"\bexpect\(\s*(?:[\w$.]+\(\s*)?NAME\b"
+        r"|\bNAME\.(?:mock|called\w*|callCount|getCall|firstCall|lastCall|notCalled)\b"
+        r"|\bassert\w*(?:\.\w+)?\(\s*NAME\b",
+    ),
+    ("fake_logger", rf"\bexpect\(\s*NAME\.{TS_METHOD}\b"),
+    (
+        "sink_push",
+        r"\bexpect\(\s*NAME\b|\bNAME\.(?:join|some|find|filter|map|every|includes|at)\("
+        r"|\bJSON\.parse\(\s*NAME\b|\bNAME\[\d+\]",
+    ),
+)
+TS_STATEMENT_LINES: Final = 3
+TS_SINK_WINDOW: Final = 3
+TS_WRITE_LOOKBACK: Final = 2
+TS_FAKE_LOOKBACK: Final = 10
+
+
+def ts_hits(lines: list[str]) -> list[Hit]:
+    spies: dict[str, int] = {}
+    fakes: dict[str, int] = {}
+    sinks: dict[str, int] = {}
+    for index, line in enumerate(lines):
+        number = index + 1
+        if is_comment(line):
+            continue
+        statement = " ".join(part.strip() for part in lines[index : index + TS_STATEMENT_LINES])
+        for regex in TS_SPY_CAPTURES:
+            match = regex.search(statement)
+            if not match:
+                continue
+            spies.setdefault(f"{match.group(1)}.{match.group(2)}", number)
+            variable = TS_SPY_VARIABLE.search(statement)
+            if variable:
+                spies.setdefault(variable.group(1), number)
+        if TS_FAKE_FIELD.search(line):
+            for back in range(index, max(index - TS_FAKE_LOOKBACK, -1), -1):
+                declaration = TS_OBJECT_DECLARATION.search(lines[back])
+                if declaration:
+                    fakes.setdefault(declaration.group(1), number)
+                    break
+        if TS_MOCKED_LOGGER_MODULE.search(line):
+            fakes.setdefault("logger", number)
+            fakes.setdefault("log", number)
+        push = TS_PUSH.search(line)
+        if push and is_log_sink_write(lines, index):
+            sinks.setdefault(push.group(1), number)
+
+    add_aliases(lines, spies)
+    return reads_of_captures(
+        lines, {"spy_logger": spies, "fake_logger": fakes, "sink_push": sinks}, TS_READS
+    )
+
+
+def is_log_sink_write(lines: list[str], index: int) -> bool:
+    """A `.push(` that stores what a log stream or transport writes."""
+    is_write = TS_ARROW_SINK.search(lines[index]) or any(
+        TS_WRITE.search(line) for line in lines[max(index - TS_WRITE_LOOKBACK, 0) : index + 1]
+    )
+    if not is_write:
+        return False
+    window = "\n".join(lines[max(index - TS_SINK_WINDOW, 0) : index + TS_SINK_WINDOW + 1])
+    return bool(TS_SINK_CONTEXT.search(window))
+
+
+def add_aliases(lines: list[str], spies: dict[str, int]) -> None:
+    """`const calls = readCalls(spy)`: the new name reads the spy too."""
+    captured_at = dict(spies)
+    for name, defined_at in captured_at.items():
+        usage = re.compile(rf"\b{re.escape(name)}\b")
+        for number, line in enumerate(lines, start=1):
+            declaration = TS_ALIAS_DECLARATION.search(line)
+            if number <= defined_at or not declaration or not usage.search(declaration.group(2)):
+                continue
+            spies.setdefault(declaration.group(1), number)
+
+
+def reads_of_captures(
+    lines: list[str],
+    captured: dict[str, dict[str, int]],
+    read_templates: tuple[tuple[str, str], ...],
+) -> list[Hit]:
+    """Lines after a capture that read it: pattern name -> {captured name: capture line}."""
+    readers = [
+        (pattern, names, compile_name_reads(set(names), template))
+        for pattern, template in read_templates
+        for names in [captured[pattern]]
+    ]
+    hits: list[Hit] = []
+    for number, line in enumerate(lines, start=1):
+        if is_comment(line):
+            continue
+        for pattern, names, regex in readers:
+            if regex is None or number <= min(names.values()) or not regex.search(line):
+                continue
+            hits.append(Hit(number, pattern, line.strip()))
+            break
+    return hits
+
+
+# --------------------------------------------------------------- dispatch
+
+TS_SUFFIXES: Final = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".mts", ".cts")
+TS_TEST_NAME: Final = re.compile(r"\.(?:test|spec)\.\w+$")
+DETECTORS: Final[dict[str, Callable[[list[str]], list[Hit]]]] = {
+    "go": go_hits,
+    "python": python_hits,
+    "typescript": ts_hits,
+}
+
+
+def language_of(path: str) -> str | None:
+    parts = path.split("/")
+    name = parts[-1]
+    directories = parts[:-1]
+    if "node_modules" in parts or "vendor" in parts:
+        return None
+    if name.endswith("_test.go"):
+        return "go"
+    if name.endswith(".py"):
+        is_test_dir = "tests" in directories or "test" in directories
+        is_test_name = name.startswith("test_") or name.endswith("_test.py") or name == "conftest.py"
+        return "python" if is_test_name or is_test_dir else None
+    if name.endswith(TS_SUFFIXES) and (TS_TEST_NAME.search(name) or "__tests__" in directories):
+        return "typescript"
+    return None
+
+
+def find_hits(path: str, text: str) -> list[Hit]:
+    language = language_of(path)
+    if language is None:
+        return []
+    return sorted(DETECTORS[language](text.splitlines()), key=lambda hit: hit.line)
+
+
+def new_hits(path: str, before: str, after: str) -> list[Hit]:
+    """Hits in `after` beyond those `before` already had, matched by pattern and text."""
+    already_present = collections.Counter(hit.key for hit in find_hits(path, before))
+    fresh = []
+    for hit in find_hits(path, after):
+        if already_present[hit.key] > 0:
+            already_present[hit.key] -= 1
+            continue
+        fresh.append(hit)
+    return fresh
+
+
+# ------------------------------------------------------------- the edit
+
+def read_disk(path: str) -> str:
+    try:
+        with open(path, encoding="utf-8") as handle:
+            return handle.read()
+    except (OSError, UnicodeDecodeError):
+        return ""
+
+
+def text_after_edit(tool_name: str, tool_input: dict, before: str) -> str | None:
+    """The file's content once the edit applies; None when the edit cannot apply."""
+    if tool_name == "Write":
+        content = tool_input.get("content")
+        return content if isinstance(content, str) else None
+    edits = [tool_input] if tool_name == "Edit" else tool_input.get("edits", [])
+    text = before
+    for edit in edits:
+        old = edit.get("old_string", "")
+        if not old or old not in text:
+            return None
+        count = -1 if edit.get("replace_all") else 1
+        text = text.replace(old, edit.get("new_string", ""), count)
+    return text
+
+
+# ------------------------------------------------------------- the commit
+
+def git_text(*args: str) -> str:
+    return subprocess.run(
+        ["git", *args], capture_output=True, text=True, check=False
+    ).stdout
+
+
+def staged_changes() -> list[tuple[str, str]]:
+    """(path before the commit, path in the commit) per added, copied, modified or renamed file."""
+    raw = git_text(
+        "diff", "--cached", "--name-status", "-M", "--diff-filter=ACMR", "-z"
+    ).split("\0")
+    changes = []
+    index = 0
+    while index < len(raw) and raw[index]:
+        if raw[index].startswith(("R", "C")):
+            changes.append((raw[index + 1], raw[index + 2]))
+            index += 3
+        else:
+            changes.append((raw[index + 1], raw[index + 1]))
+            index += 2
+    return changes
+
+
+def staged_findings(only_paths: list[str] | None = None) -> list[Finding]:
+    findings = []
+    for old_path, path in staged_changes():
+        if only_paths is not None and path not in only_paths:
+            continue
+        if language_of(path) is None:
+            continue
+        before = git_text("show", f"HEAD:{old_path}")
+        after = git_text("show", f":{path}")
+        findings.extend(Finding(path, hit) for hit in new_hits(path, before, after))
     return findings
 
 
-def cli(paths: list[str]) -> int:
-    findings = findings_for(paths)
-    if not findings:
-        return 0
-    print(RULE_NOTE, file=sys.stderr)
+# ------------------------------------------------------------- reporting
+
+def describe(findings: list[Finding], exception: str) -> str:
+    lines = [f"New log assertion in a test. {RULE_NOTE}", ""]
     for finding in findings:
-        print(f"  {finding}", file=sys.stderr)
-    return 1
+        lines.append(
+            f"  {finding.path}:{finding.hit.line}  [{finding.hit.pattern}]  {finding.hit.text[:100]}"
+        )
+    lines += ["", f"Rule: {RULES_FILE}", exception]
+    return "\n".join(lines)
+
+
+def decide(reason: str) -> None:
+    print(
+        json.dumps(
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": reason,
+                }
+            }
+        )
+    )
 
 
 def is_git(word: str | None) -> bool:
@@ -100,42 +491,47 @@ def is_commit_command(command: str) -> bool:
     return False
 
 
-def staged_test_files() -> list[str]:
-    out = subprocess.run(
-        ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM"],
-        capture_output=True,
-        text=True,
-        check=False,
-    ).stdout.splitlines()
-    return [path for path in out if TEST_FILE.search(path)]
-
-
-def decide(reason: str) -> None:
-    print(
-        json.dumps(
-            {
-                "hookSpecificOutput": {
-                    "hookEventName": "PreToolUse",
-                    "permissionDecision": "deny",
-                    "permissionDecisionReason": reason,
-                }
-            }
-        )
-    )
-
-
-def pretooluse() -> None:
-    payload = json.load(sys.stdin)
-    if payload.get("tool_name") != "Bash":
+def check_edit(payload: dict) -> None:
+    tool_input = payload.get("tool_input", {})
+    path = tool_input.get("file_path", "")
+    if not path or language_of(path) is None:
         return
+    before = read_disk(path)
+    after = text_after_edit(payload["tool_name"], tool_input, before)
+    if after is None:
+        return
+    findings = [Finding(path, hit) for hit in new_hits(path, before, after)]
+    if findings:
+        decide(describe(findings, WRITE_EXCEPTION))
+
+
+def check_commit(payload: dict) -> None:
     command = payload.get("tool_input", {}).get("command", "")
     if "git" not in command or "commit" not in command:
         return
     if not is_commit_command(command):
         return
-    findings = findings_for(staged_test_files())
+    findings = staged_findings()
     if findings:
-        decide(f"{RULE_NOTE} ({', '.join(findings)})")
+        decide(describe(findings, COMMIT_EXCEPTION))
+
+
+def pretooluse() -> None:
+    payload = json.load(sys.stdin)
+    tool_name = payload.get("tool_name")
+    if tool_name in EDIT_TOOLS:
+        check_edit(payload)
+    elif tool_name == "Bash":
+        check_commit(payload)
+
+
+def cli(arguments: list[str]) -> int:
+    only_paths = None if arguments == ["--staged"] else arguments
+    findings = staged_findings(only_paths)
+    if not findings:
+        return 0
+    print(describe(findings, COMMIT_EXCEPTION), file=sys.stderr)
+    return 1
 
 
 if __name__ == "__main__":

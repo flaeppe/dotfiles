@@ -1,0 +1,9 @@
+import logging
+
+from billing import settle_invoice
+
+
+def test_settles_invoice(caplog):
+    caplog.set_level(logging.INFO)
+    settle_invoice("inv-1")
+    assert "settled inv-1" in caplog.text

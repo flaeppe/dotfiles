@@ -1,0 +1,9 @@
+from testfixtures import LogCapture
+
+from billing import settle_invoice
+
+
+def test_settles_invoice():
+    with LogCapture() as handler:
+        settle_invoice("inv-1")
+    handler.check(("billing", "INFO", "settled inv-1"))

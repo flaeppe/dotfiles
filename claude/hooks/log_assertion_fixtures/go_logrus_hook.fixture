@@ -1,0 +1,17 @@
+package billing
+
+import (
+	"testing"
+
+	"github.com/sirupsen/logrus/hooks/test"
+)
+
+func TestSettleInvoice(t *testing.T) {
+	logger, hook := test.NewNullLogger()
+
+	SettleInvoice(logger, "inv-1")
+
+	if hook.LastEntry().Message != "settled inv-1" {
+		t.Fatal("missing log line")
+	}
+}

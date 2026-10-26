@@ -1,0 +1,19 @@
+package billing
+
+import (
+	"bytes"
+	"testing"
+)
+
+func TestPrintsReceipt(t *testing.T) {
+	var out bytes.Buffer
+	cmd := newReceiptCommand()
+	cmd.SetOutput(&out)
+
+	if err := cmd.Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if out.String() != "receipt inv-1\n" {
+		t.Fatalf("unexpected output %q", out.String())
+	}
+}

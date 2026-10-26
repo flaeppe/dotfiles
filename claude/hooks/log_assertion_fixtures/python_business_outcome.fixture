@@ -1,0 +1,12 @@
+import logging
+
+from billing import settle_invoice
+
+logger = logging.getLogger(__name__)
+
+
+def test_settles_invoice(caplog):
+    caplog.set_level(logging.INFO)
+    receipt = settle_invoice("inv-1")
+    assert receipt.status == "settled"
+    assert receipt.amount == 100

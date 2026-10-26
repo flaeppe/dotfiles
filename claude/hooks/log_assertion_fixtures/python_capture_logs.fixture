@@ -1,0 +1,9 @@
+from structlog.testing import capture_logs
+
+from billing import settle_invoice
+
+
+def test_settles_invoice():
+    with capture_logs() as emitted:
+        settle_invoice("inv-1")
+    assert emitted[0]["event"] == "settled"

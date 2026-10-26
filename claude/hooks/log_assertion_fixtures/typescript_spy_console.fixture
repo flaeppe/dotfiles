@@ -1,0 +1,7 @@
+import { settleInvoice } from "./settle";
+
+it("settles the invoice", () => {
+  const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => {});
+  settleInvoice("inv-1");
+  expect(warnSpy).toHaveBeenCalledWith("settled inv-1");
+});

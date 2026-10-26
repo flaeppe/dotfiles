@@ -1,0 +1,1 @@
+    assert "x" in caplog.records[0].message

@@ -1,0 +1,9 @@
+from unittest import mock
+
+from billing import settle_invoice
+
+
+def test_settles_invoice():
+    with mock.patch("billing.settle.logger") as mock_logger:
+        settle_invoice("inv-1")
+    mock_logger.info.assert_called_once_with("settled inv-1")

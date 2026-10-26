@@ -1,0 +1,5 @@
+
+
+def test_settles_twice(caplog):
+    settle_invoice("inv-2")
+    assert "settled inv-2" in caplog.text

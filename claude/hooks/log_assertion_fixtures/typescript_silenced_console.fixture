@@ -1,0 +1,6 @@
+import { settleInvoice } from "./settle";
+
+it("settles the invoice", () => {
+  jest.spyOn(console, "warn").mockImplementation(() => {});
+  expect(settleInvoice("inv-1").status).toBe("settled");
+});

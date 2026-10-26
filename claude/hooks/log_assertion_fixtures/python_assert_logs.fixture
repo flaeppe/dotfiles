@@ -1,0 +1,9 @@
+import unittest
+
+from billing import settle_invoice
+
+
+class SettleTest(unittest.TestCase):
+    def test_settles_invoice(self):
+        with self.assertLogs("billing", level="INFO"):
+            settle_invoice("inv-1")

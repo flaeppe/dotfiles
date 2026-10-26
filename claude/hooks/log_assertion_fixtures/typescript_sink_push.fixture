@@ -1,0 +1,10 @@
+import pino from "pino";
+
+import { settleInvoice } from "./settle";
+
+it("settles the invoice", () => {
+  const lines: string[] = [];
+  const logger = pino({}, { write: (line: string) => void lines.push(line) });
+  settleInvoice("inv-1", logger);
+  expect(lines.join("")).toContain("settled inv-1");
+});

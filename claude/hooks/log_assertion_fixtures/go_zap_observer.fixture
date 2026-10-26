@@ -1,0 +1,18 @@
+package billing
+
+import (
+	"testing"
+
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
+)
+
+func TestSettleInvoice(t *testing.T) {
+	core, logs := observer.New(zap.InfoLevel)
+
+	SettleInvoice(zap.New(core), "inv-1")
+
+	if logs.FilterMessage("settled inv-1").Len() != 1 {
+		t.Fatal("missing log line")
+	}
+}

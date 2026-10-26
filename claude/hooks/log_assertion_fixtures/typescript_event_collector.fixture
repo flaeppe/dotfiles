@@ -1,0 +1,8 @@
+import { settleInvoice } from "./settle";
+
+it("emits a settled event", () => {
+  const events: string[] = [];
+  emitter.on("settled", (id) => events.push(id));
+  settleInvoice("inv-1");
+  expect(events).toEqual(["inv-1"]);
+});

@@ -1,0 +1,9 @@
+import { settleInvoice } from "./settle";
+
+it("settles the invoice", () => {
+  const infoSpy = vi
+    .spyOn(logger, "info")
+    .mockImplementation(() => undefined);
+  settleInvoice("inv-1");
+  expect(infoSpy).toHaveBeenCalledOnce();
+});

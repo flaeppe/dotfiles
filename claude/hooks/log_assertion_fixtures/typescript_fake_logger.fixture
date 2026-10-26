@@ -1,0 +1,7 @@
+import { settleInvoice } from "./settle";
+
+it("settles the invoice", () => {
+  const log = { info: jest.fn(), error: jest.fn() };
+  settleInvoice("inv-1", log);
+  expect(log.info).toHaveBeenCalledWith("settled inv-1");
+});
