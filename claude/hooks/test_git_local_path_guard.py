@@ -126,6 +126,31 @@ class GitLocalPathGuardTest(unittest.TestCase):
         self.assertIn("feature.md: _private/plan.md", result.stderr)
         self.assertNotIn("leaky.md", result.stderr)
 
+    def start_merge_of_a_default_branch_that_added_a_local_path(self):
+        self.git(self.work, "switch", "-q", "-c", "feature")
+        self.commit(self.work, "feature.md", "feature work\n")
+
+        other = self.clone("other")
+        self.commit(other, "docs/leaky.md", LEAK)
+        self.git(other, "push", "-q", "origin", "main")
+
+        self.git(self.work, "fetch", "-q", "origin")
+        self.git(self.work, "merge", "-q", "--no-commit", "--no-ff", "origin/main")
+
+    def test_allows_a_merge_of_lines_the_other_parent_already_published(self):
+        self.start_merge_of_a_default_branch_that_added_a_local_path()
+        result = self.run_guard("git commit --no-edit", self.work)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_denies_a_merge_resolution_that_adds_its_own_local_path(self):
+        self.start_merge_of_a_default_branch_that_added_a_local_path()
+        (self.work / "resolution.md").write_text(LEAK)
+        self.git(self.work, "add", "resolution.md")
+        result = self.run_guard("git commit --no-edit", self.work)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("resolution.md: _private/plan.md", result.stderr)
+        self.assertNotIn("leaky.md", result.stderr)
+
     def test_ignores_a_non_bash_tool(self):
         payload = json.dumps({"tool_name": "Read", "tool_input": {}, "cwd": str(self.work)})
         result = subprocess.run([str(GUARD)], input=payload, capture_output=True, text=True, timeout=10)

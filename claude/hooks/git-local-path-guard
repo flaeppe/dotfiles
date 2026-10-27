@@ -82,6 +82,10 @@ HOME_PREFIX: Final = re.compile(re.escape(HOME) + r"/|~/|\$\{?HOME\}?/")
 
 STAGED_CHANGES: Final = ("diff", "--cached")
 
+# What a merge in progress is merging in: the staged tree diffed against each of
+# these shows what the merge resolution added beyond that parent.
+MERGE_HEAD_FILE: Final = "MERGE_HEAD"
+
 # Each commit reachable from HEAD but from no remote-tracking ref, diffed against
 # its own parent: exactly what a push would publish. A range against the upstream
 # branch cannot say that -- after a rebase its merge-base is the old fork point,
@@ -110,6 +114,28 @@ def git(directory: str, *args: str) -> str | None:
     if result.returncode != 0:
         return None
     return result.stdout
+
+
+def merge_heads(repo_root: str) -> list[str]:
+    """Commits being merged into HEAD, empty outside a merge. An octopus merge
+    lists several."""
+    relative = git(repo_root, "rev-parse", "--git-path", MERGE_HEAD_FILE)
+    if not relative:
+        return []
+    try:
+        with open(os.path.join(repo_root, relative.strip())) as handle:
+            return handle.read().split()
+    except OSError:
+        return []
+
+
+def staged_diffs(repo_root: str) -> list[Sequence[str]]:
+    """Diff commands whose common additions are what this commit introduces.
+    During a merge, everything the other parent brought in is already
+    published, so a line only counts when it is new against every parent."""
+    return [STAGED_CHANGES] + [
+        (*STAGED_CHANGES, head) for head in merge_heads(repo_root)
+    ]
 
 
 def git_invocation(words: list[str], git_index: int) -> tuple[str | None, str | None]:
@@ -269,17 +295,29 @@ def changed_paths(repo_root: str, diff_command: Sequence[str]) -> list[str]:
     return [line for line in output.splitlines() if line] if output else []
 
 
+def changed_in_all(repo_root: str, diff_commands: Sequence[Sequence[str]]) -> list[str]:
+    first, *others = (changed_paths(repo_root, command) for command in diff_commands)
+    return [path for path in first if all(path in other for other in map(set, others))]
+
+
+def added_in_all(
+    repo_root: str, diff_commands: Sequence[Sequence[str]]
+) -> list[tuple[str, str, str]]:
+    first, *others = (list(added_lines(repo_root, command)) for command in diff_commands)
+    return [line for line in first if all(line in other for other in map(set, others))]
+
+
 def scan_diff(
-    repo: Repo, label: str, diff_command: Sequence[str]
+    repo: Repo, label: str, diff_commands: Sequence[Sequence[str]]
 ) -> Iterator[Finding]:
-    """(location, token, reason) for every local-only reference a git diff or
-    log command reports as added."""
-    for path in changed_paths(repo.root, diff_command):
+    """(location, token, reason) for every local-only reference that every git
+    diff or log command in diff_commands reports as added."""
+    for path in changed_in_all(repo.root, diff_commands):
         reason = classify(path, repo.root, repo, PLAN_FRAGMENTS + SCRATCH_FRAGMENTS)
         if reason:
             yield "%s file" % label, path, reason
 
-    for path, file_dir, line in added_lines(repo.root, diff_command):
+    for path, file_dir, line in added_in_all(repo.root, diff_commands):
         if not repo.scans_content_of(path):
             continue
         resolve_relatives = repo.resolves_relatives_of(path)
@@ -343,9 +381,9 @@ def main() -> int:
     # blocked far more honest commits than it caught leaks.
     sources: list[Iterable[Finding]] = []
     if committing:
-        sources.append(scan_diff(repo, "staged", STAGED_CHANGES))
+        sources.append(scan_diff(repo, "staged", staged_diffs(repo.root)))
     if pushing:
-        sources.append(scan_diff(repo, "outgoing", UNPUBLISHED_COMMITS))
+        sources.append(scan_diff(repo, "outgoing", [UNPUBLISHED_COMMITS]))
 
     findings = deduplicated(sources)
     if not findings:
