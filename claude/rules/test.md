@@ -21,7 +21,7 @@ The art of testing lies in structure and clarity: valid data → minimal modific
 
 1. **No mocking libraries** - Use dependency injection and test doubles (fakes, stubs) for components: clients, gateways, services. Mock libraries are forbidden. The database is not such a component: tests run against a real one, and a 1:1 interface over queries is a mock in disguise.
 
-2. **No log assertions** - Logs are side effects. Assert on business logic outcomes: what the code returns, writes, publishes or calls. A test that proves the logic through a log line, its level or its fields lets either side drift without the other noticing. The one exception is a test whose subject is the logging itself (a log level decision, an access log, a redaction). A decision whose only observable trace is a log line is a design hole: return it as a value, then assert on that.
+2. **No log assertions** - Logs are side effects. Assert on business logic outcomes: what the code returns, writes, publishes or calls. A test that proves the logic through a log line, its level or its fields lets either side drift without the other noticing. The one exception is code under test that is the logging itself: a logger or formatter, redaction, the logger's own severity mapping. The level a business case logs at is a business decision, not an exception. A decision whose only observable trace is a log line is a design hole: return it as a value, then assert on that.
 
 3. **Broader tests preferred** - Cross-boundary tests cover more ground with less knowledge of internals. Happy paths on these cover significant ground.
 

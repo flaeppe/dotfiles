@@ -1,21 +1,21 @@
 #!/usr/bin/python3
-"""Warns when a write to a test file adds an assertion on captured log output.
+"""Refuses a write to a test file that adds an assertion on captured log output.
 
   (PreToolUse payload on stdin, Edit|Write|MultiEdit) -- the edit's result is
-      compared with the file on disk. A newly added log assertion becomes
-      context for the writing model; the write is never blocked.
+      compared with the file on disk. A newly added log assertion denies the
+      write, with the reason returned to the writing model.
   log-assertion-check --report -- counts per day and per repo, read from the
       state file: writes that fired, matched lines, and how many of those
       lines the same file's next write still held.
 
 Flags a log capture plus a read of that capture in the same Go, Python or
 TypeScript/JavaScript test file. Only hits the write adds are reported. A test
-whose name, file or directory names logging (log, logger, redact...) is the
-logging-subject exception and is skipped.
+in a logging, logger or redaction directory, or in a logger/formatter file, is
+the logging-subject exception and is skipped; the test's own name never is.
 
 State: $LOG_ASSERTION_CHECK_STATE, else
 ${XDG_STATE_HOME:-~/.local/state}/claude/log-assertion-check.jsonl; one JSON
-record per fire and per follow-up. Fails open: any error ends in exit 0.
+record per fire and per follow-up. Fails open: an internal error allows the write.
 """
 
 from __future__ import annotations
@@ -41,10 +41,10 @@ RULE_NOTE: Final = (
     "logging itself. A decision whose only trace is a log line is a design "
     "hole: return it as a value and assert that."
 )
-WRITE_EXCEPTION: Final = (
-    "If the subject of this test is the logging itself (level decision, access "
-    "log, redaction), keep the assertion and say so in your reply so the owner "
-    "sees it; otherwise rewrite it to assert the outcome."
+LOCATION_NOTE: Final = (
+    "The level a business case logs at is a business decision, so it is not "
+    "exempt. Only code under test that lives in a logging, logger or redaction "
+    "package, or in a logger/formatter file, may assert on log output."
 )
 STATE_ENV: Final = "LOG_ASSERTION_CHECK_STATE"
 
@@ -359,11 +359,8 @@ def language_of(path: str) -> str | None:
 # Ceilings: heuristic line matching, not a parser. A capture reached through a
 # helper in another file is not seen, and a read assigned to a differently
 # named variable is not followed. Edits made through the shell are not seen.
-TEST_NAME: Final = re.compile(
-    r"^\s*(?:def\s+(test\w*)|func\s+(Test\w*)"
-    r"|(?:it|test)(?:\.\w+)*\s*\(\s*['\"`]([^'\"`]*)|t\.Run\s*\(\s*\"([^\"]*))"
-)
-LOGGING_SUBJECT: Final = re.compile(r"\b(?:logs?|logged|logging|loggers?|redact\w*)\b")
+LOGGING_SUBJECT: Final = re.compile(r"\b(?:logs?|logging|loggers?|formatters?|redact\w*|mask\w*)\b")
+LOGGING_SUBJECT_DIRECTORIES: Final = 2
 
 
 def words_of(identifier: str) -> str:
@@ -371,28 +368,24 @@ def words_of(identifier: str) -> str:
     return re.sub(r"[^A-Za-z0-9]+", " ", spaced).lower()
 
 
-def is_logging_subject(path: str, lines: list[str], line_number: int) -> bool:
-    """True when the file, its directory or the enclosing test names logging as its subject."""
-    if LOGGING_SUBJECT.search(words_of(" ".join(path.split("/")[-2:]))):
-        return True
-    for text in reversed(lines[:line_number]):
-        match = TEST_NAME.match(text)
-        if match:
-            name = next(group for group in match.groups() if group is not None)
-            return bool(LOGGING_SUBJECT.search(words_of(name)))
-    return False
+def is_logging_subject(path: str) -> bool:
+    """True when the file, or one of the two directories above it, is a logging package or file.
+
+    Only the nearest directories count: an absolute path also holds the checkout's own name.
+    """
+    *directories, name = path.split("/")
+    stem = name.split(".")[0]
+    names = [*directories[-LOGGING_SUBJECT_DIRECTORIES:], stem]
+    return bool(LOGGING_SUBJECT.search(words_of(" ".join(names))))
 
 
 def find_hits(path: str, text: str) -> list[Hit]:
     language = language_of(path)
     if language is None:
         return []
-    lines = text.splitlines()
-    hits = DETECTORS[language](lines)
-    return sorted(
-        (hit for hit in hits if not is_logging_subject(path, lines, hit.line)),
-        key=lambda hit: hit.line,
-    )
+    if is_logging_subject(path):
+        return []
+    return sorted(DETECTORS[language](text.splitlines()), key=lambda hit: hit.line)
 
 
 def new_hits(path: str, before: str, after: str) -> list[Hit]:
@@ -534,21 +527,27 @@ def followup_records(path: str, after_hits: list[Hit], records: list[dict], sess
 
 def describe(findings: list[Finding]) -> str:
     lines = [
-        f"New log assertion in a test (warning; the write went through). {RULE_NOTE}",
+        f"Write refused: it adds a log assertion to a test. {RULE_NOTE}",
         "",
     ]
     for finding in findings:
         lines.append(
             f"  {finding.path}:{finding.hit.line}  [{finding.hit.pattern}]  {finding.hit.text[:100]}"
         )
-    lines += ["", f"Rule: {RULES_FILE}", WRITE_EXCEPTION]
+    lines += ["", f"Rule: {RULES_FILE}", LOCATION_NOTE]
     return "\n".join(lines)
 
 
-def warn(message: str) -> None:
+def deny(message: str) -> None:
     print(
         json.dumps(
-            {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": message}}
+            {
+                "hookSpecificOutput": {
+                    "hookEventName": "PreToolUse",
+                    "permissionDecision": "deny",
+                    "permissionDecisionReason": message,
+                }
+            }
         )
     )
 
@@ -599,7 +598,7 @@ def check_edit(payload: dict) -> None:
     except OSError:
         pass
     if hits:
-        warn(describe([Finding(path, hit) for hit in hits]))
+        deny(describe([Finding(path, hit) for hit in hits]))
 
 
 def pretooluse() -> None:

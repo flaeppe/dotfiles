@@ -87,17 +87,35 @@ class DetectionTest(unittest.TestCase):
     def test_ignores_a_console_spy_that_only_silences_output(self):
         self.assertEqual(detector.find_hits("src/settle.test.ts", fixture("typescript_silenced_console")), [])
 
-    def test_ignores_a_test_named_for_the_logging_itself(self):
-        redaction_test = fixture("python_caplog").replace("test_settles_invoice", "test_redacts_card_number_in_logs")
-        self.assertEqual(detector.find_hits("tests/test_settle.py", redaction_test), [])
+    def test_flags_a_business_test_whatever_its_name_says_about_logging(self):
+        for name in (
+            "TestClientErrorsAreNotLoggedAtErrorAndServerErrorsAre",
+            "TestHandleMessageLogsLevelByReferenceLength",
+        ):
+            named_test = fixture("go_buffer").replace("TestSettleInvoice", name)
+            hits = detector.find_hits("payout/handler_test.go", named_test)
+            self.assertEqual([hit.line for hit in hits], [17], name)
 
-    def test_ignores_a_test_file_named_for_the_logging_itself(self):
+    def test_ignores_a_test_in_a_logging_package(self):
+        for path in (
+            "internal/logging/settle_test.go",
+            "internal/logger/redact/settle_test.go",
+            "pkg/redaction/settle_test.go",
+            "internal/log/settle_test.go",
+        ):
+            self.assertEqual(detector.find_hits(path, fixture("go_buffer")), [], path)
+
+    def test_ignores_a_test_in_a_logger_or_formatter_file(self):
         self.assertEqual(detector.find_hits("tests/test_logging.py", fixture("python_caplog")), [])
         self.assertEqual(detector.find_hits("billing/logger_test.go", fixture("go_buffer")), [])
+        self.assertEqual(detector.find_hits("src/json-formatter.test.ts", fixture("typescript_spy_console")), [])
 
     def test_does_not_mistake_login_or_catalog_for_logging(self):
-        login_test = fixture("python_caplog").replace("test_settles_invoice", "test_login_catalog_logic")
-        self.assertEqual([hit.line for hit in detector.find_hits("tests/test_settle.py", login_test)], [9])
+        self.assertEqual(len(detector.find_hits("tests/login/test_catalog.py", fixture("python_caplog"))), 1)
+
+    def test_a_logging_name_above_the_nearest_directories_does_not_exempt(self):
+        path = "/work/logging-platform/billing/api/settle_test.go"
+        self.assertEqual(len(detector.find_hits(path, fixture("go_buffer"))), 1)
 
     def test_ignores_files_that_are_not_tests(self):
         self.assertEqual(detector.find_hits("billing/settle.py", fixture("python_caplog")), [])
@@ -162,12 +180,12 @@ class HookProtocolTest(unittest.TestCase):
             self.write_test_file(os.path.relpath(tool_input["file_path"], self.repo), tool_input["content"])
         return result
 
-    def warning(self, result: subprocess.CompletedProcess) -> str | None:
+    def refusal(self, result: subprocess.CompletedProcess) -> str | None:
         if not result.stdout.strip():
             return None
         output = json.loads(result.stdout)["hookSpecificOutput"]
-        self.assertNotIn("permissionDecision", output)
-        return output["additionalContext"]
+        self.assertEqual(output["permissionDecision"], "deny")
+        return output["permissionDecisionReason"]
 
     def records(self) -> list[dict]:
         if not self.state.exists():
@@ -180,56 +198,67 @@ class HookProtocolTest(unittest.TestCase):
         target.write_text(text)
         return target
 
-    def test_write_warns_about_a_new_log_assertion_without_blocking(self):
+    def test_write_is_refused_for_a_new_log_assertion(self):
         target = self.repo / "tests" / "test_settle.py"
         result = self.write_via_hook("Write", {"file_path": str(target), "content": fixture("python_caplog")})
-        message = self.warning(result)
+        message = self.refusal(result)
         self.assertIn("Assert the business outcome", message)
         self.assertIn("design hole", message)
         self.assertIn(f"{target}:9", message)
         self.assertIn("claude/rules/test.md", message)
+        self.assertIn("not exempt", message)
 
-    def test_edit_warns_only_about_the_log_assertion_it_adds(self):
+    def test_write_is_refused_for_both_log_level_tests_that_slipped_through(self):
+        for name in (
+            "TestClientErrorsAreNotLoggedAtErrorAndServerErrorsAre",
+            "TestHandleMessageLogsLevelByReferenceLength",
+        ):
+            target = self.repo / "handler" / "handler_test.go"
+            content = fixture("go_buffer").replace("TestSettleInvoice", name)
+            message = self.refusal(self.write_via_hook("Write", {"file_path": str(target), "content": content}))
+            self.assertIn(f"{target}:17", message, name)
+            target.unlink()
+
+    def test_write_is_allowed_for_a_test_in_a_logging_package(self):
+        target = self.repo / "internal" / "logging" / "redact_test.go"
+        result = self.write_via_hook("Write", {"file_path": str(target), "content": fixture("go_buffer")})
+        self.assertEqual((result.returncode, result.stdout), (0, ""))
+        self.assertEqual(self.records(), [])
+
+    def test_edit_refuses_only_the_log_assertion_it_adds(self):
         target = self.write_test_file("tests/test_settle.py", fixture("python_caplog"))
         harmless = {"file_path": str(target), "old_string": 'settle_invoice("inv-1")', "new_string": 'settle_invoice("inv-2")'}
-        self.assertIsNone(self.warning(self.write_via_hook("Edit", harmless)))
+        self.assertIsNone(self.refusal(self.write_via_hook("Edit", harmless)))
 
         added = {
             "file_path": str(target),
             "old_string": "caplog.set_level(logging.INFO)\n",
             "new_string": "caplog.set_level(logging.INFO)\n" + fixture("python_inserted_assertion"),
         }
-        message = self.warning(self.write_via_hook("Edit", added))
+        message = self.refusal(self.write_via_hook("Edit", added))
         self.assertIn(f"{target}:8", message)
         self.assertNotIn(f"{target}:10", message)
 
-    def test_multiedit_warns_about_a_log_assertion_added_by_a_later_edit(self):
+    def test_multiedit_refuses_a_log_assertion_added_by_a_later_edit(self):
         target = self.write_test_file("src/settle.test.ts", fixture("typescript_silenced_console"))
         edits = [
             {"old_string": "expect(settleInvoice", "new_string": "const result = (settleInvoice"},
             {"old_string": ".status).toBe(\"settled\");", "new_string": ".status);\n  expect(console.warn).toHaveBeenCalled();"},
         ]
-        message = self.warning(self.write_via_hook("MultiEdit", {"file_path": str(target), "edits": edits}))
+        message = self.refusal(self.write_via_hook("MultiEdit", {"file_path": str(target), "edits": edits}))
         self.assertIn("src/settle.test.ts:6", message)
 
     def test_write_is_silent_when_the_test_already_had_the_assertion(self):
         target = self.write_test_file("tests/test_settle.py", fixture("python_caplog"))
         rewritten = fixture("python_caplog") + "\n\ndef test_other():\n    assert 1 == 1\n"
         result = self.write_via_hook("Write", {"file_path": str(target), "content": rewritten})
-        self.assertIsNone(self.warning(result))
-        self.assertEqual(self.records(), [])
-
-    def test_write_is_silent_for_a_test_about_the_logging_itself(self):
-        redaction_test = fixture("python_caplog").replace("test_settles_invoice", "test_redacts_card_number_in_logs")
-        target = self.repo / "tests" / "test_settle.py"
-        result = self.write_via_hook("Write", {"file_path": str(target), "content": redaction_test})
-        self.assertIsNone(self.warning(result))
+        self.assertIsNone(self.refusal(result))
         self.assertEqual(self.records(), [])
 
     def test_write_ignores_a_file_that_is_not_a_test(self):
         target = self.repo / "billing" / "settle.py"
         result = self.write_via_hook("Write", {"file_path": str(target), "content": fixture("python_caplog")})
-        self.assertIsNone(self.warning(result))
+        self.assertIsNone(self.refusal(result))
         self.assertEqual(self.records(), [])
 
     def test_a_fire_is_recorded_with_time_repo_file_line_and_session(self):
