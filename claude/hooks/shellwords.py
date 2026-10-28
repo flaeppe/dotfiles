@@ -66,14 +66,13 @@ def words_of(command: str) -> list[str]:
 
 
 def without_heredocs(command: str) -> str:
-    """The command with each heredoc body and its terminator line replaced by `;`,
-    which keeps the commands after it from joining the one that opened it.
+    """The command with each heredoc body and its terminator line removed.
 
-    A body is text fed to a program, whatever it says: a quoted `git push` in a
-    here-document is not a push, and an apostrophe in it must not derail the
-    lexer. Ceiling: a `<<TAG` inside a quoted string reads as a heredoc start and
-    hides the lines after it; a quote-aware scan would fix that.
+    A body is text fed to a program, so a quoted `git push` or a stray
+    apostrophe in it never reaches the lexer.
     """
+    # Ceiling: a `<<TAG` inside a quoted string reads as a heredoc start and
+    # hides the lines after it; a quote-aware scan would fix that.
     kept: list[str] = []
     pending: list[tuple[str, bool]] = []
     for line in command.splitlines(keepends=True):
@@ -83,6 +82,9 @@ def without_heredocs(command: str) -> str:
             if (candidate.lstrip("\t") if strips_tabs else candidate) == tag:
                 pending.pop(0)
                 if not pending:
+                    # The lexer treats a newline as plain whitespace, so without
+                    # a `;` the next command would join the one that opened the
+                    # heredoc.
                     kept.append(";\n")
             continue
         kept.append(line)
