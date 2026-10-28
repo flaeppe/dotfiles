@@ -54,6 +54,26 @@ publisher ever patches without repointing.
 Exact pins (`==`, `4.5.2`, a full SHA) skip this section entirely — the bump is
 real by construction.
 
+## Precondition — does the vulnerable code run?
+
+When the PR exists to close security alerts, run this before the axes. Code
+nothing runs gets deleted rather than patched, and a deletion also closes the
+alerts that no available bump can fix.
+
+For each alerted package, trace it to the direct dependency that pulls it in.
+Then sort that dependency into one of these:
+
+- **Live:** production code imports it, and something calls that code.
+- **Dead path:** only code with no callers imports it, such as an uncalled
+  helper or a one-off script that no deploy manifest or package script runs.
+- **Dev-only:** the production image never installs it, for example because
+  the Dockerfile installs with `--production`.
+
+Each dead path becomes its own deletion PR, with the alerts it closes. Name the
+commit that holds the last copy, so the code can still be traced. Rebase the
+bump on those PRs, and report the alert count as live, dead path and dev-only.
+That way a reviewer sees what the bump fixes in production.
+
 ## Axes
 
 Work all four; each yields findings.
@@ -87,14 +107,15 @@ Work all four; each yields findings.
 ## Output
 
 ```
-Verdict: <not a real upgrade — close it | safe to merge |
-          merge after the to-dos | hold — needs prep work>
+Verdict: <not a real upgrade — close it | delete instead — dead path |
+          safe to merge | merge after the to-dos | hold — needs prep work>
 <one line of why>
 
 Test coverage:   <covered? gaps, with the call sites that lack tests>
 Compatibility:   <breaking changes found, pins/notes found — or "none found">
 Usage breadth:   <how wide, where; what would make it trustworthy>
 Prep work:       <what to do on the current version first — omit if none>
+Reachability:    <alerts as live / dead path / dev-only; the deletion PRs to open first — omit if no alerts>
 
 To-do (to make this PR mergeable):
 - <concrete, ordered steps: tests to add, refactors, manual checks>
