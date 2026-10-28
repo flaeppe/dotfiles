@@ -60,10 +60,10 @@ class GitLocalPathGuardTest(unittest.TestCase):
         self.git(repo, "add", filename)
         self.git(repo, "commit", "-q", "-m", "add " + filename)
 
-    def run_guard(self, command, cwd):
+    def run_guard(self, command, cwd, env=None):
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(cwd)})
         return subprocess.run(
-            [str(GUARD)], input=payload, capture_output=True, text=True, timeout=10
+            [str(GUARD)], input=payload, capture_output=True, text=True, timeout=10, env=env
         )
 
     def test_denies_staged_local_path(self):
@@ -150,6 +150,51 @@ class GitLocalPathGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("resolution.md: _private/plan.md", result.stderr)
         self.assertNotIn("leaky.md", result.stderr)
+
+    def test_allows_a_push_in_a_repo_with_no_remote(self):
+        lonely = self.root / "lonely"
+        self.git(self.root, "init", "-q", "-b", "main", str(lonely))
+        self.commit(lonely, "notes.md", LEAK)
+        result = self.run_guard("git push", lonely)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_allows_the_call_when_git_outlives_the_timeout(self):
+        self.commit(self.work, "notes.md", LEAK)
+        slow_git = self.root / "bin" / "git"
+        slow_git.parent.mkdir()
+        slow_git.write_text("#!/bin/sh\nexec sleep 30\n")
+        slow_git.chmod(0o755)
+        env = {
+            **os.environ,
+            "PATH": str(slow_git.parent) + os.pathsep + os.environ["PATH"],
+            "GIT_LOCAL_PATH_GUARD_TIMEOUT": "0.5",
+        }
+        result = self.run_guard("git push", self.work, env=env)
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(
+            result.stderr.strip(), "git-local-path-guard: git exceeded 0.5s; allowing the call"
+        )
+
+    def test_ignores_a_git_push_quoted_inside_a_heredoc_body(self):
+        self.commit(self.work, "notes.md", LEAK)
+        command = (
+            "cat > plan.md <<'EOF'\n"
+            "Sam's note:\n"
+            "`git push --force-with-lease=x:y origin HEAD:refs/heads/x`\n"
+            "EOF\n"
+        )
+        result = self.run_guard(command, self.work)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_scans_a_push_that_follows_a_heredoc(self):
+        self.commit(self.work, "notes.md", LEAK)
+        command = "cat > plan.md <<'EOF'\nSam's note\nEOF\ngit push"
+        self.assertEqual(self.run_guard(command, self.work).returncode, 2)
+
+    def test_ignores_a_push_in_a_dash_heredoc_closed_by_an_indented_tag(self):
+        self.commit(self.work, "notes.md", LEAK)
+        command = "cat <<-EOF\n\tgit push\n\tEOF\n"
+        self.assertEqual(self.run_guard(command, self.work).returncode, 0)
 
     def test_ignores_a_non_bash_tool(self):
         payload = json.dumps({"tool_name": "Read", "tool_input": {}, "cwd": str(self.work)})

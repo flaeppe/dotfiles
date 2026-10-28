@@ -70,6 +70,10 @@ ALLOWLIST_FILE: Final = ".claude/local-path-allow"
 
 MAX_FINDINGS: Final = 12
 
+# Seconds any one git subprocess may run before the guard gives up and allows the
+# call. The variable exists so a test need not wait out the default.
+GIT_TIMEOUT_SECONDS: Final = float(os.environ.get("GIT_LOCAL_PATH_GUARD_TIMEOUT", "10"))
+
 # Git global flags that consume the following word, so the subcommand is not it.
 GLOBAL_FLAGS_WITH_VALUE: Final = frozenset(
     ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env")
@@ -103,14 +107,22 @@ UNPUBLISHED_COMMITS: Final = (
 )
 
 
+class GitTimeout(Exception):
+    """A git subprocess outlived GIT_TIMEOUT_SECONDS."""
+
+
 def git(directory: str, *args: str) -> str | None:
-    """stdout of a git command, or None if it failed."""
-    result = subprocess.run(
-        ("git", "-C", directory, *args),
-        capture_output=True,
-        text=True,
-        errors="replace",
-    )
+    """stdout of a git command, or None if it failed. Raises GitTimeout."""
+    try:
+        result = subprocess.run(
+            ("git", "-C", directory, *args),
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except subprocess.TimeoutExpired as expired:
+        raise GitTimeout from expired
     if result.returncode != 0:
         return None
     return result.stdout
@@ -163,7 +175,8 @@ def git_invocations(command: str) -> list[tuple[str | None, str | None]]:
     """
     invocations: list[tuple[str | None, str | None]] = []
     cd_target: str | None = None
-    for segment in shellwords.sub_commands(shellwords.words_of(command)):
+    words = shellwords.words_of(shellwords.without_heredocs(command))
+    for segment in shellwords.sub_commands(words):
         word, index = shellwords.leading_command(segment)
         if word == "cd" and index + 1 < len(segment):
             candidate = segment[index + 1]
@@ -337,6 +350,14 @@ def deduplicated(sources: Sequence[Iterable[Finding]]) -> list[Finding]:
     return findings
 
 
+def has_remotes(repo_root: str) -> bool:
+    return bool((git(repo_root, "remote") or "").strip())
+
+
+def has_remotes(repo_root: str) -> bool:
+    return bool((git(repo_root, "remote") or "").strip())
+
+
 def deny(headline: str, findings: Sequence[Finding]) -> int:
     lines = ["BLOCKED: " + headline, ""]
     for location, token, reason in findings[:MAX_FINDINGS]:
@@ -382,7 +403,9 @@ def main() -> int:
     sources: list[Iterable[Finding]] = []
     if committing:
         sources.append(scan_diff(repo, "staged", staged_diffs(repo.root)))
-    if pushing:
+    # Without a remote there is nowhere to publish, and every commit would count
+    # as unpublished.
+    if pushing and has_remotes(repo.root):
         sources.append(scan_diff(repo, "outgoing", [UNPUBLISHED_COMMITS]))
 
     findings = deduplicated(sources)
@@ -398,5 +421,12 @@ def main() -> int:
 if __name__ == "__main__":
     try:
         sys.exit(main())
+    except GitTimeout:
+        print(
+            "git-local-path-guard: git exceeded %gs; allowing the call"
+            % GIT_TIMEOUT_SECONDS,
+            file=sys.stderr,
+        )
+        sys.exit(0)
     except Exception:
         sys.exit(0)

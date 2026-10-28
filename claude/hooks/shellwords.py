@@ -17,6 +17,9 @@ from typing import Final
 # would act on it. Quoted punctuation stays inside the word it belongs to.
 OPERATORS: Final = frozenset("|&;<>()")
 
+# `<<TAG`, `<<-TAG`, `<<'TAG'` or `<<"TAG"`, but not the here-string `<<<`.
+HEREDOC_START: Final = re.compile(r"(?<!<)<<(-?)[ \t]*(['\"]?)([A-Za-z_]\w*)\2")
+
 # A leading `VAR=value` does not consume the command position.
 ASSIGNMENT: Final = re.compile(r"^[A-Za-z_]\w*=")
 
@@ -60,6 +63,34 @@ def words_of(command: str) -> list[str]:
     if parsed is not None:
         return parsed
     return _lex(command, quotes="", escape="") or []
+
+
+def without_heredocs(command: str) -> str:
+    """The command with each heredoc body and its terminator line replaced by `;`,
+    which keeps the commands after it from joining the one that opened it.
+
+    A body is text fed to a program, whatever it says: a quoted `git push` in a
+    here-document is not a push, and an apostrophe in it must not derail the
+    lexer. Ceiling: a `<<TAG` inside a quoted string reads as a heredoc start and
+    hides the lines after it; a quote-aware scan would fix that.
+    """
+    kept: list[str] = []
+    pending: list[tuple[str, bool]] = []
+    for line in command.splitlines(keepends=True):
+        if pending:
+            tag, strips_tabs = pending[0]
+            candidate = line.rstrip("\r\n")
+            if (candidate.lstrip("\t") if strips_tabs else candidate) == tag:
+                pending.pop(0)
+                if not pending:
+                    kept.append(";\n")
+            continue
+        kept.append(line)
+        pending = [
+            (match.group(3), match.group(1) == "-")
+            for match in HEREDOC_START.finditer(line)
+        ]
+    return "".join(kept)
 
 
 def is_operator(word: str) -> bool:
