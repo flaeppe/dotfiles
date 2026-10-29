@@ -256,6 +256,12 @@
             ${builtins.readFile ./functions/_tab_checkout.fish}
           '';
         };
+        _wt_claude_exclude = {
+          description = "Makes a worktree's Claude Code skip the main checkout's CLAUDE.md and rules";
+          body = ''
+            ${builtins.readFile ./functions/_wt_claude_exclude.fish}
+          '';
+        };
         # Shared by `review <pr>` and `review skim`: both must prepare a worktree
         # identically, or a language server works in one surface and not the next.
         _review_prepare_tree = {

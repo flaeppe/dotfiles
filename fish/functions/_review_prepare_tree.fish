@@ -20,6 +20,9 @@ if test -n "$pr"
     set label "review $pr"
 end
 
+# A linked worktree would otherwise load the main checkout's instructions on top of its own.
+_wt_claude_exclude $tree $root
+
 # Per-checkout tool configuration that is gitignored, and therefore absent from a fresh
 # worktree. Extend this list with whatever a project keeps untracked; `.envrc` is the
 # load-bearing one, since without it direnv never activates and the worktree has no
