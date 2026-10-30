@@ -17,7 +17,9 @@
 #
 # `--dry-run` prints exactly what would post and posts nothing.
 #
-# Refuses while a marker is still tagged STALE -- see `_review_markers_reapply`.
+# Refuses while a marker is still tagged STALE -- see `_review_markers_reapply`. Refuses
+# while the PR's head is past the reviewed one, until `post.json` carries that head as
+# `rechecked_head`; a merged PR is posted to as COMMENT.
 
 if contains -- --help $argv; or contains -- -h $argv
     echo "Usage: review post <pr-number> [--dry-run]"
@@ -25,6 +27,8 @@ if contains -- --help $argv; or contains -- -h $argv
     echo "Posts .review/post.json (event, body, comments[]) as one GitHub PR review."
     echo "A comment whose path:line isn't in the PR's diff moves into the body instead"
     echo "of being dropped. --dry-run prints what would post and posts nothing."
+    echo "Refuses while the PR's head is past the reviewed one, until post.json"
+    echo "names that head as rechecked_head. A merged PR is posted to as COMMENT."
     return 0
 end
 
@@ -130,6 +134,44 @@ if test (count $slug_match) -lt 3
     return 1
 end
 set -l slug "$slug_match[2]/$slug_match[3]"
+
+# A PR can take new commits, or merge, while its review waits for the word to post: a
+# comment the new commits made wrong would post as if still true. A merged PR takes no
+# verdict, only a comment.
+set -l pr_now (gh pr view $pr --repo $slug --json headRefOid,state --jq '.headRefOid + " " + .state' 2>&1)
+if test $status -ne 0
+    echo "review post: could not read $slug#$pr's current head, nothing was posted --"
+    echo (string join \n -- $pr_now)
+    return 1
+end
+set -l current_head (string split ' ' -- $pr_now)[1]
+set -l pr_state (string split ' ' -- $pr_now)[2]
+if test "$pr_state" = MERGED; and test "$event" != COMMENT
+    echo "review post: $slug#$pr is merged, so this posts as COMMENT, not $event"
+    set event COMMENT
+end
+if test "$current_head" != "$head"; and test "$(jq -r '.rechecked_head // empty' $post_json)" != "$current_head"
+    git -C $review_tree fetch -q origin $current_head 2>/dev/null
+    set -l moved_paths (git -C $review_tree diff --name-only $head $current_head 2>/dev/null)
+    echo "review post: $slug#$pr moved from "(string sub -l 7 -- $head)" (reviewed) to "(string sub -l 7 -- $current_head)", nothing was posted."
+    echo "Re-check each comment against: git -C $review_tree diff $head $current_head"
+    echo "Drop or reword what the new commits changed, name those comments in your reply,"
+    echo "then add \"rechecked_head\": \"$current_head\" to $post_json and run this again."
+    echo ""
+    echo "Comments on files the new commits touch:"
+    set -l touched 0
+    for comment in $all_comments
+        set -l path (printf '%s' $comment | jq -r '.path')
+        if contains -- $path $moved_paths
+            echo "  $path:"(printf '%s' $comment | jq -r '.line')"  "(printf '%s' $comment | jq -r '.body' | head -1)
+            set touched (math $touched + 1)
+        end
+    end
+    if test $touched -eq 0
+        echo "  none"
+    end
+    return 1
+end
 
 set -l anchored
 set -l orphaned
