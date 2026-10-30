@@ -38,6 +38,7 @@ comments, commit bodies, plan summaries, handovers:
 - Explicit > implicit. Verbose > clever.
 - Early returns to reduce nesting. Avoid else after return/throw.
 - Parse, don't validate: instead of repeatedly checking raw data, parse it _once_ at the boundary of the system. After parsing, trust the type system.
+- **When code writes data it later reads back, make the illegal state unrepresentable before the write.** A type that forces the structure lets the reader trust it, and a runtime assertion after persisting is the fallback, not the guard. In review, suggest the typed write; a runtime check may stay beside it, and a stack rehaul is never demanded for it.
 - Inclusive over exclusive conditions: match what you want, not what you don't. Exclusive checks (`not in`, `!=`) silently pass unknown future values; inclusive checks (`in`, `==`) safely ignore them.
 - Prioritize readability. Split functions when it improves clarity, not dogmatically.
 
