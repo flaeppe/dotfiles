@@ -386,7 +386,9 @@ each comment's `path`+`line` against the PR's own diff at this worktree's HEAD a
 it never composes one. A comment landing outside a diff hunk moves into the body under
 its own heading instead of being dropped — GitHub rejects the whole review on one bad
 anchor. `--dry-run` prints exactly what would post and posts nothing. It refuses, dry run
-included, while a marker is still tagged `STALE` from a refresh.
+included, while a marker is still tagged `STALE` from a refresh, and while the PR's head
+is past the reviewed one: it lists the comments on files the new commits touch, and posts
+once `post.json` names that head as `rechecked_head`. A merged PR is posted to as `COMMENT`.
 
 ### Worktree preparation
 
