@@ -14,6 +14,9 @@ paths:
 - **Context first**: first param `ctx context.Context`; propagate cancellations
 - **Concurrency safety**: prefer channels or mutexes with clear ownership; avoid sharing mutable maps without sync
 - **Zero-value friendly**: types should work when zero-initialized
+- **No package-level variables**: pass state through arguments or struct fields
+- **Values over pointers**: pass and return structs by value unless the struct must be mutated
+- **Comma-ok assertions**: `v, ok := i.(T)` and check `ok`; a bare assertion panics on mismatch
 
 ## Interfaces and Errors
 
