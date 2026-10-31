@@ -38,7 +38,9 @@ set -l ahead $counts[2]
 test -z "$ahead"; and set ahead 0
 test -z "$behind"; and set behind 0
 
-set -l dirty (git -C $path status --porcelain 2>/dev/null | count)
+# Claude Code appends permission grants to .claude/settings.local.json in every tree it
+# runs in, so that file differing says nothing about work that would be lost.
+set -l dirty (git -C $path status --porcelain -- . ':(exclude).claude/settings.local.json' 2>/dev/null | count)
 
 set -l push
 set -l stranded 0

@@ -9,6 +9,11 @@
 let
   logDir = "${config.home.homeDirectory}/Library/Logs";
 in {
+  # Without -trimpath, Go's cache keys include the source directory, so each
+  # git worktree of one project recompiles everything into new cache entries
+  # (~240 MB per worktree). With it, worktrees share entries.
+  home.sessionVariables.GOFLAGS = "-trimpath";
+
   # `launchd.agents` is declared on every platform but only takes effect on
   # darwin; mkIf keeps this an inert attribute set elsewhere.
   launchd.agents.go-cache-trim = lib.mkIf pkgs.stdenv.isDarwin {

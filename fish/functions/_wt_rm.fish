@@ -134,7 +134,14 @@ for target in $argv
     # Symlinks are not followed, so a dependency tree linked from the main checkout is safe.
     chmod -R u+w $path 2>/dev/null
 
-    if not git -C $root worktree remove $force_arg $path
+    # The verdict above ignores .claude/settings.local.json, which git still counts as a change
+    # and refuses to remove a tree over. Reaching here unforced means nothing else differs.
+    set -l remove_force $force_arg
+    if test (git -C $path status --porcelain 2>/dev/null | count) -gt 0
+        set remove_force --force
+    end
+
+    if not git -C $root worktree remove $remove_force $path
         echo "wt rm: git would not remove $target — $path is still there"
         set failed 1
         continue
