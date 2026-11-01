@@ -7,6 +7,9 @@
 # and anything else is created off the default branch -- fetched first, because a worktree
 # started from a stale base is something you discover an hour later.
 #
+# A commit sha in the <branch> slot is likewise a place to start from. Ceiling: a sha-shaped
+# word that is not a commit in this repository (an unfetched sha) is taken as a branch name.
+#
 # A remote-tracking ref in the <branch> slot is where to start from, not a branch to make: the
 # new branch is called <name> and begins at that ref. A local branch named `origin/main` would
 # shadow the remote-tracking one in every `git checkout`, so no spelling of the arguments
@@ -33,6 +36,7 @@ if set -q _flag_help
     echo "  <branch>        checked out if it exists, tracked if origin has it, else created"
     echo "                  off the default branch"
     echo "  <remote>/<ref>  a remote-tracking ref: <name> is created starting from it"
+    echo "  <sha>           a commit: <name> is created starting from it"
     return 0
 end
 
@@ -73,6 +77,13 @@ end
 set -l remotes (git -C $root remote)
 set -l start
 if string match -rq -- '^(?<remote>[^/]+)/.' "$argv[2]"; and contains -- $remote $remotes
+    set start $argv[2]
+    set branch $name
+end
+if test -z "$start"; and string match -qr -- '^[0-9a-f]{7,40}$' "$argv[2]"
+    and not git -C $root show-ref --verify --quiet "refs/heads/$argv[2]"
+    and not git -C $root show-ref --verify --quiet "refs/remotes/origin/$argv[2]"
+    and git -C $root rev-parse --verify --quiet "$argv[2]^{commit}" >/dev/null
     set start $argv[2]
     set branch $name
 end
@@ -135,6 +146,16 @@ if test -z "$base"
         return 1
     end
     echo "wt new: no origin/HEAD, branching off local $base"
+end
+
+# `worktree add` refuses a branch another worktree has out, with a bare fatal that does not say
+# which one; the holder is the place the caller wants.
+set -l holder (git -C $root worktree list --porcelain | awk -v ref="branch refs/heads/$branch" '
+    /^worktree / { path = substr($0, 10) }
+    $0 == ref { print path; exit }')
+if test -n "$holder"
+    echo "wt new: $branch is already checked out at $holder -- work there, or name another branch"
+    return 1
 end
 
 if git -C $root show-ref --verify --quiet "refs/heads/$branch"
