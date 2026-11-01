@@ -30,6 +30,7 @@ if contains -- --help $argv; or contains -- -h $argv
     echo "of being dropped. --dry-run prints what would post and posts nothing."
     echo "Refuses while the PR's head is past the reviewed one, until post.json"
     echo "names that head as rechecked_head. A merged PR is posted to as COMMENT."
+    echo "Refuses a body that opens with Approve or Request changes under another event."
     return 0
 end
 
