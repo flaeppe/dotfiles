@@ -27,7 +27,7 @@ _wt_claude_exclude $tree $root
 # worktree. Extend this list with whatever a project keeps untracked; `.envrc` is the
 # load-bearing one, since without it direnv never activates and the worktree has no
 # toolchain at all, so no language server can start.
-set -l LOCAL_CONFIG .envrc .ignore .sqruff .cbmignore postgres-language-server.jsonc .ctags.d
+set -l LOCAL_CONFIG .envrc .ignore .sqruff .cbmignore postgres-language-server.jsonc .ctags.d _private
 
 # Dependency trees, symlinked rather than installed: a fresh worktree has none,
 # and without them a language server reports every import as unresolved and any
@@ -144,6 +144,14 @@ for name in $LINK_DIRS
         if not git -C $tree check-ignore -q -- $rel
             echo "$label: WARNING $rel is a symlink git does not ignore -- committing it will break CI"
         end
+    end
+end
+
+# The link above is only right while the tree installs what the main checkout installed.
+for lockfile in yarn.lock package-lock.json pnpm-lock.yaml
+    test -e "$tree/$lockfile"; or continue
+    if test -L "$tree/node_modules"; and not cmp -s "$root/$lockfile" "$tree/$lockfile"
+        echo "$label: WARNING $lockfile differs from the main checkout's, so the linked node_modules is stale here -- remove the link and install in this worktree"
     end
 end
 mkdir -p "$tree/.review"

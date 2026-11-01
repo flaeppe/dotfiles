@@ -19,7 +19,8 @@
 #
 # Refuses while a marker is still tagged STALE -- see `_review_markers_reapply`. Refuses
 # while the PR's head is past the reviewed one, until `post.json` carries that head as
-# `rechecked_head`; a merged PR is posted to as COMMENT.
+# `rechecked_head`; a merged PR is posted to as COMMENT. Refuses a body that opens with
+# "Approve" or "Request changes" under a different event.
 
 if contains -- --help $argv; or contains -- -h $argv
     echo "Usage: review post <pr-number> [--dry-run]"
@@ -100,6 +101,18 @@ if not contains -- $event APPROVE COMMENT REQUEST_CHANGES
 end
 
 set -l draft_body (jq -r '.body // ""' $post_json | string collect)
+
+# A body that opens by naming a verdict ("Approve with comments") is the reviewer's intent;
+# posting it under another event hands the author the wrong signal. Only an opening that
+# names a verdict is checked -- a body that opens any other way says nothing to contradict.
+set -l body_opening (string match -r -i -- '^\W*(approve|request(ed)? changes)' $draft_body)[2]
+set -l body_verdict
+string match -qi -- approve "$body_opening"; and set body_verdict APPROVE
+string match -qri -- '^request' "$body_opening"; and set body_verdict REQUEST_CHANGES
+if test -n "$body_verdict"; and test "$body_verdict" != "$event"
+    echo "review post: the body opens with a verdict of $body_verdict but .event in $post_json is $event -- make them agree"
+    return 1
+end
 set -l all_comments (jq -c '.comments // [] | .[]' $post_json)
 if test -z "$draft_body"; and test (count $all_comments) -eq 0
     echo "review post: empty body and no comments in $post_json -- nothing to post"
