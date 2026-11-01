@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -212,6 +213,25 @@ class GhPrBodyGuardTest(unittest.TestCase):
     def test_refuses_body_file_stdin(self):
         result = self.run_guard("gh pr create --title t --body-file -")
         self.assertEqual(result.returncode, 2)
+
+    def test_resolves_a_relative_body_file_against_the_commands_cd_target(self):
+        directory = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, directory)
+        (Path(directory) / "body.md").write_text(CLEAN_BODY)
+        result = self.run_guard("cd %s && gh pr create --title t --body-file body.md" % directory)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_resolves_a_relative_body_file_against_the_hook_cwd_without_a_cd(self):
+        directory = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, directory)
+        (Path(directory) / "body.md").write_text(CLEAN_BODY)
+        result = self.run_guard("gh pr create --title t --body-file body.md", cwd=directory)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_refusal_names_the_forms_the_guard_can_read(self):
+        result = self.run_guard("gh pr create --title t --body-file /no/such/file.md")
+        self.assertIn("quoted delimiter", result.stderr)
+        self.assertIn("/absolute/path", result.stderr)
 
     def test_refuses_body_file_that_does_not_exist(self):
         result = self.run_guard("gh pr create --title t --body-file /no/such/file.md")

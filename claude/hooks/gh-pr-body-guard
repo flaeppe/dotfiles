@@ -173,14 +173,25 @@ def flag_value(segment: list[str], index: int) -> tuple[str | None, int]:
     return None, index + 1
 
 
-def gh_calls(command: str) -> list[tuple[list[str], int]]:
-    """(sub-command words, index of `gh`) for each `gh` standing in command
-    position -- mirrors git-local-path-guard's `git_invocations`."""
-    calls: list[tuple[list[str], int]] = []
+def gh_calls(command: str, cwd: str) -> list[tuple[list[str], int, str]]:
+    """(sub-command words, index of `gh`, directory it runs in) for each `gh`
+    standing in command position -- mirrors git-local-path-guard's
+    `git_invocations`.
+
+    Ceiling: a `cd` is followed wherever it sits in the command, branches of
+    `||` and subshells included; one whose target needs the shell to resolve
+    leaves the directory unchanged.
+    """
+    calls: list[tuple[list[str], int, str]] = []
+    directory = cwd
     for segment in shellwords.sub_commands(shellwords.words_of(command)):
         word, index = shellwords.leading_command(segment)
+        if word == "cd" and index + 1 < len(segment):
+            target = os.path.expanduser(segment[index + 1])
+            if not SHELL_EXPANSION.search(target):
+                directory = os.path.join(directory, target)
         if word == "gh":
-            calls.append((segment, index))
+            calls.append((segment, index, directory))
     return calls
 
 
@@ -292,13 +303,13 @@ def pr_body_calls(command: str, cwd: str) -> list[tuple[str | None, str]]:
     body-bearing gh api .../pulls call in the command."""
     calls: list[tuple[str | None, str]] = []
     variables = assigned_variables(command)
-    for segment, gh_index in gh_calls(command):
+    for segment, gh_index, directory in gh_calls(command, cwd):
         subcommand, sub_index = gh_subcommand(segment, gh_index)
         if subcommand == "pr" and sub_index + 1 < len(segment) and segment[
             sub_index + 1
         ] in ("create", "edit"):
             creating = segment[sub_index + 1] == "create"
-            call = pr_body(segment, sub_index + 2, cwd, variables, creating)
+            call = pr_body(segment, sub_index + 2, directory, variables, creating)
         elif subcommand == "api":
             call = api_pr_body(segment, sub_index + 1, variables)
         else:
@@ -401,7 +412,13 @@ def refuse_no_marker(source: str) -> int:
             [
                 "BLOCKED: this PR body (%s) has no marker to check." % source,
                 "",
-                "Load the pr skill (/pr) and write the body through it.",
+                "Load the pr skill (/pr) and write the body through it. The guard can "
+                "read only:",
+                "  --body \"$(cat <<'TAG' ... TAG\n)\"   (quoted delimiter)",
+                "  --body-file /absolute/path           (file must exist before this "
+                "command runs)",
+                "An unquoted heredoc, $(cat file), stdin and a file this same command "
+                "writes are unreadable here.",
             ]
         ),
         file=sys.stderr,
