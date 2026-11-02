@@ -28,7 +28,7 @@ comments, commit bodies, plan summaries, handovers:
   count) beats a paragraph. Quote the error; don't describe it.
 - **No journey, no restating the brief.** Ruling out an alternative is a clause, not a
   section; headings that mirror the instructions are padding.
-- A table beats six one-line bullets; a heading over two sentences is noise.
+- A table beats six one-line bullets; a heading over one sentence is noise.
 
 ---
 

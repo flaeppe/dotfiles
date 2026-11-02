@@ -54,7 +54,7 @@ LOCAL_ONLY_FRAGMENTS: Final = (
 )
 
 # Matched as a line prefix (after stripping leading whitespace).
-FORBIDDEN_HEADINGS: Final = ("## Test plan", "## Testing")
+FORBIDDEN_HEADINGS: Final = ("## Test plan", "## Testing", "## Verification")
 
 MAX_PARAGRAPH_WORDS: Final = 80
 
