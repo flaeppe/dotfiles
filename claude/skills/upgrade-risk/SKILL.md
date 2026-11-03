@@ -60,6 +60,10 @@ When the PR exists to close security alerts, run this before the axes. Code
 nothing runs gets deleted rather than patched, and a deletion also closes the
 alerts that no available bump can fix.
 
+Call an advisory closed only when no version the lockfile resolves falls in
+its vulnerable range; a manifest range, a PR title or a green build does not
+show the vulnerable copy is gone.
+
 For each alerted package, trace it to the direct dependency that pulls it in.
 Then sort that dependency into one of these:
 
