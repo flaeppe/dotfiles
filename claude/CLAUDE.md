@@ -129,6 +129,7 @@ should be trivial — just parsing and error mapping, no logic duplication.
 - Don't mock. Inject at the component level — a client, a gateway, a service that may own
   a database — never the database itself: business logic runs against the real one so
   transactions stay real. A 1:1 interface over queries is a mock.
+- A test written for a fix must fail without it: revert the fix once and watch it go red.
 
 ### Working in Existing Codebases
 
