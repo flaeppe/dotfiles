@@ -118,6 +118,8 @@ should be trivial — just parsing and error mapping, no logic duplication.
   no "we chose X because", no "matches how service B does it" (state the local reason),
   no "instead of the old loop" (describe the current code).
 - Remove debug statements and commented-out code before finishing.
+- A suppression (`noqa`, `nolint`, `type: ignore`, `ts-expect-error`, a lint-config ignore)
+  carries its reason on the same line; a bare one reads as a silenced bug.
 
 ### Naming
 - Descriptive names over abbreviations (`i`/`j` loop counters and `x` lambdas excepted, but avoid otherwise).
