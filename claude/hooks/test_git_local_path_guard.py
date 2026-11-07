@@ -158,6 +158,14 @@ class GitLocalPathGuardTest(unittest.TestCase):
         result = self.run_guard("git push", lonely)
         self.assertEqual((result.returncode, result.stderr), (0, ""))
 
+    def test_allows_a_commit_in_a_repo_with_no_remote(self):
+        lonely = self.root / "lonely"
+        self.git(self.root, "init", "-q", "-b", "main", str(lonely))
+        (lonely / "notes.md").write_text(LEAK)
+        self.git(lonely, "add", "notes.md")
+        result = self.run_guard("git commit -m wip", lonely)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
     def test_allows_the_call_when_git_outlives_the_timeout(self):
         self.commit(self.work, "notes.md", LEAK)
         slow_git = self.root / "bin" / "git"

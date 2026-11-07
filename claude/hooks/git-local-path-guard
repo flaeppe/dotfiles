@@ -354,10 +354,6 @@ def has_remotes(repo_root: str) -> bool:
     return bool((git(repo_root, "remote") or "").strip())
 
 
-def has_remotes(repo_root: str) -> bool:
-    return bool((git(repo_root, "remote") or "").strip())
-
-
 def deny(headline: str, findings: Sequence[Finding]) -> int:
     lines = ["BLOCKED: " + headline, ""]
     for location, token, reason in findings[:MAX_FINDINGS]:
@@ -394,6 +390,10 @@ def main() -> int:
     repo_root = git(directory, "rev-parse", "--show-toplevel")
     if not repo_root:
         return 0
+    # A repo with no remote never leaves this machine, so a local path in it
+    # resolves for everyone who can read it.
+    if not has_remotes(repo_root.strip()):
+        return 0
     repo = Repo(repo_root.strip(), sibling_root(directory))
 
     # Diffs only -- the paths being recorded and the lines being added. A
@@ -403,9 +403,7 @@ def main() -> int:
     sources: list[Iterable[Finding]] = []
     if committing:
         sources.append(scan_diff(repo, "staged", staged_diffs(repo.root)))
-    # Without a remote there is nowhere to publish, and every commit would count
-    # as unpublished.
-    if pushing and has_remotes(repo.root):
+    if pushing:
         sources.append(scan_diff(repo, "outgoing", [UNPUBLISHED_COMMITS]))
 
     findings = deduplicated(sources)
