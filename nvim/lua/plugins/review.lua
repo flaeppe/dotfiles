@@ -661,7 +661,7 @@ function M.hidden_globs(root)
     local globs = vim.list_slice(M.test_globs)
     local file = io.open(root .. "/.reviewignore", "r")
     if not file then
-        -- A worktree never has its own: the file is gitignored, so checkout skips it.
+        -- A fresh worktree has none: the file is gitignored, so checkout skips it.
         local main = main_checkout(root)
         file = main and io.open(main .. "/.reviewignore", "r")
     end
