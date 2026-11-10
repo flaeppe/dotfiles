@@ -105,8 +105,8 @@ _DONE_WHEN_VIOLATION: Final = '"## Done when" heading'
 # new file, so a refused write is a paste, not a guess.
 _NO_FRONTMATTER: Final = "okf no-frontmatter"
 NO_FRONTMATTER_HINT: Final = (
-    "A report or note needs frontmatter too; the smallest block check-file "
-    "accepts:\n---\ntype: Record\nstatus: stable\nstage: Complete\n"
+    "A report or note needs frontmatter too; the smallest block the plan "
+    "guards accept on a new file:\n---\ntype: Record\nstatus: stable\nstage: Complete\n"
     "date: YYYY-MM-DD\ndescription: \"<one line>\"\n"
     "verified: {by: claude-code/<model id>, at: YYYY-MM-DD}\n---\n"
     "Or write it to the session scratchpad, which has no gate."
