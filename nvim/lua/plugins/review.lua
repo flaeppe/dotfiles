@@ -644,11 +644,27 @@ function M.reviewignore_globs(line)
     return { glob, glob .. "/**" }
 end
 
+--- The checkout holding the repository's shared git directory: `root` itself, or the
+--- main checkout when `root` is a linked worktree. nil outside a git repository.
+local function main_checkout(root)
+    local result = vim.system({ "git", "-C", root, "rev-parse", "--path-format=absolute", "--git-common-dir" }):wait()
+    if result.code ~= 0 then
+        return nil
+    end
+    return vim.fs.dirname(vim.trim(result.stdout))
+end
+
 --- The globs hidden under `root`: the test globs plus the lines of its untracked
---- `.reviewignore`, read on every call so a view opened after an edit sees it.
+--- `.reviewignore`, or of the main checkout's when `root` has none. Read on every call
+--- so a view opened after an edit sees it.
 function M.hidden_globs(root)
     local globs = vim.list_slice(M.test_globs)
     local file = io.open(root .. "/.reviewignore", "r")
+    if not file then
+        -- A worktree never has its own: the file is gitignored, so checkout skips it.
+        local main = main_checkout(root)
+        file = main and io.open(main .. "/.reviewignore", "r")
+    end
     if not file then
         return globs
     end
