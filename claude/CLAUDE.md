@@ -185,6 +185,9 @@ a full reinstall.
 
 - Silence means I checked it — hold me to any unmarked claim.
 - `unverified:` on anything I didn't check, your framing included.
+- `probed (<method>):` on a claim checked by a method that can mislead — git ancestry
+  after a squash merge, an empty result read as "none", an old log line read as now,
+  a file's name read as what it does, an agent's report of its own work.
 - Cite the target inline (`file:line`, command, doc) for load-bearing claims, so a
   wrong target is visible without reading anything. Never narrate the check.
 - Separate stated from inferred — if the source doesn't say it outright, say so.
@@ -196,6 +199,7 @@ One line per load-bearing claim. Finding first, method demoted to the parentheti
 - verified: <finding> (<method + target>)
 - inferred: <conclusion> — <what the source states>
 - unverified: <claim> (not checked)
+- probed (<method>): <claim> (<target>)
 
 - verified: duplicate charges when idempotency key absent (test_payments.py:212, fails on main)
 - inferred: retry path can double-submit — router.py:88 retries without a key, no dedup downstream
