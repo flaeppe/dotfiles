@@ -170,6 +170,27 @@ class PlanCheckGuardTest(unittest.TestCase):
         self.assertIn("inside a code fence", result.stderr)
         self.assertIn("unfence it", result.stderr)
 
+    def test_denies_a_report_without_frontmatter_with_a_pasteable_block(self):
+        result = self.write_result("foo/report.md", "# report\n\nbody\n")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("type: Record\nstatus: stable\nstage: Complete", result.stderr)
+        self.assertIn("verified: {by: claude-code/", result.stderr)
+
+    def test_allows_a_report_carrying_the_hinted_block(self):
+        block = (
+            "---\ntype: Record\nstatus: stable\nstage: Complete\n"
+            "date: 2026-11-10\ndescription: \"x\"\n"
+            "verified: {by: claude-code/test-model, at: 2026-11-10}\n---\n# report\n"
+        )
+        result = self.write_result("foo/report-ok.md", block)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_denies_an_unlisted_type_with_the_mapping_onto_listed_ones(self):
+        content = IN_PROGRESS_WITH_CHECK.replace("type: Build", "type: Proposal")
+        result = self.write_result("foo/008-plan.md", content)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("pick-one proposal -> Decision", result.stderr)
+
     def test_allows_in_progress_with_a_check(self):
         result = self.write_result("foo/002-plan.md", IN_PROGRESS_WITH_CHECK)
         self.assertEqual(result.returncode, 0)

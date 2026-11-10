@@ -100,6 +100,25 @@ _GOAL_TICK_RE: Final = re.compile(r"^- \[[ xX]\] .*\bCHECK:")
 # Appears in both done-when violations check-file can raise.
 _DONE_WHEN_VIOLATION: Final = '"## Done when" heading'
 
+# Every .md under the plan root needs frontmatter, reports and notes included;
+# the smallest block that both check-file and plan-verified-guard accept on a
+# new file, so a refused write is a paste, not a guess.
+_NO_FRONTMATTER: Final = "okf no-frontmatter"
+NO_FRONTMATTER_HINT: Final = (
+    "A report or note needs frontmatter too; the smallest block check-file "
+    "accepts:\n---\ntype: Record\nstatus: stable\nstage: Complete\n"
+    "date: YYYY-MM-DD\ndescription: \"<one line>\"\n"
+    "verified: {by: claude-code/<model id>, at: YYYY-MM-DD}\n---\n"
+    "Or write it to the session scratchpad, which has no gate."
+)
+# The type set is closed; kinds of file with no type of their own map onto it.
+_UNKNOWN_TYPE: Final = "is not one of Research"
+UNKNOWN_TYPE_HINT: Final = (
+    "Kinds with no type of their own: ask card or report -> Record; "
+    "pick-one proposal -> Decision; a goal's child step plan -> Build "
+    "(Research when the step only finds out)."
+)
+
 
 def journal_goal_is_done_when(content: str) -> bool:
     """Whether the plan's done-when list is its "## Journal goal" section: no
@@ -223,6 +242,10 @@ def main() -> int:
         return 0
 
     message_lines = list(found)
+    if any(_NO_FRONTMATTER in line for line in found):
+        message_lines.append(NO_FRONTMATTER_HINT)
+    if any(_UNKNOWN_TYPE in line for line in found):
+        message_lines.append(UNKNOWN_TYPE_HINT)
     if fenced_check_present(content):
         message_lines.append(
             "a (CHECK: ...) is present but inside a code fence -- fenced "
