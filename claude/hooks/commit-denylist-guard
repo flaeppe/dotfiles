@@ -2,8 +2,8 @@
 """Claude Code PreToolUse gate for `git commit`.
 
 Input: a PreToolUse payload on stdin for a Bash tool call. Denies any `git
-commit` invocation whose command line matches a term in the machine-local
-denylist file, but only when the command's working directory is inside a
+commit` invocation whose own words or heredoc text match a term in the
+machine-local denylist file, but only when the command's working directory is inside a
 repo explicitly opted in there via a `repo:<absolute path>` line. Every
 other command, and every commit in a repo not on that list, gets no
 verdict.
@@ -130,10 +130,21 @@ def main() -> None:
     if toplevel is None or toplevel not in enforced_repos:
         return
 
-    if pattern.search(command):
+    # Other commands chained into the same call are not the commit message.
+    # Ceiling: any heredoc body in the call still counts, since a message can
+    # arrive as `git commit -F - <<EOF`; parse which heredoc feeds the commit if
+    # that blocks honest commits.
+    scanned = "\n".join(
+        " ".join(invocation)
+        for invocation in invocations
+        if is_commit_invocation(invocation)
+    )
+    scanned += "\n" + shellwords.heredoc_bodies(command)
+    match = pattern.search(scanned)
+    if match:
         decide(
             "deny",
-            "commit blocked: command matches a machine-local denylist term "
+            f"commit blocked: `{match.group(0)}` is a machine-local denylist term "
             f"({DENYLIST_PATH}) -- remove it and retry",
         )
 

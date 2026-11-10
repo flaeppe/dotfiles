@@ -71,9 +71,20 @@ def without_heredocs(command: str) -> str:
     A body is text fed to a program, so a quoted `git push` or a stray
     apostrophe in it never reaches the lexer.
     """
+    return split_heredocs(command)[0]
+
+
+def heredoc_bodies(command: str) -> str:
+    """The heredoc body lines `without_heredocs` removes, joined."""
+    return split_heredocs(command)[1]
+
+
+def split_heredocs(command: str) -> tuple[str, str]:
+    """(the command without heredoc bodies, the removed body lines)."""
     # Ceiling: a `<<TAG` inside a quoted string reads as a heredoc start and
     # hides the lines after it; a quote-aware scan would fix that.
     kept: list[str] = []
+    bodies: list[str] = []
     pending: list[tuple[str, bool]] = []
     for line in command.splitlines(keepends=True):
         if pending:
@@ -86,13 +97,15 @@ def without_heredocs(command: str) -> str:
                     # a `;` the next command would join the one that opened the
                     # heredoc.
                     kept.append(";\n")
+            else:
+                bodies.append(line)
             continue
         kept.append(line)
         pending = [
             (match.group(3), match.group(1) == "-")
             for match in HEREDOC_START.finditer(line)
         ]
-    return "".join(kept)
+    return "".join(kept), "".join(bodies)
 
 
 def is_operator(word: str) -> bool:
