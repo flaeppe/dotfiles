@@ -86,6 +86,16 @@ class ToolchainPathGuardTest(unittest.TestCase):
         result = self.run_guard("direnv exec . yarn test", self.root)
         self.assertEqual(result.returncode, 0)
 
+    def test_allows_a_toolchain_name_inside_a_heredoc_or_quoted_note(self):
+        (self.root / ".envrc").write_text("use flake\n")
+        for command in (
+            "cat <<'EOF' > notes.md\nrun yarn test, then node build\nEOF",
+            'me note "yarn test fails under pnpm"',
+        ):
+            with self.subTest(command=command):
+                result = self.run_guard(command, self.root)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_allows_when_no_envrc(self):
         result = self.run_guard("yarn test", self.root)
         self.assertEqual(result.returncode, 0)
