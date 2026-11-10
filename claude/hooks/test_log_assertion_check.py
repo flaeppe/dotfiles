@@ -93,7 +93,7 @@ class DetectionTest(unittest.TestCase):
             "TestHandleMessageLogsLevelByReferenceLength",
         ):
             named_test = fixture("go_buffer").replace("TestSettleInvoice", name)
-            hits = detector.find_hits("payout/handler_test.go", named_test)
+            hits = detector.find_hits("fake-service/handler_test.go", named_test)
             self.assertEqual([hit.line for hit in hits], [17], name)
 
     def test_ignores_a_test_in_a_logging_package(self):
