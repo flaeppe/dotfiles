@@ -4,6 +4,7 @@
 claude/hooks/git-local-path-guard
 claude/hooks/test_git_local_path_guard.py
 claude/hooks/plan-verified-guard
+claude/hooks/test_plan_verified_guard.py
 claude/hooks/plan-check-guard
 claude/hooks/test_plan_check_guard.py
 claude/hooks/gh-pr-body-guard
