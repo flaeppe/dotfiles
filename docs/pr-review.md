@@ -434,7 +434,7 @@ ignore entry of its own, and nothing about it reaches this configuration.
 | `<Leader>ro` | the review order, as a work list |
 | `<Leader>rq` | the change, hunk by hunk, as a work list |
 | `<Leader>rD` | browse the change in a file panel |
-| `<Leader>rT` | hide or show test files: in the file panel and its next/previous-file walk, the review order and `<Leader>rq`. A hidden panel says `tests hidden (N)` in its title; the globs are `TEST_GLOBS` in `review.lua` |
+| `<Leader>rT` | hide or show test files and the paths of the repo's `.reviewignore`: in the file panel and its next/previous-file walk, the review order and `<Leader>rq`. A hidden panel says `hidden (N)` in its title; the test globs are `M.test_globs` in `review.lua` |
 | `<Leader>rb` | switch scope: this round or the whole suggestion (stack only) |
 | `<Leader>rt` | findings and their states |
 | `<Leader>rw` | harvest `findings.md` — summary plus findings — and open it |

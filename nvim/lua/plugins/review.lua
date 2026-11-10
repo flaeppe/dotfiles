@@ -620,28 +620,71 @@ M.test_globs = {
     "**/test/**",
     "**/__tests__/**",
 }
-M.test_matchers = vim.tbl_map(vim.glob.to_lpeg, M.test_globs)
 
---- `path` is relative to the repository root.
-function M.is_hidden_test(path)
-    if not vim.g.review_hide_tests then
-        return false
+--- Turns a `.reviewignore` line into pathspec globs. gitignore rules, minus negation:
+--- a pattern without a slash matches at any depth, a leading slash or a slash inside
+--- anchors it to the root, a trailing slash limits it to directories, and a match on a
+--- directory covers everything under it.
+function M.reviewignore_globs(line)
+    local pattern = vim.trim(line)
+    if pattern == "" or vim.startswith(pattern, "#") or vim.startswith(pattern, "!") then
+        return {}
     end
-    for _, matcher in ipairs(M.test_matchers) do
-        if matcher:match(path) then
-            return true
+    local isDirectoryOnly = vim.endswith(pattern, "/")
+    pattern = pattern:gsub("/+$", "")
+    local isAnchored = pattern:find("/", 1, true) ~= nil
+    pattern = pattern:gsub("^/+", "")
+    if pattern == "" then
+        return {}
+    end
+    local glob = isAnchored and pattern or ("**/" .. pattern)
+    if isDirectoryOnly then
+        return { glob .. "/**" }
+    end
+    return { glob, glob .. "/**" }
+end
+
+--- The globs hidden under `root`: the test globs plus the lines of its untracked
+--- `.reviewignore`, read on every call so a view opened after an edit sees it.
+function M.hidden_globs(root)
+    local globs = vim.list_slice(M.test_globs)
+    local file = io.open(root .. "/.reviewignore", "r")
+    if not file then
+        return globs
+    end
+    for line in file:lines() do
+        vim.list_extend(globs, M.reviewignore_globs(line))
+    end
+    file:close()
+    return globs
+end
+
+--- A predicate over paths relative to `root`; false for every path while nothing is
+--- hidden.
+function M.hidden_matcher(root)
+    if not vim.g.review_hide_tests then
+        return function()
+            return false
         end
     end
-    return false
+    local matchers = vim.tbl_map(vim.glob.to_lpeg, M.hidden_globs(root))
+    return function(path)
+        for _, matcher in ipairs(matchers) do
+            if matcher:match(path) then
+                return true
+            end
+        end
+        return false
+    end
 end
 
-function M.test_pathspecs(magic)
+function M.hidden_pathspecs(root, magic)
     return vim.tbl_map(function(glob)
         return magic .. glob
-    end, M.test_globs)
+    end, M.hidden_globs(root))
 end
 
---- How many test files the panel's diff contains.
+--- How many hidden files the panel's diff contains.
 function M.count_test_files(view)
     -- Asked of git with the same globs that exclude them, so the number agrees with what
     -- disappears from the list.
@@ -654,7 +697,7 @@ function M.count_test_files(view)
     for _, revision_args in ipairs(revisions) do
         local args = vim.list_extend({ "diff", "--name-only" }, revision_args)
         vim.list_extend(args, { "--" })
-        vim.list_extend(args, M.test_pathspecs(":(glob)"))
+        vim.list_extend(args, M.hidden_pathspecs(view.adapter.ctx.toplevel, ":(glob)"))
         count = count + #view.adapter:exec_sync(args, view.adapter.ctx.toplevel)
     end
     return count
@@ -670,13 +713,13 @@ function M.apply_test_filter(view)
     -- ones go.
     local path_args = vim.deepcopy(view.panel.path_args)
     if vim.g.review_hide_tests then
-        vim.list_extend(path_args, M.test_pathspecs(":(exclude,glob)"))
+        vim.list_extend(path_args, M.hidden_pathspecs(view.adapter.ctx.toplevel, ":(exclude,glob)"))
     end
     view.path_args = path_args
     local winid = view.panel.winid
     if winid and vim.api.nvim_win_is_valid(winid) then
         vim.wo[winid].winbar = vim.g.review_hide_tests
-                and ("%%#DiagnosticWarn# tests hidden (%d)"):format(M.count_test_files(view))
+                and ("%%#DiagnosticWarn# hidden (%d)"):format(M.count_test_files(view))
             or ""
     end
 end
@@ -950,7 +993,7 @@ function M.panel()
         "next  " .. next_step,
         "",
         "      <Leader>rD  browse the change · <Leader>rq  the same change as a work list",
-        "      <Leader>rT  hide or show test files in the diff and both lists",
+        "      <Leader>rT  hide or show test files and .reviewignore paths in the diff and both lists",
         "      <Leader>rl  findings · <Leader>rt  their states · <Leader>rp  refresh this page",
         "      <Leader>rj  same spot in the other worktree · <Leader>?  every key",
         -- This page reports state; it cannot reason about it. When the two disagree, or
@@ -1198,6 +1241,7 @@ function M.hunks()
     end
     local range, label = change_range(session)
     local root = M.root()
+    local is_hidden = M.hidden_matcher(root)
     -- -I drops any hunk whose changed lines are *all* markers, so annotating a file
     -- does not add work to the list. A marker sitting among real changes keeps its
     -- hunk, which is right -- that hunk still has to be visited.
@@ -1207,7 +1251,7 @@ function M.hunks()
         local target = line:match("^%+%+%+ b/(.*)$")
         if target then
             file = target
-        elseif file and not M.is_hidden_test(file) then
+        elseif file and not is_hidden(file) then
             -- @@ -old,n +new,m @@ trailing-context. The `,m` is omitted when the
             -- hunk is one line, so the count has to be consumed as opaque
             -- non-space -- matching only the omitted form drops every multi-line
@@ -1228,7 +1272,7 @@ function M.hunks()
     if session.role == "stack" then
         local untracked = git({ "ls-files", "--others", "--exclude-standard" }, root)
         for _, path in ipairs(vim.split(untracked, "\n", { trimempty = true })) do
-            if not M.is_hidden_test(path) then
+            if not is_hidden(path) then
                 table.insert(items, 1, { filename = root .. "/" .. path, lnum = 1, text = "new file" })
             end
         end
@@ -1237,7 +1281,7 @@ function M.hunks()
         vim.notify("Nothing in " .. label, vim.log.levels.WARN)
         return
     end
-    local suffix = vim.g.review_hide_tests and " (tests hidden)" or ""
+    local suffix = vim.g.review_hide_tests and " (hidden)" or ""
     vim.fn.setqflist({}, "r", { title = "changes: " .. label .. suffix, items = items })
     vim.cmd.copen()
 end
@@ -1286,11 +1330,12 @@ function M.order()
     -- Context entries are flagged, never silently mixed in: the count of entries
     -- is how you judge the size of the change, so a file that is not part of it
     -- must not read like one.
+    local is_hidden = M.hidden_matcher(M.root())
     local items = {}
     for index, entry in ipairs(decoded.entries) do
         -- The number is the entry's place in order.json, so a gap where tests were
         -- hidden still points at the same entry.
-        if not M.is_hidden_test(entry.file) then
+        if not is_hidden(entry.file) then
             table.insert(items, {
                 filename = M.root() .. "/" .. entry.file,
                 lnum = entry.lnum or 1,
@@ -1298,7 +1343,7 @@ function M.order()
             })
         end
     end
-    local suffix = vim.g.review_hide_tests and " (tests hidden)" or ""
+    local suffix = vim.g.review_hide_tests and " (hidden)" or ""
     vim.fn.setqflist({}, "r", { title = "review order" .. suffix, items = items })
     vim.cmd.copen()
 end
