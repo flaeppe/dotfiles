@@ -24,9 +24,11 @@ from typing import Final
 DISABLE: Final = "CLAUDE_NO_AUTOFORMAT"
 
 # Extension -> (binary, argv suffixes run in order against the edited file).
+# F401 stays unfixed: an edit that adds an import before the code using it would
+# otherwise have the import stripped again by the hook that follows it.
 # Ceiling: python/ruff only. Add a row per language as the need shows up.
 FORMATTERS: Final[dict[str, tuple[str, tuple[tuple[str, ...], ...]]]] = {
-    ".py": ("ruff", (("check", "--fix", "--quiet"), ("format", "--quiet"))),
+    ".py": ("ruff", (("check", "--fix", "--quiet", "--unfixable", "F401"), ("format", "--quiet"))),
 }
 
 TIMEOUT_SECONDS: Final = 20
