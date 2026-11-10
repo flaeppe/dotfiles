@@ -166,6 +166,40 @@ class GitLocalPathGuardTest(unittest.TestCase):
         result = self.run_guard("git commit -m wip", lonely)
         self.assertEqual((result.returncode, result.stderr), (0, ""))
 
+    def test_allows_a_path_limited_commit_beside_other_staged_leaks(self):
+        self.commit(self.work, "clean.md", "clean\n")
+        (self.work / "clean.md").write_text("clean again\n")
+        (self.work / "other-session.md").write_text(LEAK)
+        self.git(self.work, "add", "other-session.md")
+        result = self.run_guard("git commit -m wip -- clean.md", self.work)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_denies_a_path_limited_commit_of_a_leaking_file(self):
+        self.commit(self.work, "notes.md", "clean\n")
+        (self.work / "notes.md").write_text(LEAK)
+        result = self.run_guard("git commit -m wip -- notes.md", self.work)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("notes.md: _private/plan.md", result.stderr)
+
+    def test_resolves_a_path_limited_commit_from_a_subdirectory(self):
+        self.commit(self.work, "docs/notes.md", "clean\n")
+        (self.work / "docs" / "notes.md").write_text(LEAK)
+        result = self.run_guard("git commit -m wip -- notes.md", self.work / "docs")
+        self.assertEqual(result.returncode, 2)
+
+    def test_checks_the_repo_a_leading_cd_names_not_the_session_cwd(self):
+        self.commit(self.work, "notes.md", LEAK)
+        scratch = self.clone("scratch")
+        result = self.run_guard("cd %s && git push" % scratch, self.work)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_a_refusal_says_the_whole_command_did_not_run(self):
+        (self.work / "notes.md").write_text(LEAK)
+        self.git(self.work, "add", "notes.md")
+        result = self.run_guard("echo edit && git commit -m wip", self.work)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("no step of it ran", result.stderr)
+
     def test_allows_the_call_when_git_outlives_the_timeout(self):
         self.commit(self.work, "notes.md", LEAK)
         slow_git = self.root / "bin" / "git"
