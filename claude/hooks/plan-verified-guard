@@ -19,6 +19,9 @@ makes the writer do it, which is the one shape of this rule that is actually
 checkable: the banner must come off in the same edit that claims the file was
 looked at.
 
+An edit that only ticks or unticks checkboxes, and nothing else, is a progress
+mark rather than a claim that the body was reread, so it needs no restamp.
+
 Denies with exit 2 so the reason reaches Claude. Any internal failure exits 0 --
 a broken guard must never wedge a session.
 
@@ -46,6 +49,10 @@ EXEMPT: Final = (
     os.path.join(PLAN_ROOT, "_private") + os.sep,
     os.path.join(PLAN_ROOT, ".index") + os.sep,
 )
+
+# Fragments for `me journal set` that carry no frontmatter by design.
+OVERVIEW_DRAFT_DIR: Final = re.compile(r"(^|/)\d+-overview-draft/")
+CHECKBOX: Final = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+)\[[ xX]\]", re.M)
 
 # `verified:` is a plain ISO date, or a {by, at} mapping (flow, block) or a list
 # of them; the stamp's date is the `at` of a mapping, the latest one of a list.
@@ -93,6 +100,27 @@ def verified_date(text: str, is_fragment: bool = False) -> str | None:
     """The latest date `verified:` stamps in text, or None."""
     dates = verified_dates(text, is_fragment)
     return max(dates) if dates else None
+
+
+def is_checkbox_only(edits: list[dict]) -> bool:
+    """Whether every replacement differs from its original only in checkbox
+    state. An empty list is not a tick."""
+    if not edits:
+        return False
+    for edit in edits:
+        old = edit.get("old_string", "")
+        new = edit.get("new_string", "")
+        if old == new or CHECKBOX.sub(r"\1[ ]", old) != CHECKBOX.sub(r"\1[ ]", new):
+            return False
+    return True
+
+
+def edits_of(tool_name: str, tool_input: dict) -> list[dict]:
+    if tool_name == "Edit":
+        return [tool_input]
+    if tool_name == "MultiEdit":
+        return tool_input.get("edits", [])
+    return []
 
 
 def is_reasoning_note(path: str) -> bool:
@@ -237,6 +265,10 @@ def main() -> int:
     if not path.startswith(PLAN_ROOT + os.sep) or not path.endswith(".md"):
         return 0
     if path.startswith(EXEMPT) or is_reasoning_note(path):
+        return 0
+    if OVERVIEW_DRAFT_DIR.search(os.path.relpath(path, PLAN_ROOT)):
+        return 0
+    if is_checkbox_only(edits_of(tool_name, tool_input)):
         return 0
 
     today = dt.date.today().isoformat()

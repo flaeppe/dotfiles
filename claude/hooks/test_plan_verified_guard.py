@@ -62,8 +62,8 @@ class PlanVerifiedGuardTest(unittest.TestCase):
         self.plan_root = self.home / ".plan"
         self.addCleanup(self._tmp.cleanup)
 
-    def tick_checkbox(self, rel_path, content):
-        """Run the guard on a body-only Edit of a file holding `content`."""
+    def edit_body(self, rel_path, content):
+        """Run the guard on a body-only (non-checkbox) Edit of a file holding `content`."""
         target = self.plan_root / rel_path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(content)
@@ -74,7 +74,7 @@ class PlanVerifiedGuardTest(unittest.TestCase):
                 "tool_input": {
                     "file_path": str(target),
                     "old_string": "- [ ] step",
-                    "new_string": "- [x] step",
+                    "new_string": "- [ ] step reworded",
                 },
             }
         )
@@ -101,18 +101,18 @@ class PlanVerifiedGuardTest(unittest.TestCase):
         for form, template in VERIFIED_FORMS.items():
             with self.subTest(form=form):
                 stale = template % "2020-01-01"
-                result = self.tick_checkbox("proj/001-plan.md", mapped_plan(stale))
+                result = self.edit_body("proj/001-plan.md", mapped_plan(stale))
                 self.assertEqual(result.returncode, 2)
                 self.assertIn("does not restamp `verified:` (currently 2020-01-01", result.stderr)
 
     def test_allows_a_body_edit_of_a_mapped_plan_stamped_today(self):
         for form, template in VERIFIED_FORMS.items():
             with self.subTest(form=form):
-                result = self.tick_checkbox("proj/001-plan.md", mapped_plan(template % TODAY))
+                result = self.edit_body("proj/001-plan.md", mapped_plan(template % TODAY))
                 self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_a_list_is_compared_by_its_latest_at(self):
-        result = self.tick_checkbox("proj/001-plan.md", mapped_plan(LIST_VERIFIED % "2020-01-01"))
+        result = self.edit_body("proj/001-plan.md", mapped_plan(LIST_VERIFIED % "2020-01-01"))
         self.assertEqual(result.returncode, 2)
         self.assertIn("currently 2020-01-01", result.stderr)
 
@@ -137,12 +137,12 @@ class PlanVerifiedGuardTest(unittest.TestCase):
         self.assertIn("taint banner", result.stderr)
 
     def test_refuses_a_body_edit_of__a_plan_not_restamped_today(self):
-        result = self.tick_checkbox("proj/001-plan.md", STALE_PLAN)
+        result = self.edit_body("proj/001-plan.md", STALE_PLAN)
         self.assertEqual(result.returncode, 2)
         self.assertIn("does not restamp `verified:`", result.stderr)
 
     def test_a_refusal_asks_for_the_by_and_at_mapping(self):
-        result = self.tick_checkbox("proj/001-plan.md", STALE_PLAN)
+        result = self.edit_body("proj/001-plan.md", STALE_PLAN)
         self.assertIn("verified: {by: claude-code/<your model id>, at: %s}" % TODAY, result.stderr)
 
     def write_new(self, rel_path, content):
@@ -166,15 +166,35 @@ class PlanVerifiedGuardTest(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_allows_a_body_edit_of_a_plan_carrying_review(self):
-        result = self.tick_checkbox("proj/001-plan.md", STALE_PLAN_WITH_REVIEW)
+        result = self.edit_body("proj/001-plan.md", STALE_PLAN_WITH_REVIEW)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_allows_a_checkbox_tick_on_a_plan_stamped_before_today(self):
+        result = self.edit("proj/001-plan.md", STALE_PLAN, "- [ ] step", "- [x] step")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_allows_unticking_a_checkbox_on_a_stale_plan(self):
+        result = self.edit("proj/001-plan.md", STALE_PLAN.replace("- [ ]", "- [x]"), "- [x] step", "- [ ] step")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_refuses_a_tick_that_also_rewords_the_line(self):
+        result = self.edit("proj/001-plan.md", STALE_PLAN, "- [ ] step", "- [x] other step")
+        self.assertEqual(result.returncode, 2)
+
+    def test_refuses_a_tick_that_adds_a_new_checkbox(self):
+        result = self.edit("proj/001-plan.md", STALE_PLAN, "- [ ] step", "- [x] step\n- [ ] more")
+        self.assertEqual(result.returncode, 2)
+
+    def test_allows_an_edit_in_an_overview_draft_directory(self):
+        result = self.edit("proj/018-overview-draft/part.md", NO_FRONTMATTER, "- [ ] step", "- [ ] step reworded")
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_allows_an_edit_under_the_search_engine_directory(self):
-        result = self.tick_checkbox(".index/CLAUDE.md", NO_FRONTMATTER)
+        result = self.edit_body(".index/CLAUDE.md", NO_FRONTMATTER)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_allows_an_edit_under_private(self):
-        result = self.tick_checkbox("_private/sweep.md", NO_FRONTMATTER)
+        result = self.edit_body("_private/sweep.md", NO_FRONTMATTER)
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
