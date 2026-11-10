@@ -21,7 +21,8 @@ from pathlib import Path
 GUARD = Path(__file__).parent / "plan-check-guard"
 
 IN_PROGRESS_NO_CHECK = """---
-status: In Progress
+status: draft
+stage: In Progress
 type: Build
 date: 2026-09-11
 ---
@@ -32,7 +33,8 @@ date: 2026-09-11
 """
 
 IN_PROGRESS_WITH_CHECK = """---
-status: In Progress
+status: draft
+stage: In Progress
 type: Build
 date: 2026-09-11
 ---
@@ -43,7 +45,8 @@ date: 2026-09-11
 """
 
 DRAFT_NO_CHECK = """---
-status: Draft
+status: draft
+stage: Draft
 type: Build
 date: 2026-09-11
 ---
@@ -51,7 +54,8 @@ date: 2026-09-11
 """
 
 IN_PROGRESS_FENCED_CHECK = """---
-status: In Progress
+status: draft
+stage: In Progress
 type: Build
 date: 2026-09-11
 ---
@@ -65,7 +69,8 @@ date: 2026-09-11
 
 
 IN_PROGRESS_NO_DONE_WHEN = """---
-status: In Progress
+status: draft
+stage: In Progress
 type: Build
 date: 2026-09-11
 ---
@@ -76,7 +81,8 @@ date: 2026-09-11
 """
 
 JOURNAL_GOAL_WITH_CHECK = """---
-status: In Progress
+status: draft
+stage: In Progress
 type: Decision
 date: 2026-09-11
 ---
@@ -88,7 +94,8 @@ End state.
 """
 
 JOURNAL_GOAL_PROSE_ONLY = """---
-status: In Progress
+status: draft
+stage: In Progress
 type: Decision
 date: 2026-09-11
 ---
@@ -105,7 +112,8 @@ JOURNAL_GOAL_AND_EMPTY_DONE_WHEN = JOURNAL_GOAL_WITH_CHECK + """
 """
 
 JOURNAL_GOAL_FENCED_CHECK = """---
-status: In Progress
+status: draft
+stage: In Progress
 type: Decision
 date: 2026-09-11
 ---
@@ -174,6 +182,10 @@ class PlanCheckGuardTest(unittest.TestCase):
         result = self.write_result("_private/scratch.md", IN_PROGRESS_NO_CHECK)
         self.assertEqual(result.returncode, 0)
 
+    def test_allows_an_overview_draft_fragment_without_frontmatter(self):
+        result = self.write_result("proj/018-overview-draft/part.md", "## Impact\nnone\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_allows_reasoning_directory_unconditionally(self):
         result = self.write_result("somerepo/reasoning/note.md", IN_PROGRESS_NO_CHECK)
         self.assertEqual(result.returncode, 0)
@@ -218,8 +230,8 @@ class PlanCheckGuardTest(unittest.TestCase):
             "Edit",
             {
                 "file_path": str(target),
-                "old_string": "status: Draft",
-                "new_string": "status: In Progress",
+                "old_string": "stage: Draft",
+                "new_string": "stage: In Progress",
             },
         )
         self.assertEqual(result.returncode, 2)
@@ -229,8 +241,8 @@ class PlanCheckGuardTest(unittest.TestCase):
             "Edit",
             {
                 "file_path": str(target),
-                "old_string": "status: Draft",
-                "new_string": "status: In Progress",
+                "old_string": "stage: Draft",
+                "new_string": "stage: In Progress",
             },
         )
         self.assertEqual(result.returncode, 0)

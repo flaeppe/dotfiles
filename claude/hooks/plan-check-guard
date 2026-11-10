@@ -45,6 +45,10 @@ PLAN_ROOT: Final = os.path.expanduser("~/.plan")
 EXEMPT: Final = (os.path.join(PLAN_ROOT, "_private") + os.sep,)
 
 
+# Fragments for `me journal set` that carry no frontmatter by design.
+OVERVIEW_DRAFT_DIR: Final = re.compile(r"(^|/)\d+-overview-draft/")
+
+
 def is_reasoning_note(path: str) -> bool:
     """A note under <repo>/reasoning/ -- reasoning is the second path segment
     under PLAN_ROOT. Not a prefix EXEMPT can express, since <repo> varies."""
@@ -199,6 +203,8 @@ def main() -> int:
     if not path.startswith(PLAN_ROOT + os.sep) or not path.endswith(".md"):
         return 0
     if path.startswith(EXEMPT) or is_reasoning_note(path):
+        return 0
+    if OVERVIEW_DRAFT_DIR.search(os.path.relpath(path, PLAN_ROOT)):
         return 0
 
     me_bin = me_binary()
