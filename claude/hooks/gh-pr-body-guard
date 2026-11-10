@@ -247,7 +247,7 @@ def pr_body(
 
 
 def api_pr_body(
-    segment: list[str], start: int, variables: dict[str, str]
+    segment: list[str], start: int, cwd: str, variables: dict[str, str]
 ) -> tuple[str | None, str] | None:
     """(body text, description) if this `gh api` call POSTs/PATCHes a `body`
     field onto the PR's own description endpoint (`.../pulls` or
@@ -294,7 +294,7 @@ def api_pr_body(
         return None
     # `-f key=value` is literal text; only `@file`/`@-` reads from disk/stdin.
     if body.startswith("@"):
-        return resolve_body_source(body, os.getcwd(), variables)
+        return resolve_body_source(body, cwd, variables)
     return body, endpoint
 
 
@@ -311,7 +311,7 @@ def pr_body_calls(command: str, cwd: str) -> list[tuple[str | None, str]]:
             creating = segment[sub_index + 1] == "create"
             call = pr_body(segment, sub_index + 2, directory, variables, creating)
         elif subcommand == "api":
-            call = api_pr_body(segment, sub_index + 1, variables)
+            call = api_pr_body(segment, sub_index + 1, directory, variables)
         else:
             continue
         if call is not None:

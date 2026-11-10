@@ -228,6 +228,14 @@ class GhPrBodyGuardTest(unittest.TestCase):
         result = self.run_guard("gh pr create --title t --body-file body.md", cwd=directory)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_resolves_a_relative_api_body_file_against_the_hook_cwd(self):
+        directory = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, directory)
+        (Path(directory) / "body.md").write_text(CLEAN_BODY)
+        command = "gh api -X PATCH repos/example/example/pulls/1 -F body=@body.md"
+        result = self.run_guard(command, cwd=directory)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_refusal_names_the_forms_the_guard_can_read(self):
         result = self.run_guard("gh pr create --title t --body-file /no/such/file.md")
         self.assertIn("quoted delimiter", result.stderr)
