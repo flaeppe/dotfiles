@@ -52,6 +52,13 @@ RULED OUT                               — investigated and not offered
 
 - The simplest option is simpler **by a stated count**, not merely different.
   "Different tool, same shape" does not fill the slot.
+- **A sweep, census, periodic hunter or backfill gets an amortized alternate
+  beside it:** capture the signal when the change happens (free — the actor
+  holds the context), let the touching change pay a little of the debt, and
+  give the signal one named consumer. Like incremental versus stop-the-world
+  garbage collection. It pays only when all three hold: the signal is free at
+  change time, the knowledge goes stale if it waits, someone named consumes it.
+  Otherwise the sweep may be the simpler answer — say so.
 - An alternate with no stated trade-off is not an alternate. Drop it, do not pad
   to three. Zero alternates is a valid answer.
 - Never propose a dependency you have not confirmed already installed.

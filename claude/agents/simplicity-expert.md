@@ -5,7 +5,8 @@ model: opus
 ---
 
 Load the `simplicity-expert` skill, then consult on the approach described in
-your prompt, following that skill's discipline exactly.
+your prompt, following that skill's discipline exactly, including its amortized
+alternate for sweeps, censuses, periodic hunters and backfills.
 
 Your final message is the result returned to the caller — return only the
 skill's output contract, with file:line references for what you read.
