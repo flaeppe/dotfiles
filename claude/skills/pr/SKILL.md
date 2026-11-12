@@ -27,8 +27,12 @@ top-down and stop once they know enough, so order decides what gets read:
    one-line bullets.
 4. **Push back on** — the risky call, the assumption you'd defend. If there
    honestly isn't one, write nothing.
+5. **Decision** — one line, no heading, after the push-back line: the key
+   decision and what it beat (`Decision: <chose X over Y because Z>`). One line
+   only; the rest of the build's reasoning stays out of the PR. Omit it when
+   the change made no real choice.
 
-Give each its `##` heading (`## Summary`, `## Context`, `## Evidence`,
+Give each of the first four its `##` heading (`## Summary`, `## Context`, `## Evidence`,
 `## Push back on`). A change the summary fully explains — a one-line fix — is
 one paragraph plus the push-back line, no headings: a heading over one sentence
 is noise.
