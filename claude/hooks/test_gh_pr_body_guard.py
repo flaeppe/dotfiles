@@ -286,7 +286,7 @@ class GhPrBodyGuardTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_refuses_a_pr_write_chained_with_another_command(self):
-        # One case per form a session sent on 2026-11-13, plus the other separators.
+        # Each way a second command can share the call: cd, pipe, `;`, `&&`, assignment, heredoc.
         chained = {
             "leading cd": "cd /tmp/repo && gh pr ready 56 --repo example/example",
             "pipe": "gh pr ready 56 --repo example/example | tail -3",
