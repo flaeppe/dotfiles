@@ -35,6 +35,13 @@ import shellwords
 
 MARKER: Final = "<!-- pr:v1 -->"
 
+# `gh pr` verbs the owner's allow rules match only as the whole Bash command.
+LONE_PR_WRITE_VERBS: Final = frozenset(("create", "edit", "ready", "comment"))
+
+# Shell words that end one command and start another. Redirections (`>`, `2>&1`)
+# and `$(...)` parentheses are not here: neither makes a second command.
+COMMAND_SEPARATORS: Final = frozenset(("|", "||", "|&", "&", "&&", ";", ";;"))
+
 # A PR's own description lives at `.../pulls` (create) or `.../pulls/<number>`
 # (edit) -- sibling resources nested under a PR (`/comments`, `/reviews`,
 # `/requested_reviewers`, ...) have more path after the number and don't
@@ -319,6 +326,36 @@ def pr_body_calls(command: str, cwd: str) -> list[tuple[str | None, str]]:
     return calls
 
 
+def chained_pr_write(command: str) -> str | None:
+    """`gh pr <verb>` for a PR write that shares its Bash call with another
+    command, a leading `cd` or `VAR=value` included; None otherwise.
+
+    Ceiling: commands separated by a bare newline read as one command, so a
+    newline-chained write goes unseen.
+    """
+    words = shellwords.words_of(shellwords.without_heredocs(command))
+    segments: list[list[str]] = [[]]
+    for word in words:
+        if word in COMMAND_SEPARATORS:
+            segments.append([])
+            continue
+        segments[-1].append(word)
+    segments = [segment for segment in segments if segment]
+    for segment in segments:
+        word, gh_index = shellwords.leading_command(segment)
+        if word != "gh":
+            continue
+        subcommand, sub_index = gh_subcommand(segment, gh_index)
+        if subcommand != "pr" or sub_index + 1 >= len(segment):
+            continue
+        verb = segment[sub_index + 1]
+        if verb not in LONE_PR_WRITE_VERBS:
+            continue
+        if len(segments) > 1 or gh_index > 0:
+            return "gh pr %s" % verb
+    return None
+
+
 def has_trailing_marker(body: str) -> bool:
     lines = [line.strip() for line in body.splitlines() if line.strip()]
     return bool(lines) and lines[-1] == MARKER
@@ -426,6 +463,24 @@ def refuse_no_marker(source: str) -> int:
     return 2
 
 
+def refuse_chained(write: str) -> int:
+    print(
+        "\n".join(
+            [
+                "BLOCKED: `%s` shares its Bash call with other commands." % write,
+                "",
+                "The owner's permission rule matches a PR write only when it is the whole "
+                "command, so a chained one stalls on an approval nobody sees.",
+                "Write the body with the Write tool, then run the PR command alone in its "
+                "own Bash call, with absolute paths:",
+                "  gh pr create --repo <owner>/<repo> --title ... --body-file /absolute/path",
+            ]
+        ),
+        file=sys.stderr,
+    )
+    return 2
+
+
 def refuse_lint(findings: list[tuple[str, str]]) -> int:
     lines = ["BLOCKED: this PR body breaks the pr skill's rules.", ""]
     for rule, line in findings:
@@ -442,6 +497,10 @@ def main() -> int:
 
     command = payload.get("tool_input", {}).get("command", "")
     cwd = payload.get("cwd") or os.getcwd()
+
+    chained = chained_pr_write(command)
+    if chained is not None:
+        return refuse_chained(chained)
 
     for body, source in pr_body_calls(command, cwd):
         if body is None or not has_trailing_marker(body):

@@ -173,9 +173,9 @@ class GhPrBodyGuardTest(unittest.TestCase):
     def test_checks_body_file_named_by_a_variable_the_command_assigns(self):
         clean = self.write_body_file(CLEAN_BODY)
         unmarked = self.write_body_file("A fix, no marker.\n\n**Push back:** none.")
-        allowed = self.run_guard('BODY_PATH=%s; gh pr edit 1 --body-file "$BODY_PATH"' % clean)
+        allowed = self.run_guard('BODY_PATH=%s; gh api -X PATCH repos/example/example/pulls/1 -F "body=@$BODY_PATH"' % clean)
         self.assertEqual(allowed.returncode, 0, allowed.stderr)
-        refused = self.run_guard("export BODY_PATH=%s && gh pr edit 1 --body-file $BODY_PATH" % unmarked)
+        refused = self.run_guard("export BODY_PATH=%s && gh api -X PATCH repos/example/example/pulls/1 -F body=@$BODY_PATH" % unmarked)
         self.assertEqual(refused.returncode, 2)
 
     def test_checks_body_file_named_by_a_variable_in_the_hook_environment(self):
@@ -201,7 +201,7 @@ class GhPrBodyGuardTest(unittest.TestCase):
             self.assertIn("only the shell can resolve", result.stderr)
 
     def test_lets_through_a_variable_path_to_a_file_not_yet_written(self):
-        result = self.run_guard("BODY_PATH=/no/such/file.md; gh pr create --title t --body-file $BODY_PATH")
+        result = self.run_guard("BODY_PATH=/no/such/file.md; gh api -X PATCH repos/example/example/pulls/1 -F body=@$BODY_PATH")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("only the shell can resolve", result.stderr)
 
@@ -218,7 +218,7 @@ class GhPrBodyGuardTest(unittest.TestCase):
         directory = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, directory)
         (Path(directory) / "body.md").write_text(CLEAN_BODY)
-        result = self.run_guard("cd %s && gh pr create --title t --body-file body.md" % directory)
+        result = self.run_guard("cd %s && gh api -X PATCH repos/example/example/pulls/1 -F body=@body.md" % directory)
         self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_resolves_a_relative_body_file_against_the_hook_cwd_without_a_cd(self):
@@ -284,6 +284,45 @@ class GhPrBodyGuardTest(unittest.TestCase):
     def test_allows_pr_comment(self):
         result = self.run_guard('gh pr comment 1 --body "no marker, not a PR body"')
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_refuses_a_pr_write_chained_with_another_command(self):
+        # One case per form a session sent on 2026-11-13, plus the other separators.
+        chained = {
+            "leading cd": "cd /tmp/repo && gh pr ready 56 --repo example/example",
+            "pipe": "gh pr ready 56 --repo example/example | tail -3",
+            "semicolon": "gh pr edit 1 --add-reviewer octocat; gh pr view 1",
+            "variable assignment": "S=/tmp/body.md && gh pr create --title t --body-file $S",
+            "heredoc file write": "cat > /tmp/body.md <<'EOF'\n%s\nEOF\ngh pr create --title t --body-file /tmp/body.md" % CLEAN_BODY,
+            "heredoc file write then &&": "cat > /tmp/body.md <<'EOF'\n%s\nEOF\n&& gh pr create --title t --body-file /tmp/body.md" % CLEAN_BODY,
+            "comment after a read": "gh pr view 1 && gh pr comment 1 --body hi",
+            "inline assignment": "GH_TOKEN=x gh pr ready 56",
+        }
+        for form, command in chained.items():
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 2, "%s: %s" % (form, result.stderr))
+            self.assertIn("own Bash call", result.stderr, form)
+
+    def test_allows_a_lone_pr_write(self):
+        body = self.write_body_file(CLEAN_BODY)
+        lone = (
+            "gh pr ready 56 --repo example/example",
+            "gh pr comment 1 --repo example/example --body-file %s" % body,
+            "gh pr edit 1 --repo example/example --add-reviewer octocat",
+            "gh pr create --repo example/example --title t --body-file %s" % body,
+            "gh pr ready 56 --repo example/example 2>&1",
+            'gh pr comment 1 --body "a && b; c | d"',
+        )
+        for command in lone:
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
+
+    def test_allows_chained_commands_that_write_no_pr(self):
+        for command in (
+            "cd /tmp && gh pr view 1 | tail -3",
+            "cd /tmp && gh pr checks 1 --watch",
+        ):
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
 
     def test_ignores_a_non_bash_tool(self):
         payload = json.dumps({"tool_name": "Edit", "tool_input": {"file_path": "x"}})
