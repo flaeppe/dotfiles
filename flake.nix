@@ -75,6 +75,7 @@
               ./fish/fish.nix
               ./git/git.nix
               ./go-cache/go-cache.nix
+              ./nix-gc/nix-gc.nix
               ./nvim/nvim.nix
             ];
           };
