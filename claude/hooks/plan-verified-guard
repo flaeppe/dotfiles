@@ -50,6 +50,10 @@ EXEMPT: Final = (
     os.path.join(PLAN_ROOT, ".index") + os.sep,
 )
 
+# A unit state's index.md is an OKF index: it carries no frontmatter by design
+# (`me plans check-file` refuses one), so there is no `verified:` to restamp.
+STATE_INDEX: Final = re.compile(r"(^|/)state/[^/]+/index\.md$")
+
 # Fragments for `me journal set` that carry no frontmatter by design.
 OVERVIEW_DRAFT_DIR: Final = re.compile(r"(^|/)\d+-overview-draft/")
 CHECKBOX: Final = re.compile(r"^(\s*(?:[-*+]|\d+[.)])\s+)\[[ xX]\]", re.M)
@@ -266,7 +270,8 @@ def main() -> int:
         return 0
     if path.startswith(EXEMPT) or is_reasoning_note(path):
         return 0
-    if OVERVIEW_DRAFT_DIR.search(os.path.relpath(path, PLAN_ROOT)):
+    relative = os.path.relpath(path, PLAN_ROOT)
+    if OVERVIEW_DRAFT_DIR.search(relative) or STATE_INDEX.search(relative):
         return 0
     if is_checkbox_only(edits_of(tool_name, tool_input)):
         return 0
