@@ -102,6 +102,9 @@ of 200. Where a change needs new top-level names, group them into one table or
 scope them inside the function that uses them — `local M = {}` costs one slot
 whatever it holds.
 
+Fish functions with behaviour worth pinning (`wt new`, `wt rm`) have throwaway-repository
+tests: `python3 -m unittest fish.tests.test_wt`.
+
 Applying it is a separate step, and a single global slot: `nix run home-manager
 -- switch --flake .` deploys the working tree as it finds it, so it is not
 something to run while another session is editing the repository. On a machine

@@ -34,9 +34,19 @@ set -l track $argv[7]
 # side is work: a worktree zero commits ahead holds nothing that would be lost.
 set -l counts (string split \t -- (git -C $root rev-list --left-right --count "$base...$sha" 2>/dev/null))
 set -l behind $counts[1]
-set -l ahead $counts[2]
-test -z "$ahead"; and set ahead 0
 test -z "$behind"; and set behind 0
+
+# A default branch ahead of its remote holds unpushed commits that are its own history, and a
+# worktree merged into it would count them as its own work. Anything the local branch of the
+# base's name has is therefore not this worktree's to lose. A deleted local default branch
+# leaves only the base to compare with.
+set -l local_base (string replace -r '^origin/' '' -- $base)
+set -l excluded "^$base"
+if git -C $root show-ref --verify --quiet "refs/heads/$local_base"
+    set -a excluded "^refs/heads/$local_base"
+end
+set -l ahead (git -C $root rev-list --count $sha $excluded 2>/dev/null)
+test -z "$ahead"; and set ahead 0
 
 # Claude Code appends permission grants to .claude/settings.local.json in every tree it
 # runs in, so that file differing says nothing about work that would be lost.

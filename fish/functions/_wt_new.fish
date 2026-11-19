@@ -21,6 +21,9 @@
 # fetch that fails for a transient reason (offline, auth) degrades the same way instead of
 # aborting, so one flaky network call doesn't cost the whole command.
 #
+# When the new branch starts at origin's default and the local default branch holds commits
+# origin lacks, the last lines say so and give the `wt new <name> <sha>` that starts from them.
+#
 # Lands in `.worktrees/<name>`: inside the repository, where one ignore entry covers every
 # worktree and nothing has to be resolved to tell a worktree from a clone sitting beside it.
 #
@@ -102,6 +105,10 @@ end
 # and the answer has to be current or a colleague's branch gets shadowed by a new local one
 # started from the wrong place. Prunes as it goes, which is what keeps `wt` honest.
 set -l base $start
+set -l stale_base
+set -l stale_local_base
+set -l stale_ahead
+set -l branched_off_default
 if git -C $root remote get-url origin >/dev/null 2>&1
     echo "wt new: fetching origin"
     if not git -C $root fetch -q origin
@@ -116,19 +123,18 @@ if git -C $root remote get-url origin >/dev/null 2>&1
         set base (git -C $root symbolic-ref -q --short refs/remotes/origin/HEAD)
     end
 
-    if test -n "$base"
-        # $base is a remote-tracking ref, so a worktree based on it silently lacks
-        # whatever the same-named local branch has that origin doesn't -- commits
-        # never pushed. Warned about rather than based on the local ref instead:
-        # switching to local would just as silently pick up whatever half-finished
-        # state that branch happens to be in, which is its own way of handing an
-        # agent a base nobody chose on purpose.
-        set -l local_base (string replace -r '^origin/' '' -- $base)
-        if git -C $root show-ref --verify --quiet "refs/heads/$local_base"
-            set -l ahead (git -C $root rev-list --count "$base..$local_base" 2>/dev/null)
-            if test -n "$ahead"; and test "$ahead" -gt 0
-                echo "wt new: WARNING local $local_base is $ahead commit(s) ahead of $base -- this worktree won't have them"
-            end
+    # Only the default base can be stale in a way nobody chose: a <remote>/<ref> or sha the
+    # caller named is what they asked for. $base is a remote-tracking ref, so a worktree
+    # based on it lacks whatever the same-named local branch has that origin doesn't --
+    # commits never pushed. Reported after the worktree exists (see the end) rather than
+    # based on the local ref instead: switching to local would just as silently pick up
+    # whatever half-finished state that branch happens to be in, which is its own way of
+    # handing an agent a base nobody chose on purpose.
+    if test -z "$start"; and test -n "$base"
+        set stale_local_base (string replace -r '^origin/' '' -- $base)
+        if git -C $root show-ref --verify --quiet "refs/heads/$stale_local_base"
+            set stale_ahead (git -C $root rev-list --count "$base..$stale_local_base" 2>/dev/null)
+            set stale_base $base
         end
     end
 end
@@ -174,6 +180,7 @@ else
     # single push. A no-op when $base is a local branch instead (no remote
     # to fall back to), but harmless there too.
     echo "wt new: branching $branch off $base"
+    test -z "$start"; and set branched_off_default yes
     git -C $root worktree add -q --no-track -b $branch $tree $base; or return 1
 end
 
@@ -202,3 +209,11 @@ _review_prepare_tree $root $tree worktree
 
 cd $tree
 echo "wt new: $name on $branch"
+
+# Last, so it is the line still on screen. Only when the branch was created off the stale
+# default: an existing or tracked branch, or a named start, never used that base.
+if test -n "$branched_off_default"; and test -n "$stale_ahead"; and test "$stale_ahead" -gt 0
+    set -l local_tip (git -C $root rev-parse --short $stale_local_base)
+    echo "wt new: WARNING local $stale_local_base is $stale_ahead commit(s) ahead of $stale_base -- this worktree won't have them"
+    echo "wt new: to start from them, remove it and run: wt new $name $local_tip"
+end
