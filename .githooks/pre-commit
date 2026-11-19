@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-commit gate for this repo. Activated by home-manager (darwin.nix) with
+# Pre-commit gate for this repo. Activated with
 #   git config --local core.hooksPath .githooks
 # which replaces the machine-wide core.hooksPath for this repo, so the first job
 # is to run that global hook (the term denylist) anyway. The path is relative so
@@ -25,9 +25,9 @@ if ! command -v gitleaks >/dev/null; then
 fi
 gitleaks git --pre-commit --staged --redact --no-banner
 
-# The guard reads a Claude Code tool-call payload. The staged diff it scans is
-# the same one this commit records; its output text is addressed to a Claude
-# session but the findings it lists are accurate.
+# The guard takes a Claude Code tool-call payload; a synthetic `git commit` makes
+# it scan the staged diff. Its closing text addresses a Claude session, the
+# findings above it are accurate.
 jq -n --arg cwd "$repo_root" \
   '{tool_name: "Bash", tool_input: {command: "git commit"}, cwd: $cwd}' |
   "$repo_root/claude/hooks/git-local-path-guard"
