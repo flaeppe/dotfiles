@@ -132,6 +132,8 @@ should be trivial — just parsing and error mapping, no logic duplication.
   a database — never the database itself: business logic runs against the real one so
   transactions stay real. A 1:1 interface over queries is a mock.
 - A test written for a fix must fail without it: revert the fix once and watch it go red.
+- Test behaviour, not content: an expected value copied from the source (a row, a string,
+  a config value) is a change detector — read the artifact instead.
 
 ### Working in Existing Codebases
 
