@@ -25,6 +25,7 @@ in {
       dive
       fd
       git-crypt
+      gitleaks
       glow
       (google-cloud-sdk.withExtraComponents
         [ google-cloud-sdk.components.gke-gcloud-auth-plugin ])
@@ -85,6 +86,14 @@ in {
         ${ptf} ssh/id-rsa.pub              "$HOME/.ssh/id_rsa.pub"              644
         ${ptf} ssh/google-compute-engine     "$HOME/.ssh/google_compute_engine"     600
         ${ptf} ssh/google-compute-engine.pub "$HOME/.ssh/google_compute_engine.pub" 644
+      '';
+
+      # Relative, so every linked worktree resolves it against its own checkout.
+      # Skipped where the checkout does not live at ~/.dotfiles.
+      wireDotfilesHooks = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        if [ -d "$HOME/.dotfiles/.git" ]; then
+          ${pkgs.git}/bin/git -C "$HOME/.dotfiles" config --local core.hooksPath .githooks
+        fi
       '';
 
       writeNpmrc = lib.hm.dag.entryAfter [ "writeBoundary" ] ''

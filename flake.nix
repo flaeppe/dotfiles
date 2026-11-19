@@ -95,9 +95,6 @@
             echo '${luarcJsonContent}' > ./.luarc.json
             uv sync --quiet
             PATH="$PWD/.venv/bin:$PATH"
-            # git hooks are not tracked, so a fresh checkout has none until this
-            # runs. Idempotent.
-            uv run pre-commit install > /dev/null
           '';
         };
       });

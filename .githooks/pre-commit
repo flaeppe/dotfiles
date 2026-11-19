@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Pre-commit gate for this repo. Activated by home-manager (darwin.nix) with
+#   git config --local core.hooksPath .githooks
+# which replaces the machine-wide core.hooksPath for this repo, so the first job
+# is to run that global hook (the term denylist) anyway. The path is relative so
+# every linked worktree resolves it against its own checkout.
+# Then: pre-commit (ruff over staged files), gitleaks over the staged diff, and
+# the local-path guard. The repo is public; a secret or a machine-only path
+# committed here is published by the next push.
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+global_hooks="$(git config --global --get core.hooksPath || true)"
+if [ -n "$global_hooks" ] && [ -x "$global_hooks/pre-commit" ]; then
+  "$global_hooks/pre-commit" "$@"
+fi
+
+uv run --quiet pre-commit run
+
+if ! command -v gitleaks >/dev/null; then
+  echo "commit blocked: gitleaks is not on PATH -- home-manager switch installs it" >&2
+  exit 1
+fi
+gitleaks git --pre-commit --staged --redact --no-banner
+
+# The guard reads a Claude Code tool-call payload. The staged diff it scans is
+# the same one this commit records; its output text is addressed to a Claude
+# session but the findings it lists are accurate.
+jq -n --arg cwd "$repo_root" \
+  '{tool_name: "Bash", tool_input: {command: "git commit"}, cwd: $cwd}' |
+  "$repo_root/claude/hooks/git-local-path-guard"
