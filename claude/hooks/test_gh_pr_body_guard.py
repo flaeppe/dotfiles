@@ -26,16 +26,47 @@ MARKER = "<!-- pr:v1 -->"
 CLEAN_BODY = "A one-line fix for a real bug.\n\n**Push back:** nothing risky here.\n" + MARKER
 
 
-class GhPrBodyGuardTest(unittest.TestCase):
+# A stand-in `gh` the guard finds first on PATH. It logs its arguments and
+# answers the three lookups the guard makes from environment variables.
+FAKE_GH = """#!/bin/sh
+echo "$*" >> "$GH_STUB_LOG"
+[ -n "$GH_STUB_SLEEP" ] && exec sleep "$GH_STUB_SLEEP"
+[ -n "$GH_STUB_FAIL" ] && exit 1
+case "$1 $2" in
+  "pr view") echo "$GH_STUB_STATE" ;;
+  "api user") echo "$GH_STUB_ACTOR" ;;
+  "api repos/"*) echo "$GH_STUB_AUTHOR" ;;
+esac
+"""
+
+
+class GuardTestCase(unittest.TestCase):
+    def setUp(self):
+        stub_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, stub_dir)
+        gh = stub_dir / "gh"
+        gh.write_text(FAKE_GH)
+        gh.chmod(0o755)
+        self.stub_dir = stub_dir
+        self.gh_log = stub_dir / "calls.log"
+
+    def gh_calls(self):
+        return self.gh_log.read_text().splitlines() if self.gh_log.exists() else []
+
     def run_guard(self, command, cwd="/tmp", env=None):
         payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": cwd})
+        stub_env = {
+            "PATH": "%s:%s" % (self.stub_dir, os.environ["PATH"]),
+            "GH_STUB_LOG": str(self.gh_log),
+            "GH_STUB_STATE": "OPEN",
+        }
         return subprocess.run(
             [str(GUARD)],
             input=payload,
             capture_output=True,
             text=True,
-            timeout=10,
-            env={**os.environ, **(env or {})},
+            timeout=20,
+            env={**os.environ, **stub_env, **(env or {})},
         )
 
     def write_body_file(self, text):
@@ -43,6 +74,9 @@ class GhPrBodyGuardTest(unittest.TestCase):
             handle.write(text)
         self.addCleanup(Path(handle.name).unlink)
         return handle.name
+
+
+class GhPrBodyGuardTest(GuardTestCase):
 
     def run_guard_with_body(self, flag, body, cwd="/tmp"):
         command = 'gh pr create --title t %s "%s"' % (flag, body)
@@ -332,6 +366,185 @@ class GhPrBodyGuardTest(unittest.TestCase):
     def test_fails_open_on_malformed_stdin(self):
         result = subprocess.run([str(GUARD)], input="not json", capture_output=True, text=True, timeout=10)
         self.assertEqual(result.returncode, 0)
+
+
+PLAN_TEXT = "Traced in ~/.plan/fake-unit/notes.md, line 4."
+
+
+class GhProseWriteGuardTest(GuardTestCase):
+    def test_refuses_a_plan_path_in_every_covered_write(self):
+        plan_file = self.write_body_file(PLAN_TEXT)
+        commands = {
+            "pr comment": 'gh pr comment 7 --body "%s"' % PLAN_TEXT,
+            "pr review": 'gh pr review 7 --comment --body "%s"' % PLAN_TEXT,
+            "issue comment": 'gh issue comment 7 --body "%s"' % PLAN_TEXT,
+            "issue create": 'gh issue create --title t --body "%s"' % PLAN_TEXT,
+            "issue create title": 'gh issue create --title "see _private/x" --body ok',
+            "pr comment body-file": "gh pr comment 7 --body-file %s" % plan_file,
+            "pr comment -F": "gh pr comment 7 -F %s" % plan_file,
+            "api -f": 'gh api repos/fake-org/fake-repo/issues/7/comments -f body="%s"' % PLAN_TEXT,
+            "api -F @file": "gh api repos/fake-org/fake-repo/issues/7/comments -F body=@%s" % plan_file,
+            "api reply": 'gh api repos/fake-org/fake-repo/pulls/7/comments/9/replies -f body="%s"' % PLAN_TEXT,
+            "api --input": "gh api -X POST repos/fake-org/fake-repo/issues/7/comments --input %s" % plan_file,
+            "api title": 'gh api repos/fake-org/fake-repo/issues -f title="in .plan/x" -f body=ok',
+            "heredoc": "gh pr comment 7 --body \"$(cat <<'BODY'\n%s\nBODY\n)\"" % PLAN_TEXT,
+        }
+        for form, command in commands.items():
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 2, "%s: %s" % (form, result.stderr))
+            self.assertIn("path only this machine has", result.stderr, form)
+
+    def test_refuses_each_plan_fragment(self):
+        for fragment in (".plan/", "_cross/", "_private/", ".claude/plans/"):
+            result = self.run_guard('gh pr comment 7 --body "see %sx"' % fragment)
+            self.assertEqual(result.returncode, 2, fragment)
+
+    def test_allows_clean_text_in_every_covered_write(self):
+        clean_file = self.write_body_file("Looks right to me.")
+        commands = (
+            'gh pr comment 7 --body "Looks right."',
+            'gh pr review 7 --approve --body "Looks right."',
+            'gh issue comment 7 --body "Looks right."',
+            'gh issue create --title t --body "Looks right."',
+            "gh pr comment 7 --body-file %s" % clean_file,
+            'gh api repos/fake-org/fake-repo/issues/7/comments -f body="Looks right."',
+            "gh api repos/fake-org/fake-repo/issues/7/comments -F body=@%s" % clean_file,
+        )
+        for command in commands:
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
+
+    def test_allows_an_empty_body_and_a_write_without_text(self):
+        for command in (
+            'gh pr comment 7 --body ""',
+            "gh pr comment 7 --body",
+            "gh pr comment 7 --edit-last",
+            'gh api repos/fake-org/fake-repo/issues/7/comments -f body=',
+            "gh api repos/fake-org/fake-repo/issues/7/labels -f labels[]=bug",
+            "gh pr review 7 --approve",
+        ):
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
+
+    def test_ignores_an_api_read_and_a_delete(self):
+        for command in (
+            'gh api -X GET repos/fake-org/fake-repo/issues -f body="~/.plan/x"',
+            'gh api -X DELETE repos/fake-org/fake-repo/issues/comments/9 -f body="~/.plan/x"',
+            "gh api repos/fake-org/fake-repo/pulls/7",
+        ):
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
+
+    def test_allows_text_it_cannot_read_and_says_so(self):
+        cases = {
+            "stdin": ("gh pr comment 7 -F -", "stdin body"),
+            "api stdin": ("gh api repos/fake-org/fake-repo/issues/7/comments -F body=@-", "stdin body"),
+            "missing file": ("gh pr comment 7 --body-file /nonexistent/body.md", "couldn't be read"),
+            "unset variable": ("gh pr comment 7 --body-file $UNSET_BODY_PATH_FOR_TEST", "only the shell"),
+        }
+        for form, (command, expected) in cases.items():
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (form, result.stderr))
+            self.assertIn(expected, result.stderr, form)
+
+    def test_reads_a_body_file_named_by_a_variable(self):
+        plan_file = self.write_body_file(PLAN_TEXT)
+        result = self.run_guard("BODY=%s; gh pr comment 7 --body-file $BODY" % plan_file)
+        self.assertEqual(result.returncode, 2, result.stderr)
+
+    def test_refuses_a_comment_on_a_pr_that_is_not_open(self):
+        commands = (
+            'gh pr comment 7 --body "late thought"',
+            'gh pr review 7 --comment --body "late thought"',
+            'gh api repos/fake-org/fake-repo/pulls/7/comments -f body="late thought"',
+            'gh api repos/fake-org/fake-repo/pulls/7/reviews -f body="late thought" -f event=COMMENT',
+            'gh api repos/fake-org/fake-repo/pulls/7/comments/9/replies -f body="late thought"',
+        )
+        for state in ("MERGED", "CLOSED"):
+            for command in commands:
+                result = self.run_guard(command, env={"GH_STUB_STATE": state})
+                self.assertEqual(result.returncode, 2, "%s %s: %s" % (state, command, result.stderr))
+                self.assertIn(state, result.stderr)
+
+    def test_allows_a_comment_on_an_open_pr(self):
+        for command in (
+            'gh pr comment 7 --body "fine"',
+            'gh api repos/fake-org/fake-repo/pulls/7/reviews -f body="fine"',
+        ):
+            result = self.run_guard(command, env={"GH_STUB_STATE": "OPEN"})
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
+
+    def test_does_not_state_check_an_issue_write(self):
+        result = self.run_guard(
+            'gh issue comment 7 --body "fine"', env={"GH_STUB_STATE": "CLOSED"}
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.gh_calls(), [])
+
+    def test_looks_the_pr_up_by_number_url_branch_or_current_branch(self):
+        cases = {
+            'gh pr comment 7 --body ok': "pr view 7 --json state --jq .state",
+            'gh pr comment 7 -R fake-org/fake-repo --body ok': "pr view 7 --json state --jq .state --repo fake-org/fake-repo",
+            'gh pr comment https://github.example/fake-org/fake-repo/pull/7 --body ok': "pr view https://github.example/fake-org/fake-repo/pull/7 --json state --jq .state",
+            'gh pr comment my-branch --body ok': "pr view my-branch --json state --jq .state",
+            'gh pr comment --body ok': "pr view --json state --jq .state",
+            'gh api repos/fake-org/fake-repo/pulls/7/reviews -f body=ok': "pr view 7 --json state --jq .state --repo fake-org/fake-repo",
+            'gh api repos/{owner}/{repo}/pulls/7/reviews -f body=ok': "pr view 7 --json state --jq .state",
+        }
+        for command, expected in cases.items():
+            self.gh_log.unlink(missing_ok=True)
+            result = self.run_guard(command)
+            self.assertEqual(result.returncode, 0, "%s: %s" % (command, result.stderr))
+            self.assertEqual(self.gh_calls(), [expected], command)
+
+    def test_skips_the_lookup_for_a_reference_only_the_shell_knows(self):
+        result = self.run_guard('gh pr comment "$PR_FOR_TEST" --body ok')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("only known to the shell", result.stderr)
+        self.assertEqual(self.gh_calls(), [])
+
+    def test_warns_when_replying_to_a_thread_the_actor_started(self):
+        command = 'gh api repos/fake-org/fake-repo/pulls/7/comments/9/replies -f body="Fixed."'
+        result = self.run_guard(command, env={"GH_STUB_ACTOR": "fake-user", "GH_STUB_AUTHOR": "fake-user"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("warning: replying to a thread fake-user started", result.stderr)
+        self.assertIn("api repos/fake-org/fake-repo/pulls/comments/9 --jq .user.login", self.gh_calls())
+
+    def test_does_not_warn_when_replying_to_someone_else(self):
+        command = 'gh api repos/fake-org/fake-repo/pulls/7/comments/9/replies -f body="Fixed."'
+        result = self.run_guard(command, env={"GH_STUB_ACTOR": "fake-user", "GH_STUB_AUTHOR": "fake-reviewer"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("warning", result.stderr)
+
+    def test_asks_gh_to_fill_the_repo_when_the_endpoint_has_a_placeholder(self):
+        command = 'gh api repos/{owner}/{repo}/pulls/7/comments/9/replies -f body="Fixed."'
+        self.run_guard(command)
+        self.assertIn("api repos/{owner}/{repo}/pulls/comments/9 --jq .user.login", self.gh_calls())
+
+    def test_allows_and_says_so_when_the_lookup_fails(self):
+        result = self.run_guard('gh pr comment 7 --body "fine"', env={"GH_STUB_FAIL": "1"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("lookup `gh pr view` failed (exit 1)", result.stderr)
+
+    def test_allows_and_says_so_when_gh_is_missing(self):
+        result = self.run_guard('gh pr comment 7 --body "fine"', env={"PATH": "/nonexistent"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("lookup `gh pr view` failed (FileNotFoundError)", result.stderr)
+
+    def test_allows_and_says_so_when_the_lookup_times_out(self):
+        result = self.run_guard('gh pr comment 7 --body "fine"', env={"GH_STUB_SLEEP": "30"})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("TimeoutExpired", result.stderr)
+
+    def test_allows_and_says_so_when_the_lookup_prints_nothing(self):
+        result = self.run_guard('gh pr comment 7 --body "fine"', env={"GH_STUB_STATE": ""})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("printed no state", result.stderr)
+
+    def test_a_plan_path_is_refused_before_any_lookup(self):
+        result = self.run_guard('gh pr comment 7 --body "%s"' % PLAN_TEXT)
+        self.assertEqual(result.returncode, 2)
+        self.assertEqual(self.gh_calls(), [])
 
 
 if __name__ == "__main__":

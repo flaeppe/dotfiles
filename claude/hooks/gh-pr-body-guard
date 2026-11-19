@@ -10,6 +10,14 @@ Two refusals:
    or a session would paste it back without ever loading the skill.
 2. Marker present, content lint fails: name the rule and quote the line.
 
+A third refusal covers every other outward text write -- `gh pr comment`,
+`gh pr review`, `gh issue comment`, `gh issue create` and `gh api` with a `body`
+or `title` field. They need no marker, but text naming a local plan path is
+refused, and a comment or review on a PR that is no longer open is refused
+(`gh pr view --json state`). Replying to a thread you started only warns. A
+failed or slow `gh` lookup lets the call through with a note on stderr: a guard
+must not block on its own lookup.
+
 Two things pass without a check: a `gh pr edit` that sets no body at all
 (`--add-reviewer`, `--title`, ...), and a body file whose path only the shell
 can resolve (`--body-file "$(mktemp)"`, a `$VAR` nothing here defines). The
@@ -28,7 +36,9 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import sys
+from dataclasses import dataclass
 from typing import Final
 
 import shellwords
@@ -49,16 +59,49 @@ COMMAND_SEPARATORS: Final = frozenset(("|", "||", "|&", "&", "&&", ";", ";;"))
 # how `gh api` endpoints are usually written.
 PR_BODY_ENDPOINT: Final = re.compile(r"/?(repos/[^/]+/[^/]+/)?pulls(/\d+)?/?")
 
-# Checked as a plain substring anywhere in the body -- these never resolve for
-# a reader who only has GitHub and this repo.
-LOCAL_ONLY_FRAGMENTS: Final = (
+# Where plans and private notes live: a reference to one never resolves for a
+# reader who only has GitHub and this repo.
+PLAN_FRAGMENTS: Final = (
     ".plan/",
     "_cross/",
     "_private/",
     ".claude/plans/",
-    "/Users/",
-    "~/",
 )
+
+# Checked as a plain substring anywhere in a PR body.
+LOCAL_ONLY_FRAGMENTS: Final = PLAN_FRAGMENTS + ("/Users/", "~/")
+
+# `gh <noun> <verb>` pairs that publish free text without a `pr` skill marker.
+PROSE_WRITE_VERBS: Final = frozenset(
+    (
+        ("pr", "comment"),
+        ("pr", "review"),
+        ("issue", "comment"),
+        ("issue", "create"),
+    )
+)
+# Prose flags of those verbs; the first group takes text, the second a file.
+PROSE_TEXT_FLAGS: Final = frozenset(("--body", "-b", "--title", "-t"))
+PROSE_FILE_FLAGS: Final = frozenset(("--body-file", "-F"))
+# Flags of those verbs that consume a value, so the PR-reference scan does not
+# take a flag's argument for the positional.
+PROSE_VALUE_FLAGS: Final = PROSE_TEXT_FLAGS | PROSE_FILE_FLAGS | frozenset(("--repo", "-R"))
+
+# Field names of a `gh api` write that carry text a reader sees.
+API_PROSE_FIELDS: Final = frozenset(("body", "title"))
+API_WRITE_METHODS: Final = frozenset(("POST", "PATCH", "PUT"))
+
+# A comment or review under a PR: `pulls/<number>/comments|reviews[/...]`. The
+# `{owner}/{repo}` placeholder gh fills in from the working directory is
+# accepted as the repo. Ceiling: `issues/<number>/comments` also reaches a PR
+# but cannot be told from an issue without a lookup, so it is not state-checked.
+PR_CONVERSATION_ENDPOINT: Final = re.compile(
+    r"/?(repos/(?P<repo>[^/]+/[^/]+)/)?pulls/(?P<number>\d+)/(comments|reviews)(/.*)?"
+)
+REVIEW_THREAD_REPLY: Final = re.compile(r".*/comments/(?P<comment>\d+)/replies/?")
+
+CLOSED_PR_STATES: Final = frozenset(("CLOSED", "MERGED"))
+LOOKUP_TIMEOUT_SECONDS: Final = 5
 
 # Matched as a line prefix (after stripping leading whitespace).
 FORBIDDEN_HEADINGS: Final = ("## Test plan", "## Testing", "## Verification")
@@ -253,35 +296,37 @@ def pr_body(
     return (None, "no body flag") if creating else None
 
 
-def api_pr_body(
-    segment: list[str], start: int, cwd: str, variables: dict[str, str]
-) -> tuple[str | None, str] | None:
-    """(body text, description) if this `gh api` call POSTs/PATCHes a `body`
-    field onto the PR's own description endpoint (`.../pulls` or
-    `.../pulls/<number>`), else None -- it's not a call this guard covers.
-    A reply to a review comment, an issue comment or a review submission
-    targets a different endpoint and passes through untouched.
+@dataclass(frozen=True)
+class ApiCall:
+    endpoint: str | None
+    method: str
+    # (flag, key, value) for each `-f`/`-F`/`--field`/`--raw-field key=value`.
+    fields: tuple[tuple[str, str, str], ...]
+    # Value of `--input`, a file or `-` holding the whole request body.
+    input_source: str | None
 
-    Ceiling: only `-f`/`-F`/`--field`/`--raw-field body=...` is read as the
-    body. A JSON body from `--input <file>`/`--input -`, or a `gh api
-    graphql` mutation, passes through unlinted -- add here if those show up.
-    """
+
+def parse_api_call(segment: list[str], start: int) -> ApiCall:
     endpoint: str | None = None
     method: str | None = None
-    body: str | None = None
-    saw_fields = False
+    fields: list[tuple[str, str, str]] = []
+    input_source: str | None = None
     index = start
     while index < len(segment):
         word = segment[index]
+        flag = word.split("=", 1)[0]
         if word in API_METHOD_FLAGS:
             value, index = flag_value(segment, index)
             method = (value or "").upper()
             continue
         if word in API_FIELD_FLAGS:
-            saw_fields = True
             value, index = flag_value(segment, index)
-            if value and value.startswith("body="):
-                body = value[len("body=") :]
+            if value and "=" in value:
+                key, field_value = value.split("=", 1)
+                fields.append((word, key, field_value))
+            continue
+        if flag == "--input":
+            input_source, index = flag_value(segment, index)
             continue
         if word in API_VALUE_FLAGS:
             _, index = flag_value(segment, index)
@@ -292,13 +337,32 @@ def api_pr_body(
         if endpoint is None:
             endpoint = word
         index += 1
+    if method is None:
+        method = "POST" if fields or input_source else "GET"
+    return ApiCall(endpoint, method, tuple(fields), input_source)
 
+
+def api_pr_body(
+    segment: list[str], start: int, cwd: str, variables: dict[str, str]
+) -> tuple[str | None, str] | None:
+    """(body text, description) if this `gh api` call POSTs/PATCHes a `body`
+    field onto the PR's own description endpoint (`.../pulls` or
+    `.../pulls/<number>`), else None -- it's not a call this guard covers.
+    A reply to a review comment, an issue comment or a review submission
+    targets a different endpoint: no marker is required of it.
+
+    Ceiling: only `-f`/`-F`/`--field`/`--raw-field body=...` is read as the
+    body. A JSON body from `--input <file>`/`--input -`, or a `gh api
+    graphql` mutation, passes through unlinted -- add here if those show up.
+    """
+    call = parse_api_call(segment, start)
+    endpoint = call.endpoint
     if not endpoint or not PR_BODY_ENDPOINT.fullmatch(endpoint.split("?", 1)[0]):
         return None
-    if method is None:
-        method = "POST" if saw_fields else "GET"
-    if method not in ("POST", "PATCH") or body is None:
+    bodies = [value for _, key, value in call.fields if key == "body"]
+    if call.method not in ("POST", "PATCH") or not bodies:
         return None
+    body = bodies[-1]
     # `-f key=value` is literal text; only `@file`/`@-` reads from disk/stdin.
     if body.startswith("@"):
         return resolve_body_source(body, cwd, variables)
@@ -354,6 +418,248 @@ def chained_pr_write(command: str) -> str | None:
         if len(segments) > 1 or gh_index > 0:
             return "gh pr %s" % verb
     return None
+
+
+@dataclass(frozen=True)
+class PullRequestTarget:
+    """The PR a comment or review lands on. `reference` is a number, URL or
+    branch as typed; None means the current branch of `directory`."""
+
+    reference: str | None
+    repo: str | None
+    directory: str
+    reply_to_comment: str | None = None
+
+
+@dataclass(frozen=True)
+class ProseWrite:
+    verb: str
+    # Text the call publishes, as far as this hook can read it.
+    texts: tuple[str, ...]
+    # Sources that exist but cannot be read here (stdin, an unreadable file).
+    unread_sources: tuple[str, ...]
+    # Set when the write lands on a PR whose state is worth checking.
+    target: PullRequestTarget | None
+
+
+def note(message: str) -> None:
+    print("gh-pr-body-guard: %s" % message, file=sys.stderr)
+
+
+def read_prose_file(
+    value: str, cwd: str, variables: dict[str, str]
+) -> tuple[list[str], list[str]]:
+    """([text], [unread description]) for a body-file value."""
+    source = resolve_body_source(value, cwd, variables)
+    if source is None:
+        return [], []  # a path only the shell can resolve is reported on stderr, not unread
+    text, description = source
+    if text is None:
+        return [], [description]
+    return [text], []
+
+
+def cli_prose_write(
+    segment: list[str], start: int, verb: str, directory: str, variables: dict[str, str]
+) -> ProseWrite:
+    """`gh pr comment|review` / `gh issue comment|create`, `start` pointing
+    after the verb. Text comes from --body/-b, --title/-t and --body-file/-F;
+    a repeated flag contributes every occurrence."""
+    texts: list[str] = []
+    unread: list[str] = []
+    repo: str | None = None
+    reference: str | None = None
+    index = start
+    while index < len(segment):
+        word = segment[index]
+        flag = word.split("=", 1)[0]
+        if flag in PROSE_VALUE_FLAGS:
+            value, index = flag_value(segment, index)
+            if value is None:
+                continue
+            if flag in PROSE_TEXT_FLAGS:
+                texts.append(literal_body(value))
+            elif flag in PROSE_FILE_FLAGS:
+                file_texts, file_unread = read_prose_file(value, directory, variables)
+                texts += file_texts
+                unread += file_unread
+            else:
+                repo = value
+            continue
+        if not word.startswith("-") and reference is None:
+            reference = word
+        index += 1
+    is_pull_request_write = verb in ("gh pr comment", "gh pr review")
+    target = PullRequestTarget(reference, repo, directory) if is_pull_request_write else None
+    return ProseWrite(verb, tuple(texts), tuple(unread), target)
+
+
+def api_prose_write(
+    segment: list[str], start: int, directory: str, variables: dict[str, str]
+) -> ProseWrite | None:
+    """A `gh api` POST/PATCH/PUT with a `body` or `title` field, or an
+    `--input` body. None when the call writes no text.
+
+    Ceiling: an `--input` file is scanned as raw JSON text, so a path with its
+    slashes escaped slips past; `gh api graphql` mutations are read only
+    through their `-f`/`-F` fields.
+    """
+    call = parse_api_call(segment, start)
+    if call.method not in API_WRITE_METHODS:
+        return None
+    texts: list[str] = []
+    unread: list[str] = []
+    for flag, key, value in call.fields:
+        if key not in API_PROSE_FIELDS:
+            continue
+        # Only `-F`/`--field` reads `@file`; `-f` sends the text as written.
+        if flag in ("-F", "--field") and value.startswith("@"):
+            file_texts, file_unread = read_prose_file(value, directory, variables)
+            texts += file_texts
+            unread += file_unread
+        else:
+            texts.append(value)
+    if call.input_source:
+        file_texts, file_unread = read_prose_file(call.input_source, directory, variables)
+        texts += file_texts
+        unread += file_unread
+    if not texts and not unread:
+        return None
+    target = None
+    endpoint = (call.endpoint or "").split("?", 1)[0]
+    conversation = PR_CONVERSATION_ENDPOINT.fullmatch(endpoint)
+    if conversation:
+        repo = conversation.group("repo")
+        reply = REVIEW_THREAD_REPLY.fullmatch(endpoint)
+        target = PullRequestTarget(
+            conversation.group("number"),
+            None if repo is None or "{" in repo else repo,
+            directory,
+            reply.group("comment") if reply else None,
+        )
+    return ProseWrite("gh api %s" % endpoint, tuple(texts), tuple(unread), target)
+
+
+def prose_writes(command: str, cwd: str) -> list[ProseWrite]:
+    """Every outward text write in the command that this guard covers."""
+    writes: list[ProseWrite] = []
+    variables = assigned_variables(command)
+    for segment, gh_index, directory in gh_calls(command, cwd):
+        subcommand, sub_index = gh_subcommand(segment, gh_index)
+        if subcommand == "api":
+            write = api_prose_write(segment, sub_index + 1, directory, variables)
+            if write is not None:
+                writes.append(write)
+            continue
+        if subcommand is None or sub_index + 1 >= len(segment):
+            continue
+        pair = (subcommand, segment[sub_index + 1])
+        if pair in PROSE_WRITE_VERBS:
+            verb = "gh %s %s" % pair
+            writes.append(cli_prose_write(segment, sub_index + 2, verb, directory, variables))
+    return writes
+
+
+def run_gh(arguments: list[str], directory: str) -> str | None:
+    """Stdout of a read-only `gh` call, or None when it fails, times out or
+    `gh` is missing. The reason goes to stderr."""
+    try:
+        result = subprocess.run(
+            ["gh", *arguments],
+            cwd=directory if os.path.isdir(directory) else None,
+            capture_output=True,
+            text=True,
+            timeout=LOOKUP_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        note("lookup `gh %s` failed (%s)" % (" ".join(arguments[:2]), type(error).__name__))
+        return None
+    if result.returncode != 0:
+        note("lookup `gh %s` failed (exit %d)" % (" ".join(arguments[:2]), result.returncode))
+        return None
+    return result.stdout.strip()
+
+
+def pull_request_state(target: PullRequestTarget) -> str | None:
+    """OPEN, CLOSED or MERGED; None when it could not be looked up."""
+    if target.reference and SHELL_EXPANSION.search(target.reference):
+        note("PR state not checked, %s is only known to the shell" % target.reference)
+        return None
+    arguments = ["pr", "view"]
+    if target.reference:
+        arguments.append(target.reference)
+    arguments += ["--json", "state", "--jq", ".state"]
+    if target.repo:
+        arguments += ["--repo", target.repo]
+    state = run_gh(arguments, target.directory)
+    if state == "":
+        note("PR state not checked, `gh pr view` printed no state")
+    return state or None
+
+
+def replies_to_own_comment(target: PullRequestTarget) -> str | None:
+    """The acting login when the review comment being replied to is its own;
+    None when it is not, or a lookup failed."""
+    if target.reply_to_comment is None:
+        return None
+    repo = target.repo or "{owner}/{repo}"
+    author = run_gh(
+        ["api", "repos/%s/pulls/comments/%s" % (repo, target.reply_to_comment), "--jq", ".user.login"],
+        target.directory,
+    )
+    actor = run_gh(["api", "user", "--jq", ".login"], target.directory)
+    return actor if author and author == actor else None
+
+
+def refuse_plan_path(verb: str, fragment: str, line: str) -> int:
+    print(
+        "\n".join(
+            [
+                "BLOCKED: `%s` text names a path only this machine has (%s)." % (verb, fragment),
+                "",
+                "  %r" % line,
+                "",
+                "A reader on GitHub cannot open it. State the finding in the text itself, "
+                "or cite a file and line in the repo.",
+            ]
+        ),
+        file=sys.stderr,
+    )
+    return 2
+
+
+def refuse_closed_pull_request(verb: str, state: str) -> int:
+    print(
+        "\n".join(
+            [
+                "BLOCKED: `%s` targets a PR whose state is %s." % (verb, state),
+                "",
+                "Nobody is watching a PR that is not open. Open a new PR or issue for "
+                "follow-up work, or reopen this one first if the owner asked for that.",
+            ]
+        ),
+        file=sys.stderr,
+    )
+    return 2
+
+
+def check_prose_write(write: ProseWrite) -> int:
+    for source in write.unread_sources:
+        note("%s: %s, not checked for local paths" % (write.verb, source))
+    for text in write.texts:
+        for fragment in PLAN_FRAGMENTS:
+            for line in text.splitlines():
+                if fragment in line:
+                    return refuse_plan_path(write.verb, fragment, line.strip())
+    if write.target is None:
+        return 0
+    state = pull_request_state(write.target)
+    if state in CLOSED_PR_STATES:
+        return refuse_closed_pull_request(write.verb, state)
+    own_login = replies_to_own_comment(write.target)
+    if own_login:
+        note("warning: replying to a thread %s started, not to a reviewer" % own_login)
+    return 0
 
 
 def has_trailing_marker(body: str) -> bool:
@@ -508,6 +814,11 @@ def main() -> int:
         findings = lint_findings(body)
         if findings:
             return refuse_lint(findings)
+
+    for write in prose_writes(command, cwd):
+        refusal = check_prose_write(write)
+        if refusal:
+            return refusal
     return 0
 
 
