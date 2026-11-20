@@ -15,6 +15,7 @@ install -d -m 755 -o root -g wheel /usr/local/libexec
 install -m 755 -o root -g wheel "$source_dir/fseventsd-restart.sh" /usr/local/libexec/fseventsd-restart.sh
 install -m 644 -o root -g wheel "$source_dir/$label.plist" "$plist"
 
-launchctl bootout "system/$label" 2>/dev/null || true # absent on first install
+# Unload any loaded copy so bootstrap reads the new plist; bootout fails when none is loaded.
+launchctl bootout "system/$label" 2>/dev/null || true
 launchctl bootstrap system "$plist"
 launchctl print "system/$label" | head -n 5

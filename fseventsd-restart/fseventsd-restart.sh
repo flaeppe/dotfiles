@@ -1,6 +1,6 @@
 #!/bin/sh
 # Restarts fseventsd when its memory footprint is over the threshold; launchd
-# starts a fresh one. Run hourly by the LaunchDaemon, as root.
+# starts a fresh one. Must run as root: it signals fseventsd, which root owns.
 #
 # Usage: fseventsd-restart.sh [--dry-run]
 #   --dry-run  print the decision; restart nothing, log nothing.
@@ -9,7 +9,7 @@
 # the restart command, FSEVENTSD_RESTART_LOG the log path.
 set -eu
 
-# Same line as the me tooling's fseventsd alarm (8 GiB).
+# 8 GiB: far above fseventsd's normal footprint (a few MB), far below a leak (85G).
 THRESHOLD_BYTES=8589934592
 LOG="${FSEVENTSD_RESTART_LOG:-/Library/Logs/fseventsd-restart.log}"
 KILLALL="${FSEVENTSD_KILLALL:-/usr/bin/killall}"
