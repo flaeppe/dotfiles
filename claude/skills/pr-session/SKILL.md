@@ -22,8 +22,9 @@ $ARGUMENTS
 
 ## Always
 
-- **Read `.review/session.json` first.** No session file means you are not in a
-  review worktree — stop and say so.
+- **Read `.review/session.json` first.** No session file: if `.review/skim.json`
+  exists you are on the skim surface — follow **Skim surface** below; otherwise you
+  are not in a review worktree — stop and say so.
 - **Never commit on the stack branch.** A commit is the reviewer's acceptance,
   made from the editor with `:ReviewAccept`. Yours to prepare, theirs to take.
 - **Never push, never call `gh` to write, never touch the reviewed branch.**
@@ -31,6 +32,25 @@ $ARGUMENTS
   session is `review retire <pr>`, and it is the reviewer's to run.
 - The reviewer's uncommitted non-marker edits are theirs. In the review worktree
   ignore them entirely; in the stack worktree read them as instructions (Phase B).
+
+---
+
+## Skim surface
+
+`review skim` makes one detached worktree per repository with `.review/skim.json` and
+no `session.json`. Phases A–D and `post-review` need a session (two worktrees, a stack
+branch, an editor socket) and do not apply here: refuse them and say why.
+
+- **Findings are markers.** Write them as `REVIEW[n]` comments in the skim worktree's
+  files; the reviewer posts them from the editor (`:GithubComment` and the other two),
+  which refuses when the PR head moved since the worktree loaded it.
+- **A written review goes outside the worktree.** `.review/` is globally gitignored
+  and dies with the worktree. Put any prose findings file in the scratchpad directory
+  or a path the reviewer names, never in `.review/`.
+- **Never reply to a marker on GitHub.** Skim posts markers nowhere until the reviewer
+  posts them, so a thread reply to `REVIEW[n]` answers nothing.
+- **Re-read the head before quoting a finding.** The PR can move mid-session:
+  `gh pr view <pr> --json headRefOid` against `git rev-parse HEAD` in the skim worktree.
 
 ---
 

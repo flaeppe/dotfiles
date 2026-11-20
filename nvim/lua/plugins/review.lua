@@ -1932,12 +1932,53 @@ local function orphan_section(orphans)
     return table.concat(lines, "\n")
 end
 
+--- Nil while the PR's head is still the commit being reviewed, else why posting must not
+--- go ahead. A PR takes new commits while a review is written; GitHub still accepts the old
+--- `commit_id`, so findings the new commits fixed would post as live defects.
+local function moved_head_reason(context)
+    local result = vim.system({
+        "gh",
+        "pr",
+        "view",
+        tostring(context.pr),
+        "--repo",
+        context.slug,
+        "--json",
+        "headRefOid",
+        "--jq",
+        ".headRefOid",
+    }, { cwd = context.root, text = true }):wait()
+    if result.code ~= 0 then
+        return ("could not read #%s's current head, nothing was posted -- %s"):format(
+            context.pr,
+            (vim.trim(result.stderr or ""):gsub("\n", " "))
+        )
+    end
+    local live_head = vim.trim(result.stdout or "")
+    if live_head == context.head then
+        return nil
+    end
+    if live_head == "" then
+        return ("GitHub returned no head for #%s, nothing was posted"):format(context.pr)
+    end
+    return ("#%s moved from %s (reviewed) to %s, nothing was posted -- :PrDiff %s to reload, then re-check each finding"):format(
+        context.pr,
+        context.head:sub(1, 7),
+        live_head:sub(1, 7),
+        context.pr
+    )
+end
+
 --- Post, and report what the author will see. Failure leaves the draft alone and the buffer
 --- modified, which is what stops `:wq` from closing a window over an unposted review.
 local function post_review(bufnr)
     local context, reason = pr_context(vim.b[bufnr].review_root)
     if not context then
         return vim.notify("Review: " .. reason, vim.log.levels.ERROR)
+    end
+    local moved_reason = moved_head_reason(context)
+    if moved_reason then
+        return vim.notify("Review: " .. moved_reason, vim.log.levels.ERROR)
     end
     local event = vim.b[bufnr].review_event
     local summary = summary_of(bufnr)
