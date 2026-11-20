@@ -46,7 +46,12 @@ class GitLocalPathGuardTest(unittest.TestCase):
 
     def git(self, cwd, *args):
         return subprocess.run(
-            ["git", *args], cwd=cwd, env=GIT_ENV, check=True, capture_output=True, text=True
+            ["git", *args],
+            cwd=cwd,
+            env=GIT_ENV,
+            check=True,
+            capture_output=True,
+            text=True,
         ).stdout
 
     def clone(self, name):
@@ -61,9 +66,16 @@ class GitLocalPathGuardTest(unittest.TestCase):
         self.git(repo, "commit", "-q", "-m", "add " + filename)
 
     def run_guard(self, command, cwd, env=None):
-        payload = json.dumps({"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(cwd)})
+        payload = json.dumps(
+            {"tool_name": "Bash", "tool_input": {"command": command}, "cwd": str(cwd)}
+        )
         return subprocess.run(
-            [str(GUARD)], input=payload, capture_output=True, text=True, timeout=10, env=env
+            [str(GUARD)],
+            input=payload,
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env=env,
         )
 
     def test_denies_staged_local_path(self):
@@ -214,7 +226,8 @@ class GitLocalPathGuardTest(unittest.TestCase):
         result = self.run_guard("git push", self.work, env=env)
         self.assertEqual(result.returncode, 0)
         self.assertEqual(
-            result.stderr.strip(), "git-local-path-guard: git exceeded 0.5s; allowing the call"
+            result.stderr.strip(),
+            "git-local-path-guard: git exceeded 0.5s; allowing the call",
         )
 
     def test_ignores_a_git_push_quoted_inside_a_heredoc_body(self):
@@ -238,13 +251,143 @@ class GitLocalPathGuardTest(unittest.TestCase):
         command = "cat <<-EOF\n\tgit push\n\tEOF\n"
         self.assertEqual(self.run_guard(command, self.work).returncode, 0)
 
+    def write_allowlist(self, text):
+        allow = self.work / ".claude" / "local-path-allow"
+        allow.parent.mkdir(exist_ok=True)
+        allow.write_text(text)
+
+    def stage(self, filename, content):
+        path = self.work / filename
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        self.git(self.work, "add", filename)
+
+    def test_a_path_entry_exempts_every_line_under_it(self):
+        self.write_allowlist("docs/\n")
+        self.stage("docs/notes.md", LEAK + "also _private/other.md\n")
+        result = self.run_guard("git commit -m wip", self.work)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_a_pattern_entry_exempts_only_the_lines_it_matches(self):
+        self.write_allowlist("docs/:^see _private/plan\\.md\n")
+        self.stage("docs/notes.md", LEAK)
+        result = self.run_guard("git commit -m wip", self.work)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_a_matching_path_with_a_non_matching_line_is_refused(self):
+        self.write_allowlist("docs/:^see _private/plan\\.md\n")
+        self.stage("docs/notes.md", LEAK + "also _private/other.md\n")
+        result = self.run_guard("git commit -m wip", self.work)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("_private/other.md", result.stderr)
+        self.assertNotIn("_private/plan.md", result.stderr)
+
+    def test_a_pattern_entry_does_not_exempt_other_paths(self):
+        self.write_allowlist("docs/:_private\n")
+        self.stage("src/notes.md", LEAK)
+        self.assertEqual(self.run_guard("git commit -m wip", self.work).returncode, 2)
+
+    def assert_allowlist_exempts_nothing(self, text):
+        if text is not None:
+            self.write_allowlist(text)
+        self.stage("docs/notes.md", LEAK)
+        self.assertEqual(self.run_guard("git commit -m wip", self.work).returncode, 2)
+
+    def test_a_missing_allowlist_exempts_nothing(self):
+        self.assert_allowlist_exempts_nothing(None)
+
+    def test_an_empty_allowlist_exempts_nothing(self):
+        self.assert_allowlist_exempts_nothing("")
+
+    def test_a_comment_only_allowlist_exempts_nothing(self):
+        self.assert_allowlist_exempts_nothing("# docs/\n\n")
+
+    def test_an_entry_with_a_trailing_space_exempts_nothing(self):
+        self.assert_allowlist_exempts_nothing("docs/ \n")
+
+    def test_an_entry_with_an_empty_pattern_exempts_nothing(self):
+        self.assert_allowlist_exempts_nothing("docs/:\n")
+
+    def test_an_entry_with_an_empty_path_exempts_nothing(self):
+        self.assert_allowlist_exempts_nothing(":_private\n")
+
+    def test_an_entry_with_an_invalid_pattern_exempts_nothing(self):
+        self.assert_allowlist_exempts_nothing("docs/:(\n")
+
+    def test_a_marked_line_in_a_test_file_passes(self):
+        self.stage("notes_test.go", 'path := "_private/plan.md" // local-path-ok\n')
+        result = self.run_guard("git commit -m wip", self.work)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_an_unmarked_line_in_a_test_file_is_refused(self):
+        self.stage("notes_test.go", 'path := "_private/plan.md"\n')
+        self.assertEqual(self.run_guard("git commit -m wip", self.work).returncode, 2)
+
+    def test_a_marked_line_outside_a_test_file_is_refused(self):
+        self.stage("notes.go", 'path := "_private/plan.md" // local-path-ok\n')
+        self.assertEqual(self.run_guard("git commit -m wip", self.work).returncode, 2)
+
+    def test_a_marker_exempts_its_own_line_only(self):
+        self.stage(
+            "test_notes.py",
+            "a = '_private/a.md'  # local-path-ok\nb = '_private/b.md'\n",
+        )
+        result = self.run_guard("git commit -m wip", self.work)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("_private/b.md", result.stderr)
+        self.assertNotIn("_private/a.md", result.stderr)
+
+    def test_judges_a_commit_on_the_index_its_own_add_leaves(self):
+        (self.work / "notes.md").write_text(LEAK)
+        result = self.run_guard("git add notes.md && git commit -m wip", self.work)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("notes.md: _private/plan.md", result.stderr)
+
+    def test_an_add_of_a_clean_file_does_not_trip_a_leaking_one_left_unstaged(self):
+        (self.work / "notes.md").write_text(LEAK)
+        (self.work / "clean.md").write_text("clean\n")
+        result = self.run_guard("git add clean.md && git commit -m wip", self.work)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_an_add_in_the_command_leaves_the_real_index_untouched(self):
+        (self.work / "notes.md").write_text(LEAK)
+        self.run_guard("git add notes.md && git commit -m wip", self.work)
+        self.assertEqual(self.git(self.work, "diff", "--cached", "--name-only"), "")
+
+    def test_a_failing_add_leaves_the_commit_judged_on_the_current_index(self):
+        self.stage("clean.md", "clean\n")
+        result = self.run_guard("git add no-such-file && git commit -m wip", self.work)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_an_add_after_the_commit_is_not_applied_to_it(self):
+        (self.work / "notes.md").write_text(LEAK)
+        result = self.run_guard(
+            "git commit --allow-empty -m wip && git add notes.md", self.work
+        )
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+
+    def test_replays_an_add_in_the_directory_a_cd_names(self):
+        (self.work / "docs").mkdir()
+        (self.work / "docs" / "notes.md").write_text(LEAK)
+        scratch = self.clone("scratch")
+        result = self.run_guard(
+            "cd %s/docs && git add notes.md && git commit -m wip" % self.work, scratch
+        )
+        self.assertEqual(result.returncode, 2)
+
     def test_ignores_a_non_bash_tool(self):
-        payload = json.dumps({"tool_name": "Read", "tool_input": {}, "cwd": str(self.work)})
-        result = subprocess.run([str(GUARD)], input=payload, capture_output=True, text=True, timeout=10)
+        payload = json.dumps(
+            {"tool_name": "Read", "tool_input": {}, "cwd": str(self.work)}
+        )
+        result = subprocess.run(
+            [str(GUARD)], input=payload, capture_output=True, text=True, timeout=10
+        )
         self.assertEqual(result.returncode, 0)
 
     def test_fails_open_on_malformed_stdin(self):
-        result = subprocess.run([str(GUARD)], input="not json", capture_output=True, text=True, timeout=10)
+        result = subprocess.run(
+            [str(GUARD)], input="not json", capture_output=True, text=True, timeout=10
+        )
         self.assertEqual(result.returncode, 0)
 
 

@@ -14,11 +14,14 @@ subscript syntax below (PEP 585, needs 3.9+).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
+import tempfile
 from collections.abc import Iterable, Iterator, Sequence
 from typing import Final, NamedTuple
 
@@ -64,9 +67,17 @@ LOCKFILE_NAMES: Final = (
     "yarn.lock",
 )
 
-# Sources exempt from the content scan, one repo-relative path prefix per line.
-# For files that legitimately document these paths as text.
+# Sources exempt from the content scan, one entry per line: a repo-relative path
+# prefix, or `prefix:regex` to exempt only the added lines the regex matches
+# under that prefix. For files that legitimately document these paths as text.
 ALLOWLIST_FILE: Final = ".claude/local-path-allow"
+
+# An added line carrying this marker, in a test file, is a fixture naming a path
+# on purpose.
+FIXTURE_MARKER: Final = "local-path-ok"
+
+# Test files by name: `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`.
+TEST_FILENAME: Final = re.compile(r"^test_|_test\.|\.(test|spec)\.")
 
 MAX_FINDINGS: Final = 12
 
@@ -155,10 +166,12 @@ class GitInvocation(NamedTuple):
     directory: str | None
     # Words after a bare `--`: a path-limited commit records only these paths.
     pathspec: tuple[str, ...]
+    # Every word after the subcommand, so a `git add` can be replayed.
+    arguments: tuple[str, ...]
 
 
 def git_invocation(words: list[str], git_index: int) -> GitInvocation:
-    """The subcommand, `-C` directory and `--` pathspec of the `git` word at git_index."""
+    """The subcommand, `-C` directory and `--` pathspec of the `git` at git_index."""
     directory = None
     index = git_index + 1
     while index < len(words):
@@ -166,11 +179,11 @@ def git_invocation(words: list[str], git_index: int) -> GitInvocation:
         if not word.startswith("-"):
             rest = words[index + 1 :]
             pathspec = tuple(rest[rest.index("--") + 1 :]) if "--" in rest else ()
-            return GitInvocation(word, directory, pathspec)
+            return GitInvocation(word, directory, pathspec, tuple(rest))
         if word == "-C" and index + 1 < len(words):
             directory = words[index + 1]
         index += 2 if word in GLOBAL_FLAGS_WITH_VALUE else 1
-    return GitInvocation(None, directory, ())
+    return GitInvocation(None, directory, (), ())
 
 
 def git_invocations(command: str) -> list[GitInvocation]:
@@ -232,35 +245,66 @@ def sibling_root(directory: str) -> str | None:
     return None if parent in (HOME, os.sep) else parent
 
 
+class AllowEntry(NamedTuple):
+    prefix: str
+    # None exempts every line under the prefix.
+    lines: re.Pattern[str] | None
+
+
 class Repo:
     root: str
     siblings: str | None
-    allowlist: tuple[str, ...]
+    allowlist: tuple[AllowEntry, ...]
 
     def __init__(self, root: str, siblings: str | None) -> None:
         self.root = root
         self.siblings = siblings
         self.allowlist = read_allowlist(root)
 
-    def scans_content_of(self, path: str) -> bool:
-        return not (
-            path.startswith(self.allowlist)
-            or os.path.basename(path) in IGNORE_FILENAMES
+    def scans_line_of(self, path: str, line: str) -> bool:
+        if os.path.basename(path) in IGNORE_FILENAMES:
+            return False
+        if FIXTURE_MARKER in line and TEST_FILENAME.search(os.path.basename(path)):
+            return False
+        return not any(
+            path.startswith(entry.prefix)
+            and (entry.lines is None or entry.lines.search(line))
+            for entry in self.allowlist
         )
 
     def resolves_relatives_of(self, path: str) -> bool:
         return os.path.basename(path) not in LOCKFILE_NAMES
 
 
-def read_allowlist(repo_root: str) -> tuple[str, ...]:
+def parse_allow_entry(line: str) -> AllowEntry | None:
+    """The exemption a line grants, or None when the line grants nothing: blank,
+    a comment, padded with whitespace, an empty prefix or pattern (either would
+    exempt everything), or a pattern that is not a regex. Each of those is more
+    likely a typo than an intent to exempt, and a refused commit is recoverable
+    where a silent exemption is not."""
+    if not line or line != line.strip() or line.startswith("#"):
+        return None
+    prefix, has_pattern, pattern = line.partition(":")
+    if not prefix:
+        return None
+    if not has_pattern:
+        return AllowEntry(prefix, None)
+    if not pattern:
+        return None
     try:
-        with open(os.path.join(repo_root, ALLOWLIST_FILE)) as handle:
+        return AllowEntry(prefix, re.compile(pattern))
+    except re.error:
+        return None
+
+
+def read_allowlist(repo_root: str) -> tuple[AllowEntry, ...]:
+    try:
+        with open(os.path.join(repo_root, ALLOWLIST_FILE), errors="replace") as handle:
             lines = handle.read().splitlines()
     except OSError:
         return ()
-    return tuple(
-        line.strip() for line in lines if line.strip() and not line.startswith("#")
-    )
+    entries = (parse_allow_entry(line) for line in lines)
+    return tuple(entry for entry in entries if entry)
 
 
 def classify(
@@ -365,7 +409,7 @@ def scan_diff(
             yield "%s file" % label, path, reason
 
     for path, file_dir, line in added_in_all(repo.root, diff_commands, pathspec):
-        if not repo.scans_content_of(path):
+        if not repo.scans_line_of(path, line):
             continue
         resolve_relatives = repo.resolves_relatives_of(path)
         for token in path_tokens(line):
@@ -407,6 +451,54 @@ def deduplicated(sources: Sequence[Iterable[Finding]]) -> list[Finding]:
     return findings
 
 
+def adds_before_the_commit(invocations: Sequence[GitInvocation]) -> list[GitInvocation]:
+    """The `git add`s that run ahead of the first `git commit` in the command."""
+    adds: list[GitInvocation] = []
+    for invocation in invocations:
+        if invocation.subcommand == "commit":
+            return adds
+        if invocation.subcommand == "add":
+            adds.append(invocation)
+    return []
+
+
+@contextlib.contextmanager
+def index_after_adds(
+    repo_root: str, cwd: str, adds: Sequence[GitInvocation]
+) -> Iterator[None]:
+    """For the duration, every git call reads a copy of the index with the
+    command's own `git add`s applied, because the hook runs before any of them
+    has. The repository's real index is never written.
+
+    Process-wide through GIT_INDEX_FILE: the hook is one short-lived process, and
+    every diff below must see the same index. An add that fails (an unexpanded
+    variable, a missing path) changes nothing, as it would in the real command.
+    """
+    index_path = git(repo_root, "rev-parse", "--git-path", "index")
+    if not adds or not index_path:
+        yield
+        return
+    previous = os.environ.get("GIT_INDEX_FILE")
+    with tempfile.TemporaryDirectory() as scratch:
+        index_copy = os.path.join(scratch, "index")
+        with contextlib.suppress(FileNotFoundError):  # a fresh repo has no index yet
+            shutil.copyfile(os.path.join(repo_root, index_path.strip()), index_copy)
+        os.environ["GIT_INDEX_FILE"] = index_copy
+        try:
+            for add in adds:
+                directory = resolve_directory(add.directory, cwd)
+                if (
+                    git(directory, "rev-parse", "--show-toplevel") or ""
+                ).strip() == repo_root:
+                    git(directory, "add", *add.arguments)
+            yield
+        finally:
+            if previous is None:
+                del os.environ["GIT_INDEX_FILE"]
+            else:
+                os.environ["GIT_INDEX_FILE"] = previous
+
+
 def has_remotes(repo_root: str) -> bool:
     return bool((git(repo_root, "remote") or "").strip())
 
@@ -420,8 +512,12 @@ def deny(headline: str, findings: Sequence[Finding]) -> int:
     lines += [
         "",
         "Rewrite the reference so it resolves inside this repo, unstage the file,",
-        "or add the source to %s if the path is documentation." % ALLOWLIST_FILE,
-        "The whole command was refused: no step of it ran, including any before the git call.",
+        "or add the source to %s (`path` or `path:line-regex`) if the path is"
+        % ALLOWLIST_FILE,
+        "documentation. A test fixture line may carry the marker %s instead."
+        % FIXTURE_MARKER,
+        "The whole command was refused: no step of it ran, including any before "
+        "the git call.",
     ]
     print("\n".join(lines), file=sys.stderr)
     return 2
@@ -433,9 +529,10 @@ def main() -> int:
         return 0
 
     command = payload.get("tool_input", {}).get("command", "")
+    invocations = git_invocations(command)
     publishing = [
         invocation
-        for invocation in git_invocations(command)
+        for invocation in invocations
         if invocation.subcommand in ("commit", "push")
     ]
     if not publishing:
@@ -445,17 +542,21 @@ def main() -> int:
 
     cwd = payload.get("cwd") or os.getcwd()
     directory = resolve_directory(
-        next((invocation.directory for invocation in publishing if invocation.directory), None),
+        next(
+            (invocation.directory for invocation in publishing if invocation.directory),
+            None,
+        ),
         cwd,
     )
-    repo_root = git(directory, "rev-parse", "--show-toplevel")
-    if not repo_root:
+    toplevel = git(directory, "rev-parse", "--show-toplevel")
+    if not toplevel:
         return 0
+    repo_root = toplevel.strip()
     # A repo with no remote never leaves this machine, so a local path in it
     # resolves for everyone who can read it.
-    if not has_remotes(repo_root.strip()):
+    if not has_remotes(repo_root):
         return 0
-    repo = Repo(repo_root.strip(), sibling_root(directory))
+    repo = Repo(repo_root, sibling_root(directory))
 
     # Diffs only -- the paths being recorded and the lines being added. A
     # path-like token in a commit message is prose about the work, not a
@@ -467,7 +568,9 @@ def main() -> int:
     if pushing:
         sources.append(scan_diff(repo, "outgoing", [UNPUBLISHED_COMMITS]))
 
-    findings = deduplicated(sources)
+    adds = adds_before_the_commit(invocations) if committing else []
+    with index_after_adds(repo_root, cwd, adds):
+        findings = deduplicated(sources)
     if not findings:
         return 0
 
