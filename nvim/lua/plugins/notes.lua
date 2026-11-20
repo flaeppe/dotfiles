@@ -608,48 +608,6 @@ end, { desc = "Add another reference to the open reasoning-note compose buffer" 
 
 -- Writing the note ----------------------------------------------------------
 
---- Every repo named by any `ref:` line in a home file's full text (existing
---- content plus the section about to be appended).
-local function services_union(existing_text, refs)
-    local repos = {}
-    for _, ref in ipairs(refs) do
-        repos[ref.repo] = true
-    end
-    for line in (existing_text or ""):gmatch("[^\n]+") do
-        local token = line:match("^ref:%s*(.+)$")
-        local parsed = token and parse_ref(token)
-        if parsed then
-            repos[parsed.repo] = true
-        end
-    end
-    local list = {}
-    for repo in pairs(repos) do
-        table.insert(list, repo)
-    end
-    table.sort(list)
-    return list
-end
-
---- Rewrite (or insert) the `services:` line of a frontmatter block, keeping
---- every other line untouched. `body` is the file's text after the closing
---- `---`.
-local function with_services(frontmatter_lines, services)
-    local out = {}
-    local replaced = false
-    for _, line in ipairs(frontmatter_lines) do
-        if line:match("^services:") then
-            table.insert(out, "services: [" .. table.concat(services, ", ") .. "]")
-            replaced = true
-        else
-            table.insert(out, line)
-        end
-    end
-    if not replaced then
-        table.insert(out, "services: [" .. table.concat(services, ", ") .. "]")
-    end
-    return out
-end
-
 --- The frontmatter `tags:` list: `reasoning` first, then whatever is already
 --- on the file, then the author's own. A bare vocabulary term is prefixed to
 --- `trait:<term>`, because a trait written into `tags:` unprefixed collides
@@ -818,8 +776,8 @@ local function drop_candidate(bufnr, candidate_id)
 end
 
 --- Write the note: pick the home file by sorting `ref:` tokens lexically,
---- create it with frontmatter or append a section to it, rewrite its
---- `services:` union, then close the compose buffer. A candidate-backed
+--- create it with frontmatter or append a section to it, then close the
+--- compose buffer. A candidate-backed
 --- buffer (`:NoteNext`) additionally marks the candidate `kept` in
 --- `codenotes-queue` once the file is written -- or, with an empty body,
 --- takes the `drop_candidate` path instead and never gets this far. A plain
@@ -881,13 +839,11 @@ function M.write(bufnr)
 
     local out
     if vim.fn.filereadable(path) == 0 then
-        local services = services_union(nil, refs)
         out = {
             "---",
             "tags: " .. table.concat(authoring.normalise_tags(typed_tags, nil), ", "),
             "repo: " .. home.repo,
             "path: " .. home.relpath,
-            "services: [" .. table.concat(services, ", ") .. "]",
             "---",
             "",
         }
@@ -909,9 +865,8 @@ function M.write(bufnr)
         while #rest > 0 and rest[#rest] == "" do
             table.remove(rest)
         end
-        local services = services_union(table.concat(existing, "\n"), refs)
         out = { "---" }
-        vim.list_extend(out, authoring.with_tags(with_services(frontmatter, services), typed_tags))
+        vim.list_extend(out, authoring.with_tags(frontmatter, typed_tags))
         table.insert(out, "---")
         vim.list_extend(out, rest)
         table.insert(out, "")
