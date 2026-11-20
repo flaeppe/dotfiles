@@ -28,6 +28,7 @@ Home Manager symlinks these files into `~/.config/` and `~/.local/` — this rep
   - `commands/` — Slash commands
   - `hooks/` — PreToolUse/PostToolUse guards, installed as executable copies
   - `claude.nix` — Home Manager module that deploys all of the above
+- `fseventsd-restart/` — root LaunchDaemon that restarts fseventsd past 8 GiB; not a Home Manager module, installed with `sudo fseventsd-restart/install.sh`
 - `scripts/` — Activation scripts run by Home Manager
   - `pass-to-file.sh` — Helper to write secrets from `pass` to files
   - `write-sentryclirc.sh` — Writes `.sentryclirc` from `pass`
