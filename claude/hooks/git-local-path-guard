@@ -72,11 +72,10 @@ LOCKFILE_NAMES: Final = (
 # under that prefix. For files that legitimately document these paths as text.
 ALLOWLIST_FILE: Final = ".claude/local-path-allow"
 
-# An added line carrying this marker, in a test file, is a fixture naming a path
-# on purpose.
+# Marks an added line in a test file as a fixture that names a path on purpose.
 FIXTURE_MARKER: Final = "local-path-ok"
 
-# Test files by name: `test_*`, `*_test.*`, `*.test.*`, `*.spec.*`.
+# Python, Go and TypeScript test-file naming conventions.
 TEST_FILENAME: Final = re.compile(r"^test_|_test\.|\.(test|spec)\.")
 
 MAX_FINDINGS: Final = 12
@@ -277,11 +276,10 @@ class Repo:
 
 
 def parse_allow_entry(line: str) -> AllowEntry | None:
-    """The exemption a line grants, or None when the line grants nothing: blank,
-    a comment, padded with whitespace, an empty prefix or pattern (either would
-    exempt everything), or a pattern that is not a regex. Each of those is more
-    likely a typo than an intent to exempt, and a refused commit is recoverable
-    where a silent exemption is not."""
+    """The exemption a line grants, or None when it grants nothing."""
+    # Blank, comment, whitespace-padded, empty-part and non-regex entries are more
+    # likely typos than intent, and a refused commit is recoverable where a silent
+    # exemption is not. An empty prefix or pattern would exempt everything.
     if not line or line != line.strip() or line.startswith("#"):
         return None
     prefix, has_pattern, pattern = line.partition(":")
@@ -466,14 +464,8 @@ def adds_before_the_commit(invocations: Sequence[GitInvocation]) -> list[GitInvo
 def index_after_adds(
     repo_root: str, cwd: str, adds: Sequence[GitInvocation]
 ) -> Iterator[None]:
-    """For the duration, every git call reads a copy of the index with the
-    command's own `git add`s applied, because the hook runs before any of them
-    has. The repository's real index is never written.
-
-    Process-wide through GIT_INDEX_FILE: the hook is one short-lived process, and
-    every diff below must see the same index. An add that fails (an unexpanded
-    variable, a missing path) changes nothing, as it would in the real command.
-    """
+    """While active, git calls see the index as the command's `git add`s would
+    leave it. The repository's real index is never written."""
     index_path = git(repo_root, "rev-parse", "--git-path", "index")
     if not adds or not index_path:
         yield
@@ -483,6 +475,8 @@ def index_after_adds(
         index_copy = os.path.join(scratch, "index")
         with contextlib.suppress(FileNotFoundError):  # a fresh repo has no index yet
             shutil.copyfile(os.path.join(repo_root, index_path.strip()), index_copy)
+        # Process-wide so every diff reads the same index; safe because the hook
+        # is one short-lived process.
         os.environ["GIT_INDEX_FILE"] = index_copy
         try:
             for add in adds:
