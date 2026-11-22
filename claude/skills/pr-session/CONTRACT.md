@@ -112,6 +112,25 @@ assumes, what it breaks, and what it makes harder next time.
 House rules constraining how the review may be posted. Declared as data because
 executing them is the session's job, not the provider's.
 
+## The stored record
+
+A provider's return value carries none of this. Whoever stores a review as a record wraps the
+output above in an envelope; the first six fields are required.
+
+| Field | |
+|---|---|
+| `version` | `1` |
+| `pr` | `owner/repo#number` |
+| `head` | the commit the review read |
+| `at` | when the record was written, ISO 8601 with a zone |
+| `by` | `{ "kind": "agent" or "human", "name": optional }` |
+| `summary` | as above |
+| `findings` | optional here, as above; `ask` findings are the questions the author or reader still owes |
+| `order`, `verdict`, `session`, `links` | optional |
+
+A stored `order` entry names its line `line`. The `order.json` the session writes into `.review/`
+names it `lnum`; a reader of that file accepts either.
+
 ## What the session does with it
 
 Every effect happens here:
