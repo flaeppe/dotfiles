@@ -17,6 +17,9 @@
 #
 # `--dry-run` prints exactly what would post and posts nothing.
 #
+# A posted review is recorded with `me reviews-given record`: each comment's `severity`
+# ("blocking", "should-fix" or "nit") is read from post.json there, not here.
+#
 # Refuses while a marker is still tagged STALE -- see `_review_markers_reapply`. Refuses
 # while the PR's head is past the reviewed one, until `post.json` carries that head as
 # `rechecked_head`; a merged PR is posted to as COMMENT. Refuses a body that opens with
@@ -255,12 +258,19 @@ end
 set -l payload (jq -nc --arg commit_id $head --arg event $event --arg body $final_body --argjson comments $comments_json \
     '{commit_id: $commit_id, event: $event, body: $body, comments: $comments}')
 
-set -l result (printf '%s' $payload | gh api --method POST "repos/$slug/pulls/$pr/reviews" --input - --jq '.html_url' 2>&1)
+set -l result (printf '%s' $payload | gh api --method POST "repos/$slug/pulls/$pr/reviews" --input - --jq '"\(.id) \(.html_url)"' 2>&1)
 if test $status -ne 0
     echo "review post: GitHub rejected the review, nothing was posted --"
     echo (string join \n -- $result)
     return 1
 end
 
+set -l review_id (string split ' ' -- $result)[1]
+set -l review_url (string split ' ' -- $result)[2]
 echo "review post: $event posted on $slug#$pr — "(count $anchored)" inline comment(s), "(count $orphaned)" folded into the body"
-echo "  $result"
+echo "  $review_url"
+
+# Every comment of post.json is recorded, the ones folded into the body included. The review is
+# already on GitHub, so a failed record warns and does not fail the post.
+me reviews-given record --repo $slug --pr $pr --head $head --review-id $review_id --post-json $post_json
+or echo "review post: the review is posted, but recording it in state/reviews-given.jsonl failed" >&2
