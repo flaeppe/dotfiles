@@ -9,11 +9,14 @@
 # "comments": [{"path", "line", "side", "body"}, ...]}`.
 #
 # Each comment's `path`+`line` is checked against the PR's own diff, this session's base
-# to this worktree's own HEAD (never the PR's current tip, which may have moved past what
-# this session reviewed) -- the same two revisions GitHub diffs, measured locally rather
-# than by fetching the PR's files. GitHub rejects the *entire* review if one comment lands
-# outside a diff hunk, so an unanchorable comment is moved into the body under its own
-# heading instead -- never dropped, never silently skipped.
+# to the commit the review posts on -- the same two revisions GitHub diffs, measured
+# locally rather than by fetching the PR's files. That commit is this worktree's HEAD, or
+# the PR's current tip once `post.json` names it as `rechecked_head`: a repo that dismisses
+# stale approvals ignores a review whose commit is not the tip. Line numbers are the
+# reviewed commit's, so a comment on a file the new commits changed is moved into the body
+# rather than anchored to a line that may have shifted. GitHub rejects the *entire* review
+# if one comment lands outside a diff hunk, so an unanchorable comment is moved into the
+# body under its own heading instead -- never dropped, never silently skipped.
 #
 # `--dry-run` prints exactly what would post and posts nothing.
 #
@@ -29,7 +32,8 @@ if contains -- --help $argv; or contains -- -h $argv
     echo "A comment whose path:line isn't in the PR's diff moves into the body instead"
     echo "of being dropped. --dry-run prints what would post and posts nothing."
     echo "Refuses while the PR's head is past the reviewed one, until post.json"
-    echo "names that head as rechecked_head. A merged PR is posted to as COMMENT."
+    echo "names that head as rechecked_head, then posts on that head and folds comments"
+    echo "on files the new commits changed into the body. A merged PR is posted to as COMMENT."
     echo "Refuses a body that opens with Approve or Request changes under another event."
     return 0
 end
@@ -164,31 +168,44 @@ if test "$pr_state" = MERGED; and test "$event" != COMMENT
     echo "review post: $slug#$pr is merged, so this posts as COMMENT, not $event"
     set event COMMENT
 end
-if test "$current_head" != "$head"; and test "$(jq -r '.rechecked_head // empty' $post_json)" != "$current_head"
+# `post_head` is the commit the review lands on; `moved_paths` are the files the new commits
+# changed since the reviewed `head`, whose reviewed line numbers can no longer be trusted.
+set -l post_head $head
+set -l moved_paths
+if test "$current_head" != "$head"
     git -C $review_tree fetch -q origin $current_head 2>/dev/null
-    set -l moved_paths (git -C $review_tree diff --name-only $head $current_head 2>/dev/null)
-    echo "review post: $slug#$pr moved from "(string sub -l 7 -- $head)" (reviewed) to "(string sub -l 7 -- $current_head)", nothing was posted."
-    echo "Re-check each comment against: git -C $review_tree diff $head $current_head"
-    echo "Drop or reword what the new commits changed, name those comments in your reply,"
-    echo "then add \"rechecked_head\": \"$current_head\" to $post_json and run this again."
-    echo ""
-    echo "Comments on files the new commits touch:"
-    set -l touched 0
-    for comment in $all_comments
-        set -l path (printf '%s' $comment | jq -r '.path')
-        if contains -- $path $moved_paths
-            echo "  $path:"(printf '%s' $comment | jq -r '.line')"  "(printf '%s' $comment | jq -r '.body' | head -1)
-            set touched (math $touched + 1)
+    set moved_paths (git -C $review_tree diff --name-only $head $current_head 2>/dev/null)
+    if test "$(jq -r '.rechecked_head // empty' $post_json)" != "$current_head"
+        echo "review post: $slug#$pr moved from "(string sub -l 7 -- $head)" (reviewed) to "(string sub -l 7 -- $current_head)", nothing was posted."
+        echo "Re-check each comment against: git -C $review_tree diff $head $current_head"
+        echo "Drop or reword what the new commits changed, name those comments in your reply,"
+        echo "then add \"rechecked_head\": \"$current_head\" to $post_json and run this again."
+        echo "The review then posts on "(string sub -l 7 -- $current_head)"; comments on files the new commits touch move into the body."
+        echo ""
+        echo "Comments on files the new commits touch:"
+        set -l touched 0
+        for comment in $all_comments
+            set -l path (printf '%s' $comment | jq -r '.path')
+            if contains -- $path $moved_paths
+                echo "  $path:"(printf '%s' $comment | jq -r '.line')"  "(printf '%s' $comment | jq -r '.body' | head -1)
+                set touched (math $touched + 1)
+            end
         end
+        if test $touched -eq 0
+            echo "  none"
+        end
+        return 1
     end
-    if test $touched -eq 0
-        echo "  none"
+    if not git -C $review_tree cat-file -e "$current_head^{commit}" 2>/dev/null
+        echo "review post: could not fetch $current_head into $review_tree, nothing was posted"
+        return 1
     end
-    return 1
+    set post_head $current_head
 end
 
 set -l anchored
 set -l orphaned
+set -l moved_orphans
 for comment in $all_comments
     set -l path (printf '%s' $comment | jq -r '.path')
     set -l line (printf '%s' $comment | jq -r '.line')
@@ -196,8 +213,13 @@ for comment in $all_comments
 
     # Three lines of context is what GitHub's diff view carries, and a context line takes
     # a comment like a changed one -- a narrower diff would fold valid anchors into the body.
+    if contains -- $path $moved_paths
+        set -a moved_orphans "- `$path:$line` — "$body
+        continue
+    end
+
     set -l ok 0
-    for hunk in (git -C $review_tree diff --unified=3 $base $head -- $path | string match -r '^@@ .* @@')
+    for hunk in (git -C $review_tree diff --unified=3 $base $post_head -- $path | string match -r '^@@ .* @@')
         set -l m (string match -r -- '@@ -\d+,?\d* \+(\d+),?(\d*) @@' $hunk)
         test (count $m) -lt 3; and continue
         set -l new_start $m[2]
@@ -221,13 +243,16 @@ set -l body_chunks $draft_body
 if test (count $orphaned) -gt 0
     set -a body_chunks "" "" "---" "" "Not on a line this pull request's diff shows:" "" $orphaned
 end
+if test (count $moved_orphans) -gt 0
+    set -a body_chunks "" "" "---" "" "On files changed after the commit these comments were written against, so their line may have moved:" "" $moved_orphans
+end
 set -l final_body (string join \n -- $body_chunks | string collect)
 
 set -l joined_comments (string join , -- $anchored)
 set -l comments_json "[$joined_comments]"
 
 if test $dry_run -eq 1
-    echo "review post $pr --dry-run: $event on $slug#$pr at "(string sub -l 7 -- $head)
+    echo "review post $pr --dry-run: $event on $slug#$pr at "(string sub -l 7 -- $post_head)
     echo ""
     echo (count $anchored)" inline comment(s):"
     for comment in $anchored
@@ -243,6 +268,13 @@ if test $dry_run -eq 1
             echo "  $line"
         end
     end
+    if test (count $moved_orphans) -gt 0
+        echo ""
+        echo (count $moved_orphans)" comment(s) moved into the body -- their file changed after the reviewed commit:"
+        for line in $moved_orphans
+            echo "  $line"
+        end
+    end
     echo ""
     echo "--- body ---"
     echo $final_body
@@ -252,7 +284,7 @@ if test $dry_run -eq 1
     return 0
 end
 
-set -l payload (jq -nc --arg commit_id $head --arg event $event --arg body $final_body --argjson comments $comments_json \
+set -l payload (jq -nc --arg commit_id $post_head --arg event $event --arg body $final_body --argjson comments $comments_json \
     '{commit_id: $commit_id, event: $event, body: $body, comments: $comments}')
 
 set -l result (printf '%s' $payload | gh api --method POST "repos/$slug/pulls/$pr/reviews" --input - --jq '.html_url' 2>&1)
@@ -262,5 +294,5 @@ if test $status -ne 0
     return 1
 end
 
-echo "review post: $event posted on $slug#$pr — "(count $anchored)" inline comment(s), "(count $orphaned)" folded into the body"
+echo "review post: $event posted on $slug#$pr — "(count $anchored)" inline comment(s), "(math (count $orphaned) + (count $moved_orphans))" folded into the body"
 echo "  $result"
