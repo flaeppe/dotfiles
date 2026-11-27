@@ -57,8 +57,7 @@ switch "$argv[1]"
         _review_skim $argv[2..]
         return $status
     case post
-        # A local session's key is never a PR number, so `_review_post` would only fail on
-        # usage; name the reason instead.
+        # A local session has no PR to post to; say so rather than print a usage error.
         if set -q argv[2]; and string match -qr -- '^local-' $argv[2..]
             echo "review post: a local session has no PR -- nothing reaches GitHub"
             return 1
