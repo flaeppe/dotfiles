@@ -9,7 +9,8 @@
 
 set -l commands \
     "  review <pr|url> [--stack] [--no-tab]  start or resume a session: head tree for markers, stack tree for code" \
-    "  review skim [<pr|url>]                read-only browsing surface across PRs, one reusable worktree" \
+    "  review --repo <path> --base <sha> --head <sha>  local commits, no PR: head tree only, path on stdout" \
+    "  review skim [<pr|url>]              read-only browsing surface across PRs, one reusable worktree" \
     "  review refresh <pr>                   move the head tree onto the PR's new head, markers kept" \
     "  review list                           every session in this repo, live or retired" \
     "  review retire <pr> [--force]          archive findings and suggestions, remove the worktrees" \
