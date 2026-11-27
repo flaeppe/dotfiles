@@ -57,8 +57,84 @@ switch "$argv[1]"
         _review_skim $argv[2..]
         return $status
     case post
+        # A local session's key is never a PR number, so `_review_post` would only fail on
+        # usage; name the reason instead.
+        if set -q argv[2]; and string match -qr -- '^local-' $argv[2..]
+            echo "review post: a local session has no PR -- nothing reaches GitHub"
+            return 1
+        end
         _review_post $argv[2..]
         return $status
+end
+
+# A session on two local commits, no PR and no GitHub call. Only the head worktree is
+# built (no stack tree, no tab): session.json names both commits and carries the
+# `merge_base` the PR sessions' diff surfaces measure against, so the diff is base...head.
+# The session key `local-<base7>-<head7>` stands where the PR number does in the worktree
+# path, so re-running on the same commits resumes the session.
+argparse --ignore-unknown 'repo=' 'base=' 'head=' -- $argv
+or return 1
+
+if test -n "$_flag_repo$_flag_base$_flag_head"
+    if test -z "$_flag_repo" -o -z "$_flag_base" -o -z "$_flag_head"
+        echo "review: --repo, --base and --head go together; see review --help"
+        return 1
+    end
+    if set -q argv[1]; and not test "$argv" = --no-tab
+        echo "review: --repo/--base/--head take no PR and no other flag; see review --help"
+        return 1
+    end
+
+    set -l common (git -C $_flag_repo rev-parse --path-format=absolute --git-common-dir 2>/dev/null)
+    or begin
+        echo "review: $_flag_repo is not a git repository"
+        return 1
+    end
+    set -l local_root (dirname $common)
+    set -l base_sha (git -C $local_root rev-parse --verify --quiet "$_flag_base^{commit}")
+    or begin
+        echo "review: --base $_flag_base is not a commit in $local_root"
+        return 1
+    end
+    set -l head_sha (git -C $local_root rev-parse --verify --quiet "$_flag_head^{commit}")
+    or begin
+        echo "review: --head $_flag_head is not a commit in $local_root"
+        return 1
+    end
+    set -l local_merge_base (git -C $local_root merge-base $base_sha $head_sha)
+    or begin
+        echo "review: $base_sha and $head_sha share no history"
+        return 1
+    end
+
+    set -l key "local-"(string sub -l 7 -- $base_sha)"-"(string sub -l 7 -- $head_sha)
+    set -l local_repo (basename $local_root)
+    set -l local_tree "$local_root/.worktrees/review/$key/head"
+    if not test -d $local_tree
+        echo "review $key: creating review worktree"
+        git -C $local_root worktree add -q --detach $local_tree $head_sha; or return 1
+    end
+    _review_prepare_tree $local_root $local_tree review $key
+
+    jq -n \
+        --arg key $key \
+        --arg title "local $base_sha...$head_sha" \
+        --arg repo $local_repo \
+        --arg base $base_sha \
+        --arg head $head_sha \
+        --arg merge_base $local_merge_base \
+        --arg tree $local_tree \
+        --arg socket "/tmp/nvim-review-$local_repo-$key.sock" \
+        '{pr: $key, local: true, title: $title, body: "", url: "", repo: $repo, role: "review",
+          head_branch: "", base_branch: "", base: $base, head: $head,
+          pr_head: $head, pr_tip: $head, merge_base: $merge_base, stack_branch: "",
+          review_worktree: $tree, stack_worktree: "", review_socket: $socket, stack_socket: ""}' \
+        >"$local_tree/.review/session.json"
+    or return 1
+
+    echo "review $key: $base_sha...$head_sha"
+    echo $local_tree
+    return 0
 end
 
 # --stack opens a second tab on the stack worktree, in addition to the review one.
